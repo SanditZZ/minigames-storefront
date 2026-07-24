@@ -55,8 +55,10 @@ DO_BUILD=1
 # Always start from a clean slate so ports/pids never leak across runs.
 stop_stack
 
+# Backend scans upward from 8080; frontends scan upward from 3000 (kept in
+# separate ranges so the API and UI ports are easy to tell apart).
 API_PORT="$(find_free_port 8080)"
-PLAYER_PORT="$(find_free_port $((API_PORT + 1)))"
+PLAYER_PORT="$(find_free_port 3000)"
 ADMIN_PORT="$(find_free_port $((PLAYER_PORT + 1)))"
 
 API_URL="http://localhost:${API_PORT}"
