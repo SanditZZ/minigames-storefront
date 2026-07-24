@@ -1,4 +1,4 @@
-.PHONY: help backend backend-build backend-test frontend-install player admin build clean
+.PHONY: help backend backend-build backend-test frontend-install player admin build clean ship
 
 help:
 	@echo "Targets:"
@@ -30,6 +30,10 @@ admin:
 
 build: backend-build
 	cd frontend && npm run build -w apps/player && npm run build -w apps/admin
+
+# Build-gated ship: test -> build+redeploy -> commit+push to main (see CLAUDE.md).
+ship:
+	./scripts/ship.sh $(m)
 
 clean:
 	rm -rf backend/bin backend/*.db frontend/node_modules frontend/apps/*/dist
