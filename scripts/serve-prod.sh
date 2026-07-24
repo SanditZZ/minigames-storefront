@@ -23,10 +23,22 @@ ADMIN_TOKEN="${APP_ADMIN_TOKEN:-dev-admin-token}"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 
+# Recursively kill a process and all its descendants. `npx vite preview` spawns
+# a node child; killing only the npx parent orphans the child (which keeps
+# holding its port), so we must walk the whole tree.
+kill_tree() {
+  local pid="$1"
+  local child
+  for child in $(pgrep -P "$pid" 2>/dev/null); do
+    kill_tree "$child"
+  done
+  kill "$pid" 2>/dev/null || true
+}
+
 stop_stack() {
   if [[ -f "$PID_FILE" ]]; then
     while read -r pid; do
-      [[ -n "$pid" ]] && kill "$pid" 2>/dev/null || true
+      [[ -n "$pid" ]] && kill_tree "$pid"
     done <"$PID_FILE"
     rm -f "$PID_FILE"
     echo "Stopped previously running stack."
@@ -44,13 +56,27 @@ find_free_port() {
   echo "$port"
 }
 
-if [[ "${1:-}" == "--stop" ]]; then
-  stop_stack
-  exit 0
-fi
-
 DO_BUILD=1
-[[ "${1:-}" == "--no-build" ]] && DO_BUILD=0
+PUBLIC_HOST="${APP_PUBLIC_HOST:-}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --stop) stop_stack; exit 0 ;;
+    --no-build) DO_BUILD=0 ;;
+    --host) PUBLIC_HOST="${2:-}"; shift ;;
+    *) echo "unknown arg: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+# Host the BROWSER uses to reach the stack. This is baked into the frontend
+# builds (as the API URL) and allowed by CORS, so it must be an address the
+# client can reach — not "localhost", which on a remote device points at itself.
+# Default: the Tailscale IP if present (reachable across the tailnet), else
+# localhost. Override with `--host <addr>` or APP_PUBLIC_HOST=<addr>.
+if [[ -z "$PUBLIC_HOST" ]]; then
+  PUBLIC_HOST="$(tailscale ip -4 2>/dev/null | head -1 || true)"
+fi
+[[ -z "$PUBLIC_HOST" ]] && PUBLIC_HOST="localhost"
 
 # Always start from a clean slate so ports/pids never leak across runs.
 stop_stack
@@ -61,10 +87,18 @@ API_PORT="$(find_free_port 8080)"
 PLAYER_PORT="$(find_free_port 3000)"
 ADMIN_PORT="$(find_free_port $((PLAYER_PORT + 1)))"
 
-API_URL="http://localhost:${API_PORT}"
-PLAYER_URL="http://localhost:${PLAYER_PORT}"
-ADMIN_URL="http://localhost:${ADMIN_PORT}"
+# Public URLs (what the browser hits). Baked into the builds + allowed by CORS.
+API_URL="http://${PUBLIC_HOST}:${API_PORT}"
+PLAYER_URL="http://${PUBLIC_HOST}:${PLAYER_PORT}"
+ADMIN_URL="http://${PUBLIC_HOST}:${ADMIN_PORT}"
 
+# Loopback URLs used only for the local health checks below (always reachable
+# from this host regardless of how the public host routes).
+API_LOCAL="http://localhost:${API_PORT}"
+PLAYER_LOCAL="http://localhost:${PLAYER_PORT}"
+ADMIN_LOCAL="http://localhost:${ADMIN_PORT}"
+
+echo "Public host: ${PUBLIC_HOST}"
 echo "Chosen free ports → API:${API_PORT}  player:${PLAYER_PORT}  admin:${ADMIN_PORT}"
 
 if [[ "$DO_BUILD" == "1" ]]; then
@@ -78,24 +112,29 @@ if [[ "$DO_BUILD" == "1" ]]; then
 fi
 
 echo "▸ Starting API…"
+# The API already binds all interfaces (APP_ADDR=":port"). Allow both the public
+# host origins and localhost so the apps work whether reached via the Tailscale
+# IP or locally.
 APP_ADDR=":${API_PORT}" \
 APP_DB_PATH="$STATE_DIR/minigames.db" \
-APP_CORS_ORIGINS="${PLAYER_URL},${ADMIN_URL}" \
+APP_CORS_ORIGINS="${PLAYER_URL},${ADMIN_URL},${PLAYER_LOCAL},${ADMIN_LOCAL}" \
 APP_ADMIN_TOKEN="$ADMIN_TOKEN" \
   "$ROOT/backend/bin/server" >"$LOG_DIR/api.log" 2>&1 &
 echo $! >>"$PID_FILE"
 
-echo "▸ Serving player + admin (vite preview)…"
-(cd "$ROOT/frontend/apps/player" && npx vite preview --port "$PLAYER_PORT" --strictPort >"$LOG_DIR/player.log" 2>&1) &
+echo "▸ Serving player + admin (vite preview on 0.0.0.0)…"
+# --host 0.0.0.0 makes preview listen on ALL interfaces so it's reachable via
+# the Tailscale IP (default preview binds loopback only).
+(cd "$ROOT/frontend/apps/player" && npx vite preview --host 0.0.0.0 --port "$PLAYER_PORT" --strictPort >"$LOG_DIR/player.log" 2>&1) &
 echo $! >>"$PID_FILE"
-(cd "$ROOT/frontend/apps/admin" && npx vite preview --port "$ADMIN_PORT" --strictPort >"$LOG_DIR/admin.log" 2>&1) &
+(cd "$ROOT/frontend/apps/admin" && npx vite preview --host 0.0.0.0 --port "$ADMIN_PORT" --strictPort >"$LOG_DIR/admin.log" 2>&1) &
 echo $! >>"$PID_FILE"
 
-# Give the servers a moment, then verify they respond.
+# Give the servers a moment, then verify they respond (over loopback).
 sleep 3
-api_ok=$(curl -s -o /dev/null -w "%{http_code}" "${API_URL}/healthz" || echo "000")
-player_ok=$(curl -s -o /dev/null -w "%{http_code}" "$PLAYER_URL" || echo "000")
-admin_ok=$(curl -s -o /dev/null -w "%{http_code}" "$ADMIN_URL" || echo "000")
+api_ok=$(curl -s -o /dev/null -w "%{http_code}" "${API_LOCAL}/healthz" || echo "000")
+player_ok=$(curl -s -o /dev/null -w "%{http_code}" "$PLAYER_LOCAL" || echo "000")
+admin_ok=$(curl -s -o /dev/null -w "%{http_code}" "$ADMIN_LOCAL" || echo "000")
 
 echo
 echo "┌─────────────────────────────────────────────────────────────┐"
