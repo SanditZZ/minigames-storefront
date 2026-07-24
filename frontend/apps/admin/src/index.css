@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+/* Same brand palette as the player app (see frontend/CLAUDE.md). Admin leans on
+   Cream as the page background with white panels and Coral for primary actions. */
+@theme {
+  --color-brand: #ff9a86; /* Coral — primary actions, accents */
+  --color-brand-2: #ffb399; /* Melon — hover, secondary */
+  --color-brand-3: #ffd6a6; /* Apricot — subtle surfaces */
+  --color-brand-4: #fff0be; /* Cream — page background */
+  --color-ink: #4a2b20; /* Ink — text/icons */
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}

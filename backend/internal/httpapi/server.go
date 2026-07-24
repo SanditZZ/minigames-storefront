@@ -1,0 +1,92 @@
+// Package httpapi is the ACTION/transport layer: it parses HTTP requests,
+// delegates to the app service, and marshals responses. It holds no business
+// rules — every decision of consequence lives in app/game/reward.
+package httpapi
+
+import (
+	"crypto/subtle"
+	"log"
+	"net/http"
+	"strings"
+
+	"github.com/sanditzz/minigames-storefront/backend/internal/app"
+)
+
+// Server binds the app service to an HTTP router.
+type Server struct {
+	svc        *app.Service
+	cors       []string
+	adminToken string
+	handler    http.Handler
+}
+
+// NewServer builds the router with all routes and middleware wired. adminToken
+// guards the /api/v1/admin/* routes; an empty token leaves them open (dev only).
+func NewServer(svc *app.Service, corsOrigins []string, adminToken string) *Server {
+	if adminToken == "" {
+		log.Print("WARNING: admin API is unauthenticated (APP_ADMIN_TOKEN is empty)")
+	}
+	s := &Server{svc: svc, cors: corsOrigins, adminToken: adminToken}
+	s.handler = chain(s.routes(),
+		recoverMiddleware,
+		logMiddleware,
+		corsMiddleware(corsOrigins),
+	)
+	return s
+}
+
+// requireAdmin wraps an admin handler with a constant-time shared-secret check.
+// The secret may arrive as "Authorization: Bearer <token>" or "X-Admin-Token".
+// A constant-time compare avoids leaking the token via response timing.
+func (s *Server) requireAdmin(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.adminToken == "" {
+			h(w, r) // dev mode: no gate
+			return
+		}
+		presented := r.Header.Get("X-Admin-Token")
+		if presented == "" {
+			presented = strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		}
+		if subtle.ConstantTimeCompare([]byte(presented), []byte(s.adminToken)) != 1 {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		h(w, r)
+	}
+}
+
+// Handler exposes the fully-decorated handler for http.Server / tests.
+func (s *Server) Handler() http.Handler { return s.handler }
+
+func (s *Server) routes() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+
+	// --- Player-facing play flow ---
+	mux.HandleFunc("GET /api/v1/games", s.handleListGames)
+	mux.HandleFunc("GET /api/v1/games/{slug}", s.handleGetGame)
+	mux.HandleFunc("POST /api/v1/games/{slug}/sessions", s.handleStartSession)
+	mux.HandleFunc("POST /api/v1/games/{slug}/scores", s.handleSubmitScore)
+	mux.HandleFunc("GET /api/v1/games/{slug}/scores", s.handleHighScores)
+
+	// --- Admin CRUD (guarded by the shared-secret header) ---
+	mux.HandleFunc("GET /api/v1/admin/awards", s.requireAdmin(s.handleListAwards))
+	mux.HandleFunc("POST /api/v1/admin/awards", s.requireAdmin(s.handleCreateAward))
+	mux.HandleFunc("GET /api/v1/admin/awards/{id}", s.requireAdmin(s.handleGetAward))
+	mux.HandleFunc("PUT /api/v1/admin/awards/{id}", s.requireAdmin(s.handleUpdateAward))
+	mux.HandleFunc("DELETE /api/v1/admin/awards/{id}", s.requireAdmin(s.handleDeleteAward))
+
+	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAdmin(s.handleListSettings))
+	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", s.requireAdmin(s.handleUpsertSetting))
+	mux.HandleFunc("DELETE /api/v1/admin/settings/{key}", s.requireAdmin(s.handleDeleteSetting))
+
+	// The player app needs to know which games exist to render its picker; the
+	// admin app additionally needs the game list to target awards. Both are
+	// non-sensitive catalog reads already served by GET /api/v1/games.
+
+	return mux
+}

@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+/* ── Brand theme (single source of truth) ──────────────────────────────────
+   Every mini-game and screen derives its colours from these tokens. Re-theme
+   the whole player app by editing here — no per-game colours anywhere else.
+   Tailwind v4 turns each --color-* into utilities (bg-brand, text-brand, …). */
+@theme {
+  --color-brand: #ff9a86; /* Coral — primary CTAs, accents, fills */
+  --color-brand-2: #ffb399; /* Melon — secondary accents, hover, gradient mid */
+  --color-brand-3: #ffd6a6; /* Apricot — muted surfaces, gradient stop */
+  --color-brand-4: #fff0be; /* Cream — app background base, lightest surfaces */
+  --color-ink: #4a2b20; /* Ink — ALL text/icons on light surfaces */
+}
+
+/* Kiosk-friendly base: prevent text selection / tap-highlight during rapid
+   tapping, and lock the layout to the viewport. */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
