@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  benchmarkFor,
   bestScore,
   clamp01,
   countUpValue,
@@ -12,17 +13,51 @@ import {
 } from "./calc";
 import { TIERS } from "./tiers";
 
+describe("benchmarkFor", () => {
+  it("prefers the game's fixed target over the board", () => {
+    expect(benchmarkFor(60, 12)).toBe(60);
+  });
+
+  it("falls back to the board when the game declares no target", () => {
+    expect(benchmarkFor(0, 40)).toBe(40);
+    expect(benchmarkFor(undefined, 40)).toBe(40);
+    expect(benchmarkFor(null, 40)).toBe(40);
+  });
+
+  /**
+   * The bug Precision Stop exposed, at its source.
+   *
+   * Its scores can legitimately be 0 — a perfect stop — and 0 is not a scale
+   * anything can be measured against. Before this, the leader's 0 flowed
+   * straight into meterFraction's `best <= 0 → 1` guard and filled the tower
+   * for every player on that board from then on, permanently and silently.
+   * Rejecting it here is what makes that impossible rather than unlikely.
+   */
+  it("refuses a perfect board leader as a scale", () => {
+    expect(benchmarkFor(0, 0)).toBeNull();
+    expect(benchmarkFor(undefined, -3)).toBeNull();
+    // …and a game with a real target is unaffected by that leader.
+    expect(benchmarkFor(5, 0)).toBe(5);
+  });
+
+  it("ignores nonsense from either source", () => {
+    expect(benchmarkFor(Number.NaN, 40)).toBe(40);
+    expect(benchmarkFor(Number.NaN, Number.NaN)).toBeNull();
+    expect(benchmarkFor(-1, null)).toBeNull();
+  });
+});
+
 describe("meterFraction", () => {
-  it("scales against the leader for higher-is-better", () => {
+  it("scales against the benchmark for higher-is-better", () => {
     expect(meterFraction(50, 100, "higher")).toBeCloseTo(0.5);
     expect(meterFraction(100, 100, "higher")).toBe(1);
   });
 
-  it("inverts for lower-is-better, where the smaller time is the leader", () => {
-    // Best reaction is 200ms; a 400ms round is half as good.
+  it("inverts for lower-is-better, where the smaller value is the better one", () => {
+    // Benchmark reaction is 200ms; a 400ms round is half as good.
     expect(meterFraction(400, 200, "lower")).toBeCloseTo(0.5);
     expect(meterFraction(200, 200, "lower")).toBe(1);
-    // Beating the leader still can't exceed the top of the tower.
+    // Beating the benchmark still can't exceed the top of the tower.
     expect(meterFraction(100, 200, "lower")).toBe(1);
   });
 
@@ -33,17 +68,30 @@ describe("meterFraction", () => {
   });
 
   it("never returns a value outside the tower", () => {
-    for (const [value, best] of [
+    for (const [value, benchmark] of [
       [500, 100],
       [-5, 100],
       [0, 100],
     ] as const) {
-      const f = meterFraction(value, best, "higher");
+      const f = meterFraction(value, benchmark, "higher");
       expect(f).toBeGreaterThanOrEqual(0);
       expect(f).toBeLessThanOrEqual(1);
     }
-    // A nonsensical zero/negative time is not a divide-by-zero.
+    // A perfect stop is the best possible round, not a divide-by-zero.
     expect(meterFraction(0, 200, "lower")).toBe(1);
+  });
+
+  /**
+   * Precision Stop end to end through the pair: a benchmark of 5 off centre,
+   * a board whose leader already stopped perfectly. Every player must still
+   * get the tower their own round earned.
+   */
+  it("keeps scoring honestly after someone plays a perfect round", () => {
+    const benchmark = benchmarkFor(5, bestScore([{ value: 0 }, { value: 9 }]));
+    expect(meterFraction(0, benchmark, "lower")).toBe(1);
+    expect(meterFraction(5, benchmark, "lower")).toBe(1);
+    expect(meterFraction(10, benchmark, "lower")).toBeCloseTo(0.5);
+    expect(meterFraction(50, benchmark, "lower")).toBeCloseTo(0.1);
   });
 });
 

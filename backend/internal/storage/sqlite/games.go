@@ -14,7 +14,7 @@ type gameRepo struct{ db *sql.DB }
 
 func (r *gameRepo) List(ctx context.Context) ([]domain.Game, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT slug, name, description, score_unit, direction, duration_ms, enabled
+		SELECT slug, name, description, score_unit, direction, duration_ms, target_score, enabled
 		FROM games ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("list games: %w", err)
@@ -25,7 +25,7 @@ func (r *gameRepo) List(ctx context.Context) ([]domain.Game, error) {
 	for rows.Next() {
 		var g domain.Game
 		var enabled int
-		if err := rows.Scan(&g.Slug, &g.Name, &g.Description, &g.ScoreUnit, &g.Direction, &g.DurationMs, &enabled); err != nil {
+		if err := rows.Scan(&g.Slug, &g.Name, &g.Description, &g.ScoreUnit, &g.Direction, &g.DurationMs, &g.TargetScore, &enabled); err != nil {
 			return nil, fmt.Errorf("scan game: %w", err)
 		}
 		g.Enabled = enabled == 1
@@ -38,9 +38,9 @@ func (r *gameRepo) Get(ctx context.Context, slug domain.GameSlug) (domain.Game, 
 	var g domain.Game
 	var enabled int
 	err := r.db.QueryRowContext(ctx, `
-		SELECT slug, name, description, score_unit, direction, duration_ms, enabled
+		SELECT slug, name, description, score_unit, direction, duration_ms, target_score, enabled
 		FROM games WHERE slug = ?`, slug).
-		Scan(&g.Slug, &g.Name, &g.Description, &g.ScoreUnit, &g.Direction, &g.DurationMs, &enabled)
+		Scan(&g.Slug, &g.Name, &g.Description, &g.ScoreUnit, &g.Direction, &g.DurationMs, &g.TargetScore, &enabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Game{}, storage.ErrNotFound
 	}
@@ -57,12 +57,13 @@ func (r *gameRepo) Upsert(ctx context.Context, g domain.Game) error {
 		enabled = 1
 	}
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO games (slug, name, description, score_unit, direction, duration_ms, enabled)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO games (slug, name, description, score_unit, direction, duration_ms, target_score, enabled)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(slug) DO UPDATE SET
 			name=excluded.name, description=excluded.description, score_unit=excluded.score_unit,
-			direction=excluded.direction, duration_ms=excluded.duration_ms, enabled=excluded.enabled`,
-		g.Slug, g.Name, g.Description, g.ScoreUnit, g.Direction, g.DurationMs, enabled)
+			direction=excluded.direction, duration_ms=excluded.duration_ms,
+			target_score=excluded.target_score, enabled=excluded.enabled`,
+		g.Slug, g.Name, g.Description, g.ScoreUnit, g.Direction, g.DurationMs, g.TargetScore, enabled)
 	if err != nil {
 		return fmt.Errorf("upsert game: %w", err)
 	}

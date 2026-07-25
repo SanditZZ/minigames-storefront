@@ -14,6 +14,7 @@
 
 export * from "./brand";
 export * from "./claims/present";
+export * from "./games/precision";
 export * from "./games/reaction";
 export * from "./prizes/merge";
 export * from "./reveal/calc";

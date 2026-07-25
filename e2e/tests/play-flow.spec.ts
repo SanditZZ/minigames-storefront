@@ -124,11 +124,12 @@ test.describe("play flow", () => {
 });
 
 test.describe("game catalog", () => {
-  test("both games are offered and each carries its own icon", async ({ page }) => {
+  test("every game in the catalog is offered and carries its own icon", async ({ page }) => {
     await page.goto("/");
 
     await expect(ui.gameCard(page, "Tap Fast")).toBeVisible();
     await expect(ui.gameCard(page, "Reaction Timer")).toBeVisible();
+    await expect(ui.gameCard(page, "Precision Stop")).toBeVisible();
   });
 
   test("the landing screen advertises prizes before a game is chosen", async ({ page }) => {
@@ -153,5 +154,25 @@ test.describe("game catalog", () => {
     await ui.waitButton(page).dispatchEvent("pointerdown");
     await expect(page.getByText("Too soon!")).toBeVisible();
     await expect(page).toHaveURL(/\/play\/reaction-timer/);
+  });
+
+  /**
+   * Precision Stop is the first game the PLAYER ends. Tap Fast and Reaction
+   * Timer both run until a timer fires, so nothing until now exercised a round
+   * that finishes on a pointer event mid-clock — and this is also the only game
+   * whose score can legitimately be 0, the case the reveal meter was rewritten
+   * for. Both are worth one pass through a real browser.
+   */
+  test("Precision Stop ends the round on the player's own tap", async ({ page }) => {
+    await page.goto("/");
+    await ui.gameCard(page, "Precision Stop").click();
+
+    const stop = ui.stopButton(page);
+    await expect(stop).toBeVisible();
+    await stop.dispatchEvent("pointerdown");
+
+    // The round is over the instant it is stopped: no waiting out the clock.
+    await expect(ui.completeStage(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/result\/precision-stop\/[\w-]+/);
   });
 });

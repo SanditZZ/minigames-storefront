@@ -14,8 +14,12 @@ interface Props {
   value: number;
   unit: string;
   direction: Direction;
-  /** Best score on the board, used as the top of the tower. */
-  best: number | null;
+  /**
+   * The score the top of the tower represents — the game's own benchmark, or
+   * the board leader when it has none. Null means no honest scale exists;
+   * see benchmarkFor, which is what decides this.
+   */
+  benchmark: number | null;
   /** Whether this round took first place — lights the bell. */
   isRecord: boolean;
   onDone: () => void;
@@ -35,11 +39,11 @@ interface Props {
  * skipped by accident far more often than on purpose. Reduced motion still
  * jumps straight to the settled state; that is a preference, not a stray tap.
  */
-export function ScoreReveal({ value, unit, direction, best, isRecord, onDone }: Props) {
+export function ScoreReveal({ value, unit, direction, benchmark, isRecord, onDone }: Props) {
   const reducedMotion = usePrefersReducedMotion();
   const progress = useAnimationProgress(REVEAL_DURATION_MS, reducedMotion, onDone);
 
-  const target = meterFraction(value, best, direction);
+  const target = meterFraction(value, benchmark, direction);
   const height = meterHeight(target, progress);
   const shown = countUpValue(value, progress);
   const tier = tierFor(height);

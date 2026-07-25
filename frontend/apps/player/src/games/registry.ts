@@ -1,4 +1,5 @@
 import type { MiniGame } from "./types";
+import { PrecisionStop } from "./PrecisionStop";
 import { ReactionTimer } from "./ReactionTimer";
 import { TapFast } from "./TapFast";
 
@@ -7,7 +8,7 @@ import { TapFast } from "./TapFast";
 //   2. add a MiniGame entry here keyed by the same slug the backend uses.
 // Everything else (session, submit, countdown, reward reveal, leaderboard) is
 // shared, so nothing outside those two steps changes.
-const games: MiniGame[] = [TapFast, ReactionTimer];
+const games: MiniGame[] = [TapFast, ReactionTimer, PrecisionStop];
 
 const bySlug = new Map(games.map((g) => [g.slug, g]));
 

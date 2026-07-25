@@ -74,8 +74,12 @@ func defaultSettings() []domain.Setting {
 func starterAwards(now time.Time) []domain.Award {
 	// A three-tier ladder per game so the reward flow is demonstrable out of the
 	// box. Note the thresholds run in opposite directions: tap-fast is
-	// higher-is-better (more taps), reaction-timer is lower-is-better (a faster
-	// time), so its hardest prize carries the SMALLEST MinScore.
+	// higher-is-better (more taps), reaction-timer and precision-stop are
+	// lower-is-better (a faster time, a smaller miss), so their hardest prize
+	// carries the SMALLEST MinScore.
+	//
+	// The hardest prize's threshold is also each game's TargetScore, so a player
+	// who fills the reveal tower is exactly a player who won the top prize.
 	mk := func(slug domain.GameSlug, name, desc string, min, stock, order int) domain.Award {
 		return domain.Award{
 			ID:          id.New(),
@@ -98,5 +102,9 @@ func starterAwards(now time.Time) []domain.Award {
 		mk(game.SlugReactionTimer, "10% Off Coupon", "React in under 400ms for a thank-you discount.", 400, domain.Unlimited, 1),
 		mk(game.SlugReactionTimer, "Free Coffee", "React in under 300ms to earn a free coffee.", 300, 100, 2),
 		mk(game.SlugReactionTimer, "Store Tote Bag", "React in under 220ms for a limited-edition tote.", 220, 25, 3),
+
+		mk(game.SlugPrecisionStop, "10% Off Coupon", "Stop within 25 of centre for a thank-you discount.", 25, domain.Unlimited, 1),
+		mk(game.SlugPrecisionStop, "Free Coffee", "Stop within 12 of centre to earn a free coffee.", 12, 100, 2),
+		mk(game.SlugPrecisionStop, "Store Tote Bag", "Stop within 5 of centre for a limited-edition tote.", 5, 25, 3),
 	}
 }

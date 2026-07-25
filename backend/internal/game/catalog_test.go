@@ -74,16 +74,75 @@ func TestValidateReactionTimer_RejectsLongerThanTheSession(t *testing.T) {
 	}
 }
 
+func TestValidatePrecisionStop_AcceptsAPerfectStop(t *testing.T) {
+	// The point of the whole game: 0 is the goal, not an impossible value. A
+	// validator that rejected it would reject the best round anyone can play.
+	if err := validatePrecisionStop(0, 2000, DefaultLimits()); err != nil {
+		t.Fatalf("a perfect stop must be accepted, got %v", err)
+	}
+	if err := validatePrecisionStop(PrecisionTrackHalf, 2000, DefaultLimits()); err != nil {
+		t.Fatalf("stopping at the far end is the worst legal score, got %v", err)
+	}
+}
+
+func TestValidatePrecisionStop_RejectsOffTrackAndNoTime(t *testing.T) {
+	if err := validatePrecisionStop(PrecisionTrackHalf+1, 2000, DefaultLimits()); err == nil {
+		t.Fatal("a miss wider than the track should be rejected")
+	}
+	if err := validatePrecisionStop(-1, 2000, DefaultLimits()); err == nil {
+		t.Fatal("a negative distance should be rejected")
+	}
+	if err := validatePrecisionStop(10, 0, DefaultLimits()); err == nil {
+		t.Fatal("zero elapsed time should be rejected")
+	}
+}
+
 func TestRegistry_EnabledFiltersDisabled(t *testing.T) {
 	r := DefaultRegistry()
 	if len(r.Enabled()) == 0 {
 		t.Fatal("default registry should expose at least one enabled game")
 	}
-	if _, ok := r.Get(SlugTapFast); !ok {
-		t.Fatal("tap-fast should be registered")
+	for _, slug := range []domain.GameSlug{SlugTapFast, SlugReactionTimer, SlugPrecisionStop} {
+		if _, ok := r.Get(slug); !ok {
+			t.Fatalf("%s should be registered", slug)
+		}
 	}
-	if _, ok := r.Get(SlugReactionTimer); !ok {
-		t.Fatal("reaction-timer should be registered")
+}
+
+// The reveal meter and the reward ladder both key off Direction, so a game
+// declaring the wrong one silently inverts every prize threshold.
+func TestPrecisionStop_IsLowerIsBetter(t *testing.T) {
+	def, ok := DefaultRegistry().Get(SlugPrecisionStop)
+	if !ok {
+		t.Fatal("precision-stop should be registered")
+	}
+	if def.Game.Direction != domain.LowerIsBetter {
+		t.Fatalf("precision-stop must be lower-is-better, got %q", def.Game.Direction)
+	}
+	if def.Game.TargetScore != PrecisionTargetOff {
+		t.Fatalf("TargetScore %d should be the benchmark constant %d",
+			def.Game.TargetScore, PrecisionTargetOff)
+	}
+}
+
+// TestEveryGameDeclaresATargetScore is the guard that keeps the client's
+// benchmark fallback unreachable, and it is the real fix for the bug Precision
+// Stop exposed.
+//
+// The reveal meter can only scale honestly against something. Given no
+// TargetScore it falls back to the leaderboard leader, which is the board
+// scaling against itself: flattering on an empty board, and permanently broken
+// on a lower-is-better game once a leader scores 0 — the meter then reads full
+// for everyone, forever, because nothing beats perfect. Requiring a benchmark
+// here turns that from a silent maths failure into a red test the moment
+// someone adds a game without one.
+func TestEveryGameDeclaresATargetScore(t *testing.T) {
+	for _, g := range DefaultRegistry().Games() {
+		if g.TargetScore <= 0 {
+			t.Errorf("%s has TargetScore %d; every game needs a positive benchmark "+
+				"or its reveal meter scales against the leaderboard and lies",
+				g.Slug, g.TargetScore)
+		}
 	}
 }
 

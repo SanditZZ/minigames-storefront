@@ -4,7 +4,7 @@ import { api } from "../api";
 import { Leaderboard } from "../components/Leaderboard";
 import { ResultSummary } from "../components/ResultSummary";
 import { ScoreReveal } from "../components/ScoreReveal";
-import { bestScore, isNewRecord } from "@minigames/player-core";
+import { benchmarkFor, bestScore, isNewRecord } from "@minigames/player-core";
 import { takeResult } from "../state/resultCache";
 import { Spinner, Stack, StatusMessage } from "../ui";
 
@@ -67,7 +67,8 @@ export function ResultScreen({
     };
   }, [slug, scoreId]);
 
-  // The leaderboard, which doubles as the scale for the reveal meter.
+  // The leaderboard. It is also the meter's FALLBACK scale, for a game whose
+  // catalog entry declares no targetScore — see benchmarkFor.
   useEffect(() => {
     if (!slug) return;
     let alive = true;
@@ -98,8 +99,10 @@ export function ResultScreen({
     );
   }
 
-  // Wait for the leaderboard too: the meter is scaled against the house best,
-  // so revealing before it lands would draw the tower against the wrong scale.
+  // Wait for the leaderboard too. The meter usually scales against the game's
+  // own targetScore and would not need it — but the board is still the fallback
+  // for a game without one, and revealing before it lands would draw the tower
+  // against the wrong scale in exactly the case that has no other scale.
   if (!result || scores === null) return <Spinner label="Loading your score…" />;
 
   if (!revealed) {
@@ -108,7 +111,7 @@ export function ResultScreen({
         value={result.score.value}
         unit={game.scoreUnit}
         direction={game.direction}
-        best={bestScore(scores)}
+        benchmark={benchmarkFor(game.targetScore, bestScore(scores))}
         isRecord={isNewRecord(result.rank)}
         onDone={finishReveal}
       />

@@ -23,13 +23,24 @@ const (
 
 // Game is the catalog definition of a playable mini-game. It is reference data
 // describing HOW a game is scored; it holds no per-play state.
+//
+// TargetScore is the house benchmark the score reveal scales its tower against:
+// the value at which the meter reads full. It exists because the alternative —
+// scaling against the current leaderboard leader — makes the board its own
+// denominator, so an empty board tells every player they broke the record, and
+// on a lower-is-better game whose scores can legitimately reach 0 it fills the
+// tower for everyone forever once anyone plays perfectly. A fixed benchmark is
+// also what a real strength tester has: a painted scale, not one that moves
+// with the last customer. Zero means unset and the client falls back to the
+// leader; game.TestEveryGameDeclaresATargetScore keeps that fallback unreached.
 type Game struct {
 	Slug        GameSlug       `json:"slug"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
-	ScoreUnit   string         `json:"scoreUnit"`  // e.g. "taps", "ms"
-	Direction   ScoreDirection `json:"direction"`  // higher- or lower-is-better
-	DurationMs  int            `json:"durationMs"` // suggested round length
+	ScoreUnit   string         `json:"scoreUnit"`   // e.g. "taps", "ms"
+	Direction   ScoreDirection `json:"direction"`   // higher- or lower-is-better
+	DurationMs  int            `json:"durationMs"`  // suggested round length
+	TargetScore int            `json:"targetScore"` // benchmark for a full meter; 0 = unset
 	Enabled     bool           `json:"enabled"`
 }
 

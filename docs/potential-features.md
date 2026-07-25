@@ -13,33 +13,38 @@ component each:
   reaction ms. It was the first `LowerIsBetter` game, so it is what finally
   exercises the reward ladder, leaderboard ordering and reveal meter in their
   other direction end to end.
-- **Precision Stop** — stop a moving bar in the target zone; score = distance
-  from centre (`LowerIsBetter`). **The next game to build**, and not because it
-  is the most fun: it is the cheapest one that breaks something real. A distance
-  from centre can be **0**, and 0 is the *goal* rather than an impossibility —
-  which is the one thing `meterFraction`
-  (`packages/player-core/src/reveal/calc.ts:22`) is written to assume away. Both
-  of its guards exist because a reaction time of 0ms cannot happen:
-  - `value <= 0 → 1` is fine here — a perfect round filling the tower is correct.
-  - `best <= 0 → 1` is not. `bestScore` reads the leader's value straight off the
-    backend-ordered board (`calc.ts:86`), so the first player who nails a perfect
-    stop makes `best === 0` **for every later round on that board**, and the
-    meter fills for everyone forever. Not an edge case — a permanent, silent
-    break of the reveal for the game, triggered by playing it well.
+- ~~**Precision Stop**~~ — **built, together with `targetScore`, exactly as this
+  entry insisted.** A marker sweeps a track, the player stops it, and the score
+  is the distance from centre (`LowerIsBetter`), so a perfect round scores 0.
+  The prediction held: the game itself was cheap — one `game.Definition`
+  (`catalog.go`), one component (`games/PrecisionStop.tsx`), one pure geometry
+  module (`player-core/src/games/precision.ts`), and the reward side needed
+  nothing, since `minScore: 5` already means "within 5 of centre" for a
+  lower-is-better game. Everything expensive was the meter.
 
-  So this game is the forcing function for **"Per-game benchmark score"** in the
-  Result URL polish section below: a `targetScore` on `domain.Game` gives the
-  tower a fixed scale and stops the leaderboard leader being the denominator.
-  Build the two together, or build the game and watch the meter lie.
+  **The fix was not the one this entry described.** It proposed a fixed scale so
+  the leader stops being the denominator, and that shipped — but adding
+  `targetScore` alone would have left the break intact for any game that lacked
+  one. What actually closes it is a new pure `benchmarkFor`
+  (`packages/player-core/src/reveal/calc.ts`) that **refuses a non-positive
+  board leader as a scale** rather than passing it to `meterFraction`, so a
+  perfect round can never become anyone's denominator, benchmark or no
+  benchmark. `meterFraction`'s no-scale branch survives only as the
+  new-client-old-server case.
 
-  Cheap in every other respect — one `game.Definition` in
-  `backend/internal/game/catalog.go` (the existing `LowerIsBetter` entry at
-  `catalog.go:63` is the template) plus one player component. The **reward side
-  needs nothing**: "within 5px of centre" is already expressible as an award with
-  `minScore: 5`, because `reward.Eligible` (`internal/reward/reward.go:17`)
-  switches to `score <= MinScore` for `LowerIsBetter`. Worth stating explicitly,
-  because it narrows the work to exactly one place — the meter's assumption that
-  a zero score is impossible.
+  Two things worth keeping from the build:
+  - **The invariant is enforced in Go, not hoped for in TypeScript.**
+    `game.TestEveryGameDeclaresATargetScore` fails the build when a game is
+    registered without a benchmark, which is what makes the client's fallback
+    unreachable in practice instead of merely unlikely.
+  - **The benchmark is the top prize's threshold** for all three games (see
+    `app.starterAwards`), so "filled the tower" and "won the best prize" are the
+    same event to a player rather than two unrelated scales. That is a
+    convention held by a comment; nothing tests it.
+
+  It is also the first game the **player** ends — Tap Fast and Reaction Timer
+  both run until a timer fires — which is why it got its own browser test rather
+  than only unit coverage.
 - **Memory Flash** — repeat a flashed sequence; score = longest sequence.
 - **Hold Steady** — keep a dot inside a shrinking ring; score = ms survived.
 - **Quick Math** — answer as many as possible in N seconds.
@@ -192,9 +197,11 @@ component each:
   a Postgres adapter for richer querying/analytics.
 - **Caching** for the hot read paths (game catalog, leaderboards, and now the
   public prize showcase) with invalidation on write. The landing screen fetches
-  prizes once per game (`state/usePrizes.ts`), which is two identical-for-everyone
-  requests today and the obvious first thing to batch or cache as the catalog
-  grows.
+  prizes once per game (`state/usePrizes.ts`), which is **three**
+  identical-for-everyone requests since Precision Stop landed — it was two when
+  this was written, and that is the point: the cost is per game, so every new
+  game makes the landing page slower for everyone. The obvious first thing to
+  batch or cache.
 - **Observability** — structured logging, request tracing, metrics (play latency,
   error rates), health/readiness probes.
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode
@@ -210,18 +217,48 @@ rather than re-argued.
 
 ### Result URL polish
 
-- **Per-game benchmark score.** The reveal meter is scaled against the current
-  leaderboard leader, so on an empty board the player is their own benchmark and
-  every round reads "Record breaker". Adding a `targetScore` to the game catalog
-  (`domain.Game`, alongside `durationMs`) would give the tower a fixed, honest
-  scale — exactly like a real strength tester — and fall back to the leaderboard
-  only when unset.
-  **An empty board is the mild version of this.** Adding Precision Stop (see the
-  games section) turns it into a permanent break: its scores can legitimately be
-  0, and `meterFraction`'s `best <= 0 → 1` guard then fills the tower for every
-  player once anyone stops perfectly. Today's two games both have strictly
-  positive scores, which is the only reason that guard has never been wrong.
-  Ship `targetScore` with that game, not after it.
+- ~~**Per-game benchmark score.**~~ — **built**, shipped in the same change as
+  Precision Stop as this entry demanded. `domain.Game.TargetScore` sits beside
+  `DurationMs`, persisted by migration `004_game_target_score.sql`; the client
+  reads it through `benchmarkFor`, which prefers it and falls back to the
+  leaderboard only when it is unset. The empty-board "Record breaker" is gone
+  along with the permanent break.
+  **What it cost that the entry did not anticipate:** a benchmark is a *catalog*
+  value, so it is only editable by changing Go and redeploying. An admin can
+  tune the claim TTL and the anti-cheat limits from `SettingsPanel`, but not the
+  number the reveal is measured against — see the follow-up below.
+- **A game's benchmark is not admin-tunable.** `TargetScore` lives in
+  `backend/internal/game/catalog.go` and is pushed to the `games` table by
+  `Service.Seed` on every boot, which is correct — it is catalog data, and Seed
+  overwriting it is what keeps code and database in step. The consequence is
+  that tuning the number the reveal measures against needs a code change and a
+  redeploy, while the claim TTL and the anti-cheat limits next to it are
+  editable from `SettingsPanel`. Fine while there are three games and one
+  operator; the moment a venue wants "our tote bag is 40 taps, not 60" it is a
+  gap. A settings-backed override read by `Seed`, or an admin games panel, are
+  the two shapes; neither is small, so this is a decision rather than a chore.
+- **The benchmark/top-prize convention has no test.** Every game's `TargetScore`
+  equals the `MinScore` of its hardest starter award (`app.starterAwards`), so
+  filling the reveal tower and winning the best prize are the same event. That
+  is asserted by a comment in `seed.go` and by nothing else — an admin editing
+  the award, or a future game seeded carelessly, breaks it silently and the only
+  symptom is a player being told they maxed the meter while winning nothing.
+- **Precision Stop's score cannot be verified server-side, and its validator
+  says so.** `validatePrecisionStop` bounds-checks (`0 <= value <=
+  PrecisionTrackHalf`) and stops there, because the marker's starting phase is
+  drawn on the client (`PrecisionStop.tsx`, `phaseRef`), leaving the server no
+  shared secret to recompute a stop position from. Tap Fast has a
+  physiological ceiling and Reaction Timer a physiological floor; this game has
+  neither, so a fabricated `0` is indistinguishable from a perfect round. It is
+  the first game where **"server-authoritative scoring"** in the anti-abuse
+  section buys something concrete: sending the phase seed with the session and
+  the stop timestamp with the score would make it checkable.
+- **`precisionVerdict` is written, exported, and rendered nowhere.** It grades a
+  stop ("Perfect", "Dead on", "Close"…) the way `reactionVerdict` does, and like
+  `reactionVerdict` nothing on the result screen shows it. Two dead exports of
+  the same shape is a pattern now, not an oversight: the reveal's tier ladder
+  took over the job of grading a round, so either these feed it per-game copy or
+  they should go.
 - **Link previews for shared results.** Result URLs are now permanent and worth
   sharing, but the SPA serves the same empty `index.html` to every crawler, so a
   pasted link shows nothing. Needs a small server-rendered route emitting OG/
@@ -376,7 +413,13 @@ are the seams that give way as the catalog and the score table grow.
   quietly rather than failing it. A generated constants file, or reading the
   values off the page, would close it.
 - **Every E2E round is now ~3.8s longer.** Six specs play a full round, so the
-  unskippable sequence adds roughly 20s to the local gate. Acceptable today;
+  unskippable sequence adds roughly 20s to the local gate. **That count is
+  already stale and the entry is the reason to re-derive it rather than trust
+  it** — `playRound` has ten call sites across `play-flow.spec.ts` and
+  `result-url.spec.ts` today, plus the new Precision Stop test, which reaches
+  the same sequence by a different route (it ends the round on a tap instead of
+  waiting out a clock). The cost grows every time a game is added. Acceptable
+  today;
   if the suite grows, the reveal needs a test-only way to shorten the beats that
   is not the skip that was just removed — emulating `prefers-reduced-motion`
   already collapses both holds to zero (`holdMs`) and is the obvious lever.

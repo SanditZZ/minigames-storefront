@@ -22,6 +22,9 @@ var scoreAwardSQL string
 //go:embed migrations/003_claims.sql
 var claimsSQL string
 
+//go:embed migrations/004_game_target_score.sql
+var gameTargetScoreSQL string
+
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
 	db       *sql.DB
@@ -72,6 +75,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 	// CREATE ... IF NOT EXISTS throughout, like the base schema.
 	if _, err := s.db.ExecContext(ctx, claimsSQL); err != nil {
 		return fmt.Errorf("apply claims schema: %w", err)
+	}
+	if err := s.addColumnIfMissing(ctx, "games", "target_score", gameTargetScoreSQL); err != nil {
+		return err
 	}
 	return nil
 }

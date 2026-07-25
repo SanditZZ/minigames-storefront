@@ -15,6 +15,13 @@ export interface Game {
   scoreUnit: string;
   direction: ScoreDirection;
   durationMs: number;
+  /**
+   * The house benchmark the reveal meter reads full at. 0 means unset, and the
+   * client falls back to the leaderboard leader — see benchmarkFor in
+   * @minigames/player-core for why that fallback is a last resort rather than
+   * the design.
+   */
+  targetScore: number;
   enabled: boolean;
 }
 

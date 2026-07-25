@@ -17,6 +17,8 @@ export const ui = {
   confirmQuit: (page: Page) => page.getByRole("button", { name: "Confirm quitting this round" }),
   /** Reaction Timer's pre-flip state. */
   waitButton: (page: Page) => page.getByRole("button", { name: /Wait for the signal/i }),
+  /** Precision Stop's only control. */
+  stopButton: (page: Page) => page.getByRole("button", { name: /Stop the marker/i }),
 };
 
 /**
