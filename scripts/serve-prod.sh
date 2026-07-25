@@ -125,9 +125,14 @@ echo $! >>"$PID_FILE"
 echo "▸ Serving player + admin (vite preview on 0.0.0.0)…"
 # --host 0.0.0.0 makes preview listen on ALL interfaces so it's reachable via
 # the Tailscale IP (default preview binds loopback only).
-(cd "$ROOT/frontend/apps/player" && npx vite preview --host 0.0.0.0 --port "$PLAYER_PORT" --strictPort >"$LOG_DIR/player.log" 2>&1) &
+# The redirect must sit OUTSIDE the subshell, not just on the vite command. A
+# backgrounded subshell inherits this script's stdout/stderr, so if it keeps them
+# open the whole stack holds the write end of any pipe ship.sh is feeding — and
+# `./scripts/ship.sh | tee log` then hangs forever waiting for EOF, long after
+# the script itself has finished.
+(cd "$ROOT/frontend/apps/player" && npx vite preview --host 0.0.0.0 --port "$PLAYER_PORT" --strictPort) >"$LOG_DIR/player.log" 2>&1 &
 echo $! >>"$PID_FILE"
-(cd "$ROOT/frontend/apps/admin" && npx vite preview --host 0.0.0.0 --port "$ADMIN_PORT" --strictPort >"$LOG_DIR/admin.log" 2>&1) &
+(cd "$ROOT/frontend/apps/admin" && npx vite preview --host 0.0.0.0 --port "$ADMIN_PORT" --strictPort) >"$LOG_DIR/admin.log" 2>&1 &
 echo $! >>"$PID_FILE"
 
 # Give the servers a moment, then verify they respond (over loopback).
