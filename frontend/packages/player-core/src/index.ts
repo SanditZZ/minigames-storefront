@@ -16,6 +16,7 @@ export * from "./brand";
 export * from "./games/reaction";
 export * from "./prizes/merge";
 export * from "./reveal/calc";
+export * from "./reveal/pacing";
 export * from "./reveal/tiers";
 export * from "./router/parse";
 export * from "./router/routes";

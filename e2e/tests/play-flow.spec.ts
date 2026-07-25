@@ -1,19 +1,19 @@
 import { expect, test } from "@playwright/test";
-import { playRound, revealScore, shownScore, ui } from "../helpers/round";
+import { END_OF_ROUND_MS, playRound, revealScore, SETTLED_RESULT_URL, shownScore, ui } from "../helpers/round";
 
 test.describe("play flow", () => {
   test("a finished round celebrates first and withholds the score until the reveal", async ({ page }) => {
+    // The celebration beat is time-boxed and advances itself, so what is
+    // asserted DURING it has to resolve immediately. These all pass on the
+    // element that playRound already waited for; nothing here waits.
     await playRound(page, "Flow");
 
     // The whole point of this stage: the round is over, the score is not shown.
     await expect(ui.completeStage(page)).toContainText("Game complete");
-    await expect(ui.playAgain(page)).toBeHidden();
     await expect(ui.revealStage(page)).toBeHidden();
-    // Celebrating does not navigate — the player is still on the play URL.
-    await expect(page).toHaveURL(/\/play\/tap-fast/);
 
-    // Continuing moves to the result URL and flags the one-shot reveal.
-    await ui.completeStage(page).click();
+    // The sequence carries itself to the result URL, flagging the one-shot
+    // reveal on the way.
     await expect(page).toHaveURL(/\/result\/tap-fast\/[\w-]+\?.*reveal=1/);
 
     // Once the meter settles, the flag is dropped from the URL so a refresh
@@ -21,6 +21,27 @@ test.describe("play flow", () => {
     await expect(page).toHaveURL(/\/result\/tap-fast\/[\w-]+(\?name=[^&]*)?$/);
     await expect(page).not.toHaveURL(/reveal=1/);
     await expect(ui.playAgain(page)).toBeVisible();
+  });
+
+  test("a tap-storm carried past the final whistle cannot skip the ending", async ({ page }) => {
+    await playRound(page, "Masher");
+    const startedAt = Date.now();
+
+    // A player does not stop tapping the instant the round ends. These land in
+    // the middle of the screen — exactly where the two skip buttons used to be,
+    // and exactly where a Tap Fast finger already is.
+    const view = page.viewportSize();
+    for (let i = 0; i < 12; i++) {
+      await page.mouse.click((view?.width ?? 400) / 2, (view?.height ?? 700) / 2);
+      await page.waitForTimeout(60);
+    }
+
+    await expect(page).toHaveURL(SETTLED_RESULT_URL);
+
+    // The floor is what makes this a real assertion: a working skip would land
+    // here in well under a second. It sits comfortably below END_OF_ROUND_MS so
+    // timer jitter cannot fail it.
+    expect(Date.now() - startedAt).toBeGreaterThan(END_OF_ROUND_MS - 800);
   });
 
   test("the revealed score is a real number and the player is named on the board", async ({ page }) => {

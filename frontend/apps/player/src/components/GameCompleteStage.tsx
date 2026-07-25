@@ -1,3 +1,5 @@
+import { COMPLETE_BEAT_MS, holdMs } from "@minigames/player-core";
+import { useHold, usePrefersReducedMotion } from "../reveal/useAnimationProgress";
 import { Confetti, Eyebrow, HaloBox } from "../ui";
 
 /**
@@ -8,18 +10,27 @@ import { Confetti, Eyebrow, HaloBox } from "../ui";
  * deliberately absent here, because the whole point of the reveal that follows
  * is that the player doesn't already know the answer.
  *
- * It doubles as cover for the submit request. The score is uploading while this
- * is on screen, so the network round-trip costs the player nothing; if they tap
- * before it lands they simply see a brief "Scoring…" instead of a spinner they
- * had to wait through.
+ * It doubles as cover for the submit request. The score uploads while this is
+ * on screen, so the network round-trip costs the player nothing.
+ *
+ * It ends on a timer, not on a tap. It used to be a full-screen button — which
+ * put a skip target directly under the finger of someone who was, one moment
+ * earlier, hammering that exact spot several times a second. The stray tap that
+ * ended a Tap Fast round then skipped the celebration and the reveal behind it.
+ * See pacing.ts in @minigames/player-core.
+ *
+ * `pending` only changes the copy. Handing over early is the parent's decision
+ * (it waits for the score AND this beat, whichever lands second), so a slow
+ * upload lengthens the wait rather than this stage having to know about it.
  */
 export function GameCompleteStage({ pending, onContinue }: { pending: boolean; onContinue: () => void }) {
+  const reducedMotion = usePrefersReducedMotion();
+  useHold(holdMs(COMPLETE_BEAT_MS, reducedMotion), onContinue);
+
   return (
-    <button
-      type="button"
-      onClick={onContinue}
-      aria-label="Game complete. Continue to your score."
-      className="relative flex flex-1 flex-col items-center justify-center gap-6 outline-none focus-visible:ring-4 focus-visible:ring-brand/50 rounded-3xl"
+    <section
+      aria-label="Game complete. Your score is on its way."
+      className="relative flex flex-1 flex-col items-center justify-center gap-6"
     >
       <div className="relative grid place-items-center">
         <HaloBox>
@@ -36,8 +47,8 @@ export function GameCompleteStage({ pending, onContinue }: { pending: boolean; o
       </div>
 
       <p className="animate-flash text-lg font-bold text-ink/70">
-        {pending ? "Scoring…" : "Tap to reveal your score"}
+        {pending ? "Scoring…" : "Revealing your score…"}
       </p>
-    </button>
+    </section>
   );
 }

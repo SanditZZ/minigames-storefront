@@ -80,6 +80,45 @@ type Award struct {
 // Unlimited is the sentinel Stock value meaning "never runs out".
 const Unlimited = -1
 
+// Claim is the redeemable credential a winning round earns: the thing a player
+// presents at the counter and an admin marks used. It is deliberately its own
+// entity rather than columns on ScoreEntry — a score is an immutable result,
+// while a claim has a lifecycle (issued → redeemed, or issued → expired).
+//
+// AwardName is a SNAPSHOT taken when the claim was issued, not a lookup. An
+// award deleted afterwards resolves to "no prize" for display purposes, which
+// would otherwise rewrite history on a permanent result URL: a page that read
+// "You won a Coffee" would start reading "no prize this time". Copying the name
+// onto the claim keeps the win honest whatever happens to the award later.
+//
+// There is no Status field, by design. issued/redeemed/expired is a pure
+// function of (RedeemedAt, ExpiresAt, now) — storing it as well would create a
+// second source of truth that disagrees the moment a claim expires without
+// anyone writing a row. See internal/claim.StatusAt.
+type Claim struct {
+	ID         string     `json:"id"`
+	Code       string     `json:"code"`    // human-transcribed; see id.NewClaimCode
+	ScoreID    string     `json:"scoreId"` // the round that earned it
+	AwardID    string     `json:"awardId"`
+	AwardName  string     `json:"awardName"` // snapshot, see above
+	IssuedAt   time.Time  `json:"issuedAt"`
+	ExpiresAt  time.Time  `json:"expiresAt,omitempty"` // zero = never expires
+	RedeemedAt *time.Time `json:"redeemedAt,omitempty"`
+}
+
+// ClaimStatus is the derived state of a Claim at a point in time. It is never
+// persisted; internal/claim.StatusAt computes it.
+type ClaimStatus string
+
+const (
+	// ClaimIssued — outstanding and redeemable.
+	ClaimIssued ClaimStatus = "issued"
+	// ClaimRedeemed — handed over at the counter. Terminal.
+	ClaimRedeemed ClaimStatus = "redeemed"
+	// ClaimExpired — its window closed before anyone redeemed it.
+	ClaimExpired ClaimStatus = "expired"
+)
+
 // Setting is a single admin-configurable key/value knob. Typed so the admin UI
 // can render an appropriate control and the backend can parse safely.
 type Setting struct {
@@ -107,4 +146,12 @@ const (
 	SettingMinReactionMs     = "min_reaction_ms"
 	SettingHighScoreLimit    = "high_score_limit"
 	SettingAllowReplays      = "allow_replays"
+	// SettingClaimTTLHours is how long an issued prize claim stays redeemable.
+	// Admin-tunable because the right window is a venue policy, not a code
+	// decision. Zero or negative means claims never expire (see claim.TTL).
+	SettingClaimTTLHours = "claim_ttl_hours"
 )
+
+// DefaultClaimTTLHours is the fallback claim window: seven days, long enough
+// that a player who wins on a Friday can still collect the next weekend.
+const DefaultClaimTTLHours = 168

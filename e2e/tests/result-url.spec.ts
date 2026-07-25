@@ -14,8 +14,10 @@ test.describe("result URL", () => {
     await expect(ui.playAgain(page)).toBeVisible();
     expect(await shownScore(page)).toBe(score);
     expect(page.url()).toBe(url);
-    // Someone who already knows their score should not sit through it again.
-    await expect(ui.skipHint(page)).toBeHidden();
+    // Someone who already knows their score must not sit through it again —
+    // which matters more now the reveal cannot be skipped. The settled URL
+    // carries no ?reveal flag, so the reload renders the result directly.
+    await expect(ui.revealStage(page)).toBeHidden();
   });
 
   test("is genuinely addressable — a fresh browser context renders the same result", async ({ page, browser }) => {

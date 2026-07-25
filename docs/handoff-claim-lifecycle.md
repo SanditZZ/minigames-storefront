@@ -152,10 +152,22 @@ assuming 39 bits never collides.
 | `e2e/tests/*.spec.ts` | one assertion: a winning round shows a claim code |
 | `docs/potential-features.md` | strike through "Prize claim lifecycle is now one step away" AND the award-delete-rewrites-history item; add follow-ups |
 
-## 6. Todo list (already created in the previous session's tracker)
+## 6. Progress
 
-1. **Backend: claim domain, code format and pure lifecycle calculations**
-2. **Backend: storage, service wiring and HTTP endpoints**
+1. ~~**Backend: claim domain, code format and pure lifecycle calculations**~~ —
+   **done.** `domain.Claim`/`ClaimStatus`, `id.NewClaimCode` +
+   `NormalizeClaimCode` + `LooksLikeClaimCode`, and the pure
+   `internal/claim` package (`TTL`, `Issue`, `StatusAt`, `CanRedeem`, `Filter`).
+   Two things worth carrying forward:
+   - **`Filter` exists because status is derived.** An admin list therefore
+     *cannot* be filtered with `WHERE status = ?` — that would re-implement
+     `StatusAt` in SQL and reintroduce the second source of truth §4.3 avoids.
+     The store lists rows; the calculation decides what they are. `ListByStatus`
+     in the §5 plan should be `List` (plus `ListByScore`) for this reason.
+   - **The expiry boundary matches the session rule** (`now.After`), so a claim
+     inspected at the exact nanosecond of expiry is still valid. One convention
+     for "expired" across the repo.
+2. **Backend: storage, service wiring and HTTP endpoints** — next.
 3. **Backend: run the gate and ship the claim API** — then pause for review
    before touching either frontend.
 
@@ -179,15 +191,22 @@ Group C above is deliberately *not* in that list; it is the next session's work.
 - Theme/icon artifacts are generated and committed; `npm run theme:check` and
   `node scripts/icons/gen-icons.mjs --check` fail on drift.
 
-## 8. Open questions for the next session
+## 8. Questions — now answered
 
-- **Claim TTL.** Not decided. A setting (`domain.SettingClaimTTLHours`, default
-  perhaps 168 = 7 days) fits the existing settings pattern and is admin-tunable.
-  Confirm before building.
-- **Does an expired claim still show the prize name on the result URL?** The
-  argument for yes: the win happened, and hiding it makes the page look broken.
-  The argument for no: it reads as claimable when it is not. Needs a decision on
-  the copy, not just the data.
+- ~~**Claim TTL.**~~ **Decided: an admin setting, defaulting to 7 days.**
+  `domain.SettingClaimTTLHours` + `domain.DefaultClaimTTLHours = 168`, read
+  through the existing `settingInt` path. `claim.TTL(hours)` converts it and
+  treats **zero or negative as "never expires"** rather than "already expired" —
+  the setting is a plain int, so a missing or fat-fingered value lands on 0, and
+  the safe failure for a prize someone genuinely won is a claim that still works.
+- ~~**Does an expired claim still show the prize name?**~~ **Decided: yes —
+  show the win, mark the code dead.** The result screen keeps reading "You won a
+  Coffee" (from the snapshotted `AwardName`), and the code area says the claim
+  expired instead of rendering a redeemable code. This is why `award_name` is a
+  snapshot; without it the copy would have nothing honest to show.
+- **Still open:** should the native admin get the redeem screen? (Was the third
+  bullet here; unchanged. A phone at a counter is the right device for it, but
+  it is separate work with its own Maestro flow.)
 - **Should the native admin get the redeem screen?** It is the obvious first
   real screen for `mobile/admin` (a phone at the counter is exactly the right
   device for scanning/typing a code), but it is a separate piece of work with

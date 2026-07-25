@@ -19,5 +19,6 @@ export const TIERS: Tier[] = [
   { from: 0.97, label: "Record breaker", icon: "👑" },
 ];
 
-/** How long the meter takes to climb and settle, in ms. */
-export const REVEAL_DURATION_MS = 2200;
+// REVEAL_DURATION_MS used to live here. It moved to ./pacing, next to the
+// celebration beat it plays after — the two are one sequence, and the rule that
+// neither may be skipped only reads as a rule when they sit together.

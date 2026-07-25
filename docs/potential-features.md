@@ -83,12 +83,13 @@ component each:
 - **Accessibility** — larger tap targets, reduced-motion mode, screen-reader labels.
   (Reduced motion and focus rings are done.) Two concrete gaps remain, both
   found while adding the second game:
-  - **The revealed score is never announced.** `RevealMeter` is correctly
-    `aria-hidden`, but the number beside it (`ScoreReveal.tsx`) is a plain
-    `<div>` inside a button labelled "Revealing your score. Tap to skip." — so a
-    screen-reader user is told the reveal is happening and then never hears the
-    result. It needs an `aria-live="polite"` region announcing the settled value
-    once, not the count-up (which would babble every frame).
+  - ~~**The revealed score is never announced.**~~ — **built**, as a side
+    effect of making the reveal unskippable. `ScoreReveal.tsx` now marks the
+    count-up digits `aria-hidden` and announces the settled value once through a
+    `role="status"` line. Worth noting what forced it: the old announcement was
+    the *button's* label, so removing the button removed the only thing a screen
+    reader was told. The accessibility fix was not optional cleanup afterwards —
+    it was part of not regressing.
   - **Errors are not announced.** `StatusMessage` renders failures as ordinary
     text with no `role="alert"`, so a failed submit is silent.
   - Both are small, and `Spinner` in the same file (`ui/Feedback.tsx`) already
@@ -197,10 +198,26 @@ are the seams that give way as the catalog and the score table grow.
   caption) — none of which a DOM assertion would catch. Playwright's
   `toHaveScreenshot()` would, but it needs a pinned container image for stable
   font/emoji rendering; deliberately deferred rather than half-done.
-- **Reveal timing is untested end-to-end.** The maths is unit-tested and the flow
-  is E2E-tested, but "the animation lasts about 2.2s and can be skipped" is only
-  covered indirectly. A trace-based assertion could pin it if the feel starts
-  regressing.
+- ~~**Reveal timing is untested end-to-end.**~~ — **built**, and the entry was
+  half wrong by the time it was: the animation can no longer be skipped at all.
+  Both end-of-round stages were full-screen "tap to skip" buttons sitting exactly
+  where a Tap Fast player's finger already is, so the tap-storm that ended a
+  round routinely skipped the celebration *and* the reveal before the player
+  registered either. `play-flow.spec.ts` now mashes the middle of the screen
+  throughout and asserts a wall-clock floor on reaching the settled URL, which is
+  the direct timing assertion this entry asked for.
+- **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
+  `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
+  `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —
+  the e2e package sits outside the frontend workspace on purpose, so it cannot
+  import them. The floor has 800ms of slack, so drift degrades the assertion
+  quietly rather than failing it. A generated constants file, or reading the
+  values off the page, would close it.
+- **Every E2E round is now ~3.8s longer.** Six specs play a full round, so the
+  unskippable sequence adds roughly 20s to the local gate. Acceptable today;
+  if the suite grows, the reveal needs a test-only way to shorten the beats that
+  is not the skip that was just removed — emulating `prefers-reduced-motion`
+  already collapses both holds to zero (`holdMs`) and is the obvious lever.
 - **iOS has no coverage whatsoever.** The Maestro suite
   (`mobile/admin/.maestro/`) is Android-only, and nothing in this repo has ever
   run on an iOS simulator — which also means the `NSAllowsLocalNetworking`
