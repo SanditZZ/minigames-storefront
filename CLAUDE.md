@@ -22,6 +22,11 @@ scripts by name rather than re-spelling them, so the two cannot drift. A
 lookalike command that "does the same thing" is how a broken `typecheck` script
 survived unnoticed — the gate never called it.
 
+**E2E is a LOCAL gate only.** GitHub Actions runs steps 1, 2 and 4 plus a
+typecheck of the E2E specs; it does not run the browser suite, which would cost
+minutes of runner time per push. That makes step 3 above the only place the
+player flow is exercised in a browser — so never push around it.
+
 **Never push on red.** If a test fails, fix it or report and stop — do not
 comment it out, do not `--no-verify`, and do not reach for `SKIP_E2E=1` (that
 escape hatch exists only for machines where browsers cannot run at all).
