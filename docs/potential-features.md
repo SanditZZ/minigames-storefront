@@ -58,13 +58,30 @@ component each:
 - **Rate limiting** per IP/device/session on session-create and submit.
 - **Signed sessions / nonce** and device attestation for kiosk mode.
 - **Anomaly detection** — flag improbable score distributions per device.
+- **Claim codes are bearer tokens, and nothing enforces one holder.** Now that
+  the lifecycle is built, this section's heading applies to it directly: a code
+  works for whoever types it, so a screenshot forwarded to a friend is as good
+  as the original. Redemption is single-use, which caps the damage at one prize
+  per win rather than one per screenshot — that *was* the point — but it does
+  not make the code personal. Binding it to a customer identity is the fix, and
+  it is blocked on the identity section above.
 
 ## Admin & operations
 
 - **Real auth** — replace the shared secret with user accounts, roles
   (admin/staff), and audit logs of who changed which award/setting.
+  **Redeeming a claim raised the stakes here.** Handing over a prize is the
+  first admin action that is a transaction with a customer rather than a config
+  edit, and it is the one most likely to be disputed later ("I never collected
+  that"). `claims.redeemed_at` answers *when* and can never answer *who*, so
+  until this lands the audit trail for the app's most contested action is a
+  timestamp and a shared password.
 - **Analytics dashboard** — plays, win rate, prize burn-down, cost per
-  engagement, funnel from purchase → play → claim.
+  engagement, funnel from purchase → play → claim. **The last step of that
+  funnel is now measurable** — `claims` records issued vs redeemed vs expired,
+  so "how many prizes did we actually hand over?" is a query rather than a
+  guess. It was the missing piece when this entry was written; the rest of the
+  funnel still is not instrumented.
 - **Award image uploads** (currently a URL field) with storage + CDN.
 - **Config change history** and one-click rollback for settings/awards.
 - **A/B testing** thresholds and reward mixes to optimise retention.
@@ -178,6 +195,19 @@ rather than re-argued.
   UUIDv4's 122 — so guessing one is still impractical, but the margin that made
   "enumeration is impossible" a throwaway line is smaller, and a per-IP limit
   belongs here before real prizes are on the line.
+  **Claim codes changed what a score id is worth.** `ScoreResult` returns the
+  claim, and `GET /games/{slug}/scores/{id}` is unauthenticated — verified: the
+  full code comes back with no admin token. That is not a bug to patch, it is
+  the design: a player has no account, so the unguessable result URL is the only
+  way to show them their own code. But it makes the score id a **bearer
+  capability for a prize** rather than a name for a public leaderboard row, and
+  nothing in the app treats it that way yet. The consequences are all in where
+  URLs leak rather than in guessing: shared links, browser history on a borrowed
+  phone, screenshots, a `Referer` header to any third party the result page ever
+  loads. Worth deciding deliberately before prizes have value — the options are
+  rate-limiting (cheap, partial), omitting the code unless the request proves it
+  owns the round (correct, needs a token minted at submit time), or accepting it
+  explicitly and writing down that a result URL is as sensitive as the prize.
 - ~~**Prize claim lifecycle is now one step away.**~~ — **built (backend), and
   the entry's own prediction was wrong.** It said this "only needs a status
   column". It needed a table: a claim is a credential with its own lifecycle,
@@ -228,6 +258,24 @@ are the seams that give way as the catalog and the score table grow.
   hypothetical** — prizes *are* claimable, and `GET /api/v1/admin/claims`
   answers the counter's version of that question by code. The scores panel
   still cannot answer it by person or by date.
+- **Changing the claim TTL does not move existing claims.** `app.issueClaim`
+  reads `claim_ttl_hours` once and stamps the result into `claims.expires_at`
+  (`service.go:264`), so the setting only governs claims issued afterwards. That
+  is the right storage model — a claim's deadline should not move under the
+  person holding it — but `SettingsPanel` renders every setting the same generic
+  way, so an admin shortening the window sees a knob that looks retroactive and
+  is not. The fix is copy on that setting, not a change to the data.
+- **A redemption cannot be undone.** The only write is
+  `POST /api/v1/admin/claims/{code}/redeem`; there is no inverse. A code
+  redeemed by mistake — a mistyped lookup that happened to hit a real claim, a
+  customer who walked off before collecting — is terminal, and the only repair
+  is editing SQLite by hand. An un-redeem action (admin-only, and itself
+  audited) is the obvious pair to the audit-trail item below.
+- **`redeemed_at` records when, never who.** The claims table has no actor
+  column (`003_claims.sql`), and the admin API is one shared secret with no
+  identities behind it, so "who handed this prize over?" is unanswerable by
+  construction. Same root cause as the award-delete audit gap below, and the
+  same fix buys both: admin identities, then an audit log.
 - **The admin's token field has no label.** `TokenGate.tsx` renders the password
   `Input` with a placeholder and nothing else, so a screen reader announces an
   unlabelled edit box on the app's first and only gate. Found while driving the
@@ -296,7 +344,9 @@ are the seams that give way as the catalog and the score table grow.
   when no emulator is attached. It says so, but a push from a machine without
   one still reports green — the same class of hole `SKIP_E2E` opens for the
   browser suite, and worth remembering before trusting a native change that was
-  only ever compiled.
+  only ever compiled. **It skipped on every push in the session that built the
+  claim lifecycle** — four ships, zero native runs — which is the shape the
+  problem actually takes: not one forgotten check, a standing one.
 
 ### Small cleanups
 
