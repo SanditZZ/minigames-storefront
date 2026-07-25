@@ -559,8 +559,21 @@ are the seams that give way as the catalog and the score table grow.
   it** — `playRound` has ten call sites across `play-flow.spec.ts` and
   `result-url.spec.ts` today, plus the new Precision Stop test, which reaches
   the same sequence by a different route (it ends the round on a tap instead of
-  waiting out a clock). The cost grows every time a game is added. Acceptable
-  today;
+  waiting out a clock). The cost grows every time a game is added.
+  **It has now produced its first flake**, which is the reason to stop treating
+  this entry as bookkeeping: the run that shipped the post-stop hold reported
+  `play flow › a winning round hands the player a claim code` as flaky — a
+  60s per-test timeout (`playwright.config.ts:30`) blown inside `playRound`'s
+  wait loop, passing on the single configured retry. The page snapshot in
+  `test-results/…/error-context.md` shows it had in fact reached the winning
+  result with a valid code, so the assertion was never the problem; the budget
+  was. Note the test does not touch Precision Stop, and `workers: 1` rules out
+  contention inside Playwright, so this reads as the suite's own slack running
+  out rather than a specific regression — the root cause was not chased and
+  should be, from a trace, before the retry starts hiding something real.
+  `playRound` paces up to 80 dispatch-and-wait iterations at 120ms against a
+  round the *server* times at 5s, which is the obvious place to look.
+  Acceptable today;
   if the suite grows, the reveal needs a test-only way to shorten the beats that
   is not the skip that was just removed — emulating `prefers-reduced-motion`
   already collapses both holds to zero (`holdMs`) and is the obvious lever.
