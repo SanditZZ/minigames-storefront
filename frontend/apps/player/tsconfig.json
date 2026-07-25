@@ -3,7 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@minigames/api-client": ["../../packages/api-client/src"]
+      "@minigames/api-client": ["../../packages/api-client/src"],
+      "@minigames/player-core": ["../../packages/player-core/src"]
     }
   },
   "include": ["src", "vite.config.ts"]

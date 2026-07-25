@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorPulse, finishPulse, goPulse } from "../effects/haptics";
 import { CenterStack, Eyebrow } from "../ui";
-import { isFalseStart, reactionScore, waitDelayMs } from "./reaction";
+import { isFalseStart, reactionScore, waitDelayMs } from "@minigames/player-core";
 import type { MiniGame, PlayProps } from "./types";
 
 type Phase = "waiting" | "go";

@@ -4,7 +4,7 @@ import { api } from "../api";
 import { Leaderboard } from "../components/Leaderboard";
 import { ResultSummary } from "../components/ResultSummary";
 import { ScoreReveal } from "../components/ScoreReveal";
-import { bestScore, isNewRecord } from "../reveal/calc";
+import { bestScore, isNewRecord } from "@minigames/player-core";
 import { takeResult } from "../state/resultCache";
 import { Spinner, Stack, StatusMessage } from "../ui";
 

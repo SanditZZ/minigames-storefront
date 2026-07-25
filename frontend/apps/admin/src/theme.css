@@ -1,0 +1,15 @@
+/* GENERATED — do not edit.
+   Source: frontend/packages/tokens/src/  ·  Regenerate: node scripts/tokens/gen-theme.mjs
+
+   Tailwind v4 turns each --color-* into utilities (bg-brand, text-ink, …) and
+   each --animate-* into an animate-* class. The @keyframes these compose with
+   stay in the app's own index.css: their geometry is web-only, while the
+   timings below are shared with the native apps. */
+
+@theme {
+  --color-brand: #ff9a86; /* Coral — Primary actions/CTAs, key accents, progress & timer fills, active states, focus rings */
+  --color-brand-2: #ffb399; /* Melon — Secondary accents, hover states, gradient mid-stop */
+  --color-brand-3: #ffd6a6; /* Apricot — Muted surfaces, subtle backgrounds, gradient stop */
+  --color-brand-4: #fff0be; /* Cream — App background base, lightest surfaces */
+  --color-ink: #4a2b20; /* Ink — ALL text and icons on light surfaces */
+}

@@ -56,9 +56,12 @@ ship flow before considering the change done — do not skip it:
 
 - `backend/**/*_test.go` — Go unit tests. The app layer uses an in-memory
   `storage.Store` fake (`internal/app/service_test.go`), so no DB is needed.
-- `frontend/apps/*/src/**/*.test.ts` — vitest, **calculations only** (pure
+- `frontend/packages/*/src/**/*.test.ts` — vitest, **calculations only** (pure
   functions: no DOM, no components). Component and flow behaviour is covered by
-  the browser suite instead of a jsdom imitation of it.
+  the browser suite instead of a jsdom imitation of it. The suites live beside
+  the code they test, which since the shared-package split means they live in
+  `packages/` — an app that still has a `.test.ts` under `apps/` is a sign the
+  logic under it never got extracted.
 - `e2e/` — Playwright. A self-contained npm package, deliberately outside the
   frontend workspace so it never enters an app build. It starts its own API and
   player app via `webServer` and wipes its database before each run.
@@ -66,6 +69,39 @@ ship flow before considering the change done — do not skip it:
 When adding a game or a screen, add the pure logic to a calculation module and
 test it in vitest; add one E2E assertion only if it changes the player's path
 through the app.
+
+## Frontend package layout — the line native clients will be built along
+
+`frontend/` is an npm workspace. What lives in `packages/` versus `apps/` is not
+a filing preference; it is the boundary between what a React Native client can
+reuse verbatim and what has to be written a second time.
+
+```
+packages/api-client    typed HTTP client + wire types
+packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
+packages/player-core   route grammar, reveal maths, prize merge, game scoring
+packages/admin-core    route grammar, award filter/sort
+apps/player            React DOM: screens, UI kit, useRouter, the games
+apps/admin             React DOM: panels, UI kit, useRouter
+```
+
+**A package may not import React, touch `window`/`document`, or reach the
+network.** That single rule is what keeps the packages portable. Anything that
+breaks it belongs in an app, split the way `router/` already is: a pure
+`parse.ts` in the package, a thin `useRouter.ts` in the app that is the only
+thing knowing about history.
+
+Both apps re-export their package's routing through `src/router/index.ts`, so
+screens import `"../router"` and never have to know which side of the line a
+symbol falls on.
+
+**Design tokens are data, not CSS.** `packages/tokens` holds the five brand
+colours and every animation's duration/easing as TypeScript; each app's
+`src/theme.css` is generated from it and committed. Regenerate with
+`npm run theme`, verify with `npm run theme:check`. React Native has no
+stylesheet at all — styles are plain objects — so a palette locked inside a
+`.css` file could not have followed the apps onto a phone. See
+`frontend/CLAUDE.md` for the full rules.
 
 ## Identifiers — nanoid(11) for entities, UUID for credentials
 

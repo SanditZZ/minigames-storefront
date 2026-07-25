@@ -1,5 +1,5 @@
 import type { Game, SubmitResult } from "@minigames/api-client";
-import { isNewRecord } from "../reveal/calc";
+import { isNewRecord } from "@minigames/player-core";
 import { AppearIn, Badge, Button, HighlightCard, Stack, Stat } from "../ui";
 
 interface Props {

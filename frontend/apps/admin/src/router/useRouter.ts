@@ -1,10 +1,10 @@
 // ACTIONS layer: the only place the admin app touches window.history and
 // window.location. All URL reasoning is delegated to the pure functions in
-// ./parse, exactly as the player app's router does.
+// @minigames/admin-core, exactly as the player app's router does.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { clearedFilters, hasActiveFilters, hrefFor, parseLocation, sameLocation } from "./parse";
-import type { Location, Tab } from "./routes";
+import { clearedFilters, hasActiveFilters, hrefFor, parseLocation, sameLocation } from "@minigames/admin-core";
+import type { Location, Tab } from "@minigames/admin-core";
 
 function readLocation(): Location {
   return parseLocation(window.location.pathname, window.location.search);

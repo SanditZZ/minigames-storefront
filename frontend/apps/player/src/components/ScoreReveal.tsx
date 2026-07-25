@@ -1,6 +1,13 @@
 import { useState } from "react";
-import { countUpValue, meterFraction, meterHeight, tierFor, type Direction } from "../reveal/calc";
-import { REVEAL_DURATION_MS, TIERS } from "../reveal/tiers";
+import {
+  countUpValue,
+  meterFraction,
+  meterHeight,
+  tierFor,
+  REVEAL_DURATION_MS,
+  TIERS,
+  type Direction,
+} from "@minigames/player-core";
 import { useAnimationProgress, usePrefersReducedMotion } from "../reveal/useAnimationProgress";
 import { Confetti, Eyebrow, RevealMeter } from "../ui";
 
@@ -19,9 +26,9 @@ interface Props {
  * The punching-machine score reveal: the puck slams up the tower, overshoots,
  * settles on the player's mark, and only then is the number legible.
  *
- * All timing/easing/tier maths lives in reveal/calc.ts; this component just
- * feeds it progress and paints the result. Tapping skips to the end — a reveal
- * you can't cut short is an annoyance on the second play, not a delight.
+ * All timing/easing/tier maths lives in @minigames/player-core; this component
+ * just feeds it progress and paints the result. Tapping skips to the end — a
+ * reveal you can't cut short is an annoyance on the second play, not a delight.
  */
 export function ScoreReveal({ value, unit, direction, best, isRecord, onDone }: Props) {
   const reducedMotion = usePrefersReducedMotion();

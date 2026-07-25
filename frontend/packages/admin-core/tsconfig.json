@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@minigames/api-client": ["../api-client/src"]
+    }
+  },
+  "include": ["src"]
+}

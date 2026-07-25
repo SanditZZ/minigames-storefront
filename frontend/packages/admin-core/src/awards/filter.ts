@@ -3,7 +3,7 @@
 
 import type { Award } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
-import type { SortOrder, StatusFilter, StockFilter } from "../router";
+import type { SortOrder, StatusFilter, StockFilter } from "../router/routes";
 
 export interface AwardQuery {
   /** "" means every game. */

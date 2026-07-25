@@ -1,10 +1,10 @@
 // ACTIONS layer: fetching the prize showcase. All the shaping is delegated to
-// the pure functions in ../prizes/merge.
+// the pure functions in @minigames/player-core.
 
 import { useEffect, useState } from "react";
 import type { Game } from "@minigames/api-client";
 import { api } from "../api";
-import { mergePrizes, orderPrizes, type ShowcasePrize } from "../prizes/merge";
+import { mergePrizes, orderPrizes, type ShowcasePrize } from "@minigames/player-core";
 
 /**
  * Loads the prizes on offer across every game, for the landing screen.

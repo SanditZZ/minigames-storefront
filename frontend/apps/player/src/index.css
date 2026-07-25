@@ -1,29 +1,16 @@
 @import "tailwindcss";
 
-/* ── Brand theme (single source of truth) ──────────────────────────────────
-   Every mini-game and screen derives its colours from these tokens. Re-theme
-   the whole player app by editing here — no per-game colours anywhere else.
-   Tailwind v4 turns each --color-* into utilities (bg-brand, text-brand, …). */
-@theme {
-  --color-brand: #ff9a86; /* Coral — primary CTAs, accents, fills */
-  --color-brand-2: #ffb399; /* Melon — secondary accents, hover, gradient mid */
-  --color-brand-3: #ffd6a6; /* Apricot — muted surfaces, gradient stop */
-  --color-brand-4: #fff0be; /* Cream — app background base, lightest surfaces */
-  --color-ink: #4a2b20; /* Ink — ALL text/icons on light surfaces */
+/* ── Brand theme + motion timings ──────────────────────────────────────────
+   GENERATED from frontend/packages/tokens — the colours and the --animate-*
+   declarations both live there as TypeScript, so the native apps read the same
+   values instead of re-typing them. Re-theme by editing the tokens package and
+   running `npm run theme`; never edit theme.css by hand.
 
-  /* ── Motion kit ──────────────────────────────────────────────────────────
-     Named animations the celebration/reveal components compose. Declared here
-     (not inline) so timing and feel stay consistent across every game, exactly
-     like the colour tokens above. Tailwind v4 exposes each as `animate-*`. */
-  --animate-pop-in: pop-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  --animate-rise-in: rise-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
-  --animate-halo: halo 1.8s ease-out infinite;
-  --animate-bob: bob 2.4s ease-in-out infinite;
-  --animate-confetti: confetti 1.6s cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
-  --animate-flash: flash 700ms ease-in-out infinite;
-  --animate-float-up: float-up 650ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  --animate-urgent: urgent 400ms ease-in-out infinite;
-}
+   What stays HERE is everything below: the @keyframes those timings compose
+   with. Their geometry is CSS-only — React Native describes the same motion as
+   a Reanimated worklet — so there is nothing to share and no reason to
+   generate them. */
+@import "./theme.css";
 
 @keyframes pop-in {
   0% {

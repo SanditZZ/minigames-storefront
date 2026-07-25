@@ -1,14 +1,12 @@
 @import "tailwindcss";
 
-/* Same brand palette as the player app (see frontend/CLAUDE.md). Admin leans on
-   Cream as the page background with white panels and Coral for primary actions. */
-@theme {
-  --color-brand: #ff9a86; /* Coral — primary actions, accents */
-  --color-brand-2: #ffb399; /* Melon — hover, secondary */
-  --color-brand-3: #ffd6a6; /* Apricot — subtle surfaces */
-  --color-brand-4: #fff0be; /* Cream — page background */
-  --color-ink: #4a2b20; /* Ink — text/icons */
-}
+/* The same brand palette the player app uses, GENERATED from the shared
+   frontend/packages/tokens (see frontend/CLAUDE.md). Admin leans on Cream as
+   the page background with white panels and Coral for primary actions.
+
+   No --animate-* here: this app has no keyframes, so the generator omits the
+   motion kit rather than offering utilities that would resolve to nothing. */
+@import "./theme.css";
 
 html,
 body,

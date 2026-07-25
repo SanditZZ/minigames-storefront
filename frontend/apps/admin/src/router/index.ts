@@ -1,3 +1,7 @@
+// The web admin's routing surface: the shared URL grammar plus the one hook
+// that touches the browser. Same split as the player app — see
+// @minigames/admin-core for why the grammar is a package rather than a folder.
+
 export {
   clearedFilters,
   hasActiveFilters,
@@ -16,8 +20,6 @@ export {
   resolveGameSlug,
   sameLocation,
   usesGameFilter,
-} from "./parse";
-export {
   DEFAULT_LOCATION,
   DEFAULT_TAB,
   GAME_PARAM,
@@ -36,5 +38,5 @@ export {
   type StatusFilter,
   type StockFilter,
   type Tab,
-} from "./routes";
+} from "@minigames/admin-core";
 export { useRouter, type AdminRouter, type FilterPatch } from "./useRouter";

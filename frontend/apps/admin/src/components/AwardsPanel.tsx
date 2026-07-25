@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ApiClient, Award, AwardInput, Game } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
-import { visibleAwards } from "../awards/filter";
+import { visibleAwards } from "@minigames/admin-core";
 import { NEW_AWARD, type AdminRouter } from "../router";
 import { AwardFilters } from "./AwardFilters";
 import { AwardForm } from "./AwardForm";

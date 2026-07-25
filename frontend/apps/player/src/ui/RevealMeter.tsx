@@ -1,4 +1,4 @@
-import type { Tier } from "../reveal/tiers";
+import type { Tier } from "@minigames/player-core";
 
 interface Props {
   /** Current puck height, 0–100 (% of the tower). */
@@ -15,7 +15,7 @@ interface Props {
  * The arcade strength-tester tower used to reveal a score.
  *
  * Presentational only: it renders whatever height it is given, so the timing,
- * easing and overshoot all stay in reveal/calc.ts where they can be tested.
+ * easing and overshoot all stay in @minigames/player-core where they are tested.
  * The whole thing is aria-hidden — the score is announced as text by the screen
  * that owns it, so a screen-reader user hears the number instead of a meter.
  */

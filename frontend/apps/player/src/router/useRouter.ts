@@ -1,9 +1,9 @@
 // ACTIONS layer: the only place that touches window.history and window.location.
-// All URL reasoning is delegated to the pure functions in ./parse.
+// All URL reasoning is delegated to the pure functions in @minigames/player-core.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { hrefFor, parseLocation, sameLocation } from "./parse";
-import type { Location, Route } from "./routes";
+import { hrefFor, parseLocation, sameLocation } from "@minigames/player-core";
+import type { Location, Route } from "@minigames/player-core";
 
 /** Reads the browser's current URL as a Location. */
 function readLocation(): Location {

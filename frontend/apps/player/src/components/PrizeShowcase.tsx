@@ -1,4 +1,4 @@
-import type { ShowcasePrize } from "../prizes/merge";
+import type { ShowcasePrize } from "@minigames/player-core";
 import { Panel } from "../ui";
 
 /**

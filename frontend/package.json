@@ -10,8 +10,10 @@
     "dev:player": "npm run dev -w apps/player",
     "dev:admin": "npm run dev -w apps/admin",
     "build": "npm run build -w apps/player && npm run build -w apps/admin",
-    "typecheck": "tsc -b apps/player apps/admin",
-    "test": "vitest run"
+    "typecheck": "tsc -b packages/tokens packages/player-core packages/admin-core apps/player apps/admin",
+    "test": "vitest run",
+    "theme": "node --experimental-strip-types --no-warnings ../scripts/tokens/gen-theme.mjs",
+    "theme:check": "node --experimental-strip-types --no-warnings ../scripts/tokens/gen-theme.mjs --check"
   },
   "devDependencies": {
     "vitest": "^4.1.10"

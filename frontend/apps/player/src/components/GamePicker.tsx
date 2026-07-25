@@ -1,8 +1,6 @@
 import type { Game } from "@minigames/api-client";
-import { BRAND_NAME, BRAND_TAGLINE } from "../brand";
+import { BRAND_NAME, BRAND_TAGLINE, MAX_NAME_LENGTH, type ShowcasePrize } from "@minigames/player-core";
 import { gameIcon, getMiniGame } from "../games/registry";
-import type { ShowcasePrize } from "../prizes/merge";
-import { MAX_NAME_LENGTH } from "../router";
 import { PageHeader, SelectCard, Stack, TextField } from "../ui";
 import { PrizeShowcase } from "./PrizeShowcase";
 

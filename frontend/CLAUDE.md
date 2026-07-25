@@ -14,8 +14,47 @@ Tailwind stock palette colors (indigo/slate/etc.) for anything brand-related.
 | `brand-4`        | `#FFF0BE` | Cream  | App background base, lightest surfaces |
 | `ink`            | `#4A2B20` | Ink    | ALL text and icons on light surfaces |
 
-Defined once in each app's `src/index.css` via Tailwind v4 `@theme`. Re-theme by
-editing those five vars only.
+Defined once in **`packages/tokens/src/palette.ts`**. Re-theme by editing those
+five values only, then `npm run theme`.
+
+## Tokens are data — don't hand-edit theme.css
+
+`apps/*/src/theme.css` is GENERATED from `packages/tokens` and committed. It
+carries the `@theme` block: the five `--color-*` tokens, plus the eight
+`--animate-*` timings for the player.
+
+```bash
+npm run theme         # regenerate both apps' theme.css
+npm run theme:check   # fail if the committed CSS drifted from the tokens
+```
+
+React Native has no stylesheet — styles are plain JS objects — so a palette that
+only exists as CSS cannot follow these apps onto a phone. Holding the values in
+TypeScript and generating the CSS keeps "edit one place" true across web and
+native both. `PALETTE` carries each colour's role string alongside its value, so
+the rule in the table above travels with the number instead of living only here.
+
+### What is and isn't shared
+
+- **Shared:** colour values, animation durations and easings. "The pop-in lasts
+  420ms on a back-eased curve" is the same design decision on any platform.
+- **Not shared:** `@keyframes`. Their geometry is CSS-only — React Native
+  expresses the same motion as a Reanimated worklet — so they stay hand-written
+  in each app's `index.css` and the generator never touches them.
+- `REVEAL_DURATION_MS` lives in `player-core`, not here: it is a gameplay beat
+  the score maths is written against and the player can skip, not decoration.
+
+Only the player gets `--animate-*`. Admin has no keyframes, so emitting the
+utilities there would offer classes that resolve to nothing.
+
+## Package boundary (MANDATORY)
+
+`packages/` is the code a native client reuses verbatim; `apps/` is what gets
+written twice. **No package may import React, touch `window`/`document`, or
+reach the network.** When something needs one of those, split it the way
+`router/` already is — pure `parse.ts` in the package, thin `useRouter.ts` in the
+app — rather than pulling the browser into a package. The full layout is in the
+repo-root `CLAUDE.md`.
 
 ### Usage rules
 
