@@ -228,6 +228,12 @@ are the seams that give way as the catalog and the score table grow.
   hypothetical** — prizes *are* claimable, and `GET /api/v1/admin/claims`
   answers the counter's version of that question by code. The scores panel
   still cannot answer it by person or by date.
+- **The admin's token field has no label.** `TokenGate.tsx` renders the password
+  `Input` with a placeholder and nothing else, so a screen reader announces an
+  unlabelled edit box on the app's first and only gate. Found while driving the
+  panel with Playwright — `getByLabel` could not see it, which is exactly what a
+  screen reader experiences. One `aria-label` fixes it; the same check is worth
+  running over the other admin `Input`s, which mostly sit inside `Field`.
 - **The admin claims panel has no browser coverage.** `e2e/` starts the API and
   the PLAYER app only, so nothing exercises `ClaimsPanel.tsx` in a browser — the
   redeem box, the status filter and the row buttons are covered by unit tests on

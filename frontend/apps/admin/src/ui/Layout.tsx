@@ -105,7 +105,16 @@ export function ClaimRow({
         <div className="mt-0.5 truncate text-ink/60">{claim.awardName}</div>
       </div>
       {status === "issued" && (
-        <Button onClick={onRedeem} disabled={busy} className="shrink-0 whitespace-nowrap">
+        // The visible label is "Redeem" on every row, which is right on screen
+        // (the code is right there) and useless to a screen reader, which reads
+        // controls out of context — a panel of identical "Redeem" buttons plus
+        // the lookup box's own. The accessible name carries the code instead.
+        <Button
+          onClick={onRedeem}
+          disabled={busy}
+          aria-label={`Redeem claim ${claim.code}`}
+          className="shrink-0 whitespace-nowrap"
+        >
           Redeem
         </Button>
       )}
