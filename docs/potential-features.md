@@ -14,7 +14,32 @@ component each:
   exercises the reward ladder, leaderboard ordering and reveal meter in their
   other direction end to end.
 - **Precision Stop** — stop a moving bar in the target zone; score = distance
-  from centre (`LowerIsBetter`).
+  from centre (`LowerIsBetter`). **The next game to build**, and not because it
+  is the most fun: it is the cheapest one that breaks something real. A distance
+  from centre can be **0**, and 0 is the *goal* rather than an impossibility —
+  which is the one thing `meterFraction`
+  (`packages/player-core/src/reveal/calc.ts:22`) is written to assume away. Both
+  of its guards exist because a reaction time of 0ms cannot happen:
+  - `value <= 0 → 1` is fine here — a perfect round filling the tower is correct.
+  - `best <= 0 → 1` is not. `bestScore` reads the leader's value straight off the
+    backend-ordered board (`calc.ts:86`), so the first player who nails a perfect
+    stop makes `best === 0` **for every later round on that board**, and the
+    meter fills for everyone forever. Not an edge case — a permanent, silent
+    break of the reveal for the game, triggered by playing it well.
+
+  So this game is the forcing function for **"Per-game benchmark score"** in the
+  Result URL polish section below: a `targetScore` on `domain.Game` gives the
+  tower a fixed scale and stops the leaderboard leader being the denominator.
+  Build the two together, or build the game and watch the meter lie.
+
+  Cheap in every other respect — one `game.Definition` in
+  `backend/internal/game/catalog.go` (the existing `LowerIsBetter` entry at
+  `catalog.go:63` is the template) plus one player component. The **reward side
+  needs nothing**: "within 5px of centre" is already expressible as an award with
+  `minScore: 5`, because `reward.Eligible` (`internal/reward/reward.go:17`)
+  switches to `score <= MinScore` for `LowerIsBetter`. Worth stating explicitly,
+  because it narrows the work to exactly one place — the meter's assumption that
+  a zero score is impossible.
 - **Memory Flash** — repeat a flashed sequence; score = longest sequence.
 - **Hold Steady** — keep a dot inside a shrinking ring; score = ms survived.
 - **Quick Math** — answer as many as possible in N seconds.
@@ -191,6 +216,12 @@ rather than re-argued.
   (`domain.Game`, alongside `durationMs`) would give the tower a fixed, honest
   scale — exactly like a real strength tester — and fall back to the leaderboard
   only when unset.
+  **An empty board is the mild version of this.** Adding Precision Stop (see the
+  games section) turns it into a permanent break: its scores can legitimately be
+  0, and `meterFraction`'s `best <= 0 → 1` guard then fills the tower for every
+  player once anyone stops perfectly. Today's two games both have strictly
+  positive scores, which is the only reason that guard has never been wrong.
+  Ship `targetScore` with that game, not after it.
 - **Link previews for shared results.** Result URLs are now permanent and worth
   sharing, but the SPA serves the same empty `index.html` to every crawler, so a
   pasted link shows nothing. Needs a small server-rendered route emitting OG/
