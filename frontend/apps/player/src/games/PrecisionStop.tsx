@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BULLSEYE_OFF,
   NEAR_OFF,
+  STOP_HOLD_MS,
   WORST_SCORE,
   missDistance,
+  precisionVerdict,
   sweepPosition,
   trackPercent,
   zoneWidthPercent,
@@ -11,6 +13,14 @@ import {
 import { finishPulse } from "../effects/haptics";
 import { CenterStack, Eyebrow, ProgressBar } from "../ui";
 import type { MiniGame, PlayProps } from "./types";
+
+/** Where the marker came to rest, and how it got there. */
+interface Landing {
+  position: number;
+  off: number;
+  /** True when the clock ran out rather than the player stopping it. */
+  timedOut: boolean;
+}
 
 /**
  * Precision Stop: a marker sweeps the track; stop it as close to centre as you
@@ -29,27 +39,41 @@ import type { MiniGame, PlayProps } from "./types";
  * the game's benchmark. A player can see what they are aiming at rather than
  * discovering the numbers on the result screen.
  *
+ * A stop does not hand off immediately — the marker freezes and the track holds
+ * for STOP_HOLD_MS so the player can see where they landed. See that constant
+ * for why the beat exists and why it does not honour reduced motion the way the
+ * celebration beats do.
+ *
  * All the geometry lives in ../../packages/player-core/src/games/precision.ts
  * as pure functions; this component only runs the clock and paints.
  */
 function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
   const [position, setPosition] = useState(0);
   const [remaining, setRemaining] = useState(durationMs);
-  const finishedRef = useRef(false);
+  const [landing, setLanding] = useState<Landing | null>(null);
+  const landedRef = useRef(false);
   const positionRef = useRef(0);
   // Drawn once per round: a fixed opening would be learnable, and a player who
   // can count their way to the centre is not playing this game any more.
   const phaseRef = useRef(Math.random());
 
-  const finish = useCallback(
-    (off: number) => {
-      if (finishedRef.current) return;
-      finishedRef.current = true;
-      finishPulse();
-      onFinish(off);
-    },
-    [onFinish],
-  );
+  // Ends the round: freezes the marker and shows where it stopped. The score is
+  // NOT reported here — the hold below does that once the player has seen it.
+  const land = useCallback((next: Landing) => {
+    if (landedRef.current) return;
+    landedRef.current = true;
+    finishPulse();
+    setLanding(next);
+  }, []);
+
+  // The hold, and the only place onFinish is called. Its cleanup matters: a
+  // player who quits mid-hold unmounts this, and the round must not go on to
+  // submit a score behind the screen they just left.
+  useEffect(() => {
+    if (!landing) return;
+    const id = window.setTimeout(() => onFinish(landing.off), STOP_HOLD_MS);
+    return () => window.clearTimeout(id);
+  }, [landing, onFinish]);
 
   // One rAF loop drives both the marker and the clock. rAF rather than an
   // interval because the marker's position IS the game — a stutter here is a
@@ -59,7 +83,9 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
     let raf = 0;
 
     const frame = () => {
-      if (finishedRef.current) return;
+      // Landing stops the loop, which is what freezes the marker where the
+      // player stopped it for the duration of the hold.
+      if (landedRef.current) return;
       const elapsed = performance.now() - startedAt;
 
       const pos = sweepPosition(elapsed, phaseRef.current);
@@ -69,8 +95,11 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
 
       // Never stopping is a legitimate outcome, and it scores the worst legal
       // value rather than stranding the player on a screen with no way out.
+      // The marker still freezes where it was, but the readout says "out of
+      // time" rather than a distance — the marker's position is not what was
+      // scored, and showing a verdict for it would be a lie.
       if (elapsed >= durationMs) {
-        finish(WORST_SCORE);
+        land({ position: pos, off: WORST_SCORE, timedOut: true });
         return;
       }
       raf = requestAnimationFrame(frame);
@@ -78,20 +107,31 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [durationMs, finish]);
+  }, [durationMs, land]);
 
   // Read the position from the ref, not from state: state is a frame behind by
   // the time a pointer event is handled, and on this game that lag is the score.
-  const handleStop = useCallback(() => finish(missDistance(positionRef.current)), [finish]);
+  const handleStop = useCallback(() => {
+    const pos = positionRef.current;
+    land({ position: pos, off: missDistance(pos), timedOut: false });
+  }, [land]);
 
-  const markerPct = trackPercent(position);
+  const markerPct = trackPercent(landing ? landing.position : position);
   const seconds = (remaining / 1000).toFixed(1);
+  const stopped = landing !== null && !landing.timedOut;
 
   return (
     <CenterStack>
+      {/* Both lines keep a reserved height: they swap copy the instant the
+          marker lands, and a taller or shorter line would jolt the track
+          underneath at exactly the moment the player is reading it. */}
       <div className="text-center">
-        <Eyebrow>Stop it dead centre</Eyebrow>
-        <p className="mt-1 text-sm text-ink/60">The closer you land, the lower your score</p>
+        <Eyebrow>
+          {landing ? (landing.timedOut ? "Out of time" : precisionVerdict(landing.off)) : "Stop it dead centre"}
+        </Eyebrow>
+        <p className="mt-1 flex h-6 items-center justify-center text-sm text-ink/60">
+          {stopped ? `${landing.off} off centre` : "The closer you land, the lower your score"}
+        </p>
       </div>
 
       {/* The track is a picture of the numbers below it; a screen reader is
@@ -112,19 +152,34 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
         {/* The exact centre — the thing actually being aimed at. */}
         <div className="absolute inset-y-2 left-1/2 w-px -translate-x-1/2 bg-ink/40" />
 
+        {/* The landing flare: a band that pops open around the frozen marker so
+            the eye is pulled to where it stopped. Decoration only — the global
+            reduce-motion rule in index.css neutralises the animation, leaving
+            the band and the marker exactly where they are. */}
+        {landing && (
+          <div
+            className="animate-pop-in absolute inset-y-0 w-9 -translate-x-1/2 rounded-full bg-brand-2/60"
+            style={{ left: `${markerPct}%` }}
+          />
+        )}
+
         {/* No CSS transition on the marker: it is positioned every frame, and
             an easing curve would draw it somewhere it has not been. */}
         <div
-          className="absolute inset-y-1 w-1.5 -translate-x-1/2 rounded-full bg-ink"
+          className={`absolute inset-y-1 -translate-x-1/2 rounded-full bg-ink ${landing ? "w-2" : "w-1.5"}`}
           style={{ left: `${markerPct}%` }}
         />
       </div>
 
+      {/* Disabled once landed rather than unmounted: the round is over but the
+          hold is still running, and removing the control the player just
+          pressed would collapse the layout under the thing they are reading. */}
       <button
         type="button"
         onPointerDown={handleStop}
+        disabled={landing !== null}
         aria-label="Stop the marker as close to the centre of the track as you can"
-        className="aspect-square w-44 max-w-[58vw] select-none rounded-full bg-brand text-3xl font-black text-ink shadow-2xl outline-none ring-4 ring-white/50 transition-transform duration-75 focus-visible:ring-brand/50 active:scale-90"
+        className="aspect-square w-44 max-w-[58vw] select-none rounded-full bg-brand text-3xl font-black text-ink shadow-2xl outline-none ring-4 ring-white/50 transition-transform duration-75 focus-visible:ring-brand/50 active:scale-90 disabled:bg-brand-3 disabled:text-ink/50 disabled:shadow-none disabled:active:scale-100"
       >
         STOP!
       </button>

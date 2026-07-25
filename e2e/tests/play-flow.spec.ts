@@ -171,6 +171,12 @@ test.describe("game catalog", () => {
     await expect(stop).toBeVisible();
     await stop.dispatchEvent("pointerdown");
 
+    // The stop holds the track before handing off, so the player can see where
+    // they landed — the one thing the score reveal can never show them, since
+    // it reports a distance and not a place.
+    await expect(page.getByText(/off centre/)).toBeVisible();
+    await expect(stop).toBeDisabled();
+
     // The round is over the instant it is stopped: no waiting out the clock.
     await expect(ui.completeStage(page)).toBeVisible();
     await expect(page).toHaveURL(/\/result\/precision-stop\/[\w-]+/);

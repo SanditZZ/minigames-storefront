@@ -34,6 +34,28 @@ export const NEAR_OFF = 25;
 export const SWEEP_PERIOD_MS = 1400;
 
 /**
+ * How long the track holds after a stop, before the round hands off.
+ *
+ * Without it the screen changes on the same pointer event that ends the round,
+ * so the one thing the player was aiming at — where the marker actually
+ * stopped — is never shown. The score reveal that follows says how far off they
+ * were as a number; only the track can say it as a *place*, and it is gone by
+ * then.
+ *
+ * Deliberately NOT routed through pacing.holdMs, which collapses every beat to
+ * zero under reduced motion. That rule is right for the celebration and the
+ * reveal, which are motion; this beat is a readout that happens to be
+ * animated. The ring drawn on it is decoration and the global reduce-motion
+ * rule in index.css already neutralises that, leaving the frozen marker and the
+ * verdict — which is exactly what a player who asked for less movement should
+ * still get.
+ *
+ * Short on purpose: the celebration is 1600ms away and the reveal 2200ms behind
+ * that, so this is paying into an ending that is already long.
+ */
+export const STOP_HOLD_MS = 700;
+
+/**
  * Where the marker is at `elapsedMs`, as a position in 0…TRACK_WIDTH.
  *
  * A triangle wave: the marker runs to one end, turns, and comes back at the

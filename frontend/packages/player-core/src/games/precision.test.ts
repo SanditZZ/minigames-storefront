@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { COMPLETE_BEAT_MS } from "../reveal/pacing";
 import {
   BULLSEYE_OFF,
+  STOP_HOLD_MS,
   SWEEP_PERIOD_MS,
   TRACK_HALF,
   TRACK_WIDTH,
@@ -93,6 +95,18 @@ describe("track geometry", () => {
     expect(zoneWidthPercent(BULLSEYE_OFF)).toBeCloseTo(5);
     expect(zoneWidthPercent(TRACK_HALF)).toBe(100);
     expect(zoneWidthPercent(-1)).toBe(0);
+  });
+});
+
+describe("STOP_HOLD_MS", () => {
+  /**
+   * The beat exists so the player sees where they stopped, and it is paid for
+   * out of an ending that already runs COMPLETE_BEAT_MS + REVEAL_DURATION_MS.
+   * Long enough to read, short enough not to be the reason the ending drags.
+   */
+  it("is a real pause, but shorter than the celebration it precedes", () => {
+    expect(STOP_HOLD_MS).toBeGreaterThan(0);
+    expect(STOP_HOLD_MS).toBeLessThan(COMPLETE_BEAT_MS);
   });
 });
 

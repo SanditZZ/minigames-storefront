@@ -45,6 +45,17 @@ component each:
   It is also the first game the **player** ends — Tap Fast and Reaction Timer
   both run until a timer fires — which is why it got its own browser test rather
   than only unit coverage.
+
+  **And it needed a beat the other games do not.** Handing off on the same
+  pointer event that ends the round meant the screen changed before the player
+  could see where the marker actually stopped, which is the only thing they were
+  aiming at. `STOP_HOLD_MS` (700ms, in `precision.ts`) freezes the track and
+  names the landing first. Note it deliberately does **not** go through
+  `pacing.holdMs`: that function collapses a beat to zero under reduced motion,
+  which is right for the celebration and the reveal because those are motion,
+  and wrong here because this beat is a readout that happens to be animated.
+  A third beat now sits between the last input and the score, so the ending is
+  the thing to watch if it starts to drag.
 - **Memory Flash** — repeat a flashed sequence; score = longest sequence.
 - **Hold Steady** — keep a dot inside a shrinking ring; score = ms survived.
 - **Quick Math** — answer as many as possible in N seconds.
@@ -167,6 +178,69 @@ component each:
   guess. It was the missing piece when this entry was written; the rest of the
   funnel still is not instrumented.
 - **Award image uploads** (currently a URL field) with storage + CDN.
+- **Store logo upload.** An admin picks an image; the player app shows it where
+  `PageHeader` currently renders the brand wordmark (`PageHeader.tsx` already
+  says in its own comment that a logo should be able to replace the text "in one
+  edit", so the seam exists). Three things this repo does not have yet, worth
+  knowing before it is scoped as small:
+  - **There is no file handling anywhere in the backend.** No `multipart` parse,
+    no `http.FileServer`, no `ServeFile` — grep confirms it. This is a new
+    capability with its own size limits, content-type allowlist and filename
+    sanitising, not a new field on an existing handler.
+  - **Storage should be an interface from the first commit, and the repo already
+    has the pattern to copy.** `storage.Store` is an interface whose only
+    implementation is SQLite, which is exactly what makes "DynamoDB adapter"
+    above a drop-in. A `BlobStore` with `Put`/`URL`/`Delete` and a `localfs`
+    implementation gives S3 the same treatment: a sibling package, no caller
+    changes. Local files go under `.prod/uploads/` — **already gitignored**,
+    since `.gitignore` ends with `.prod/`; anywhere else needs a new rule and
+    will eventually be committed by accident.
+  - **The served URL is the trap.** `serve-prod.sh` bakes an absolute API base
+    into the frontend bundles, so a stored `/uploads/logo.png` resolves against
+    the *player* origin (port 3000), not the API (8081), and silently 404s
+    across the tailnet. Whatever `BlobStore.URL` returns has to be absolute for
+    the same reason the API URL is.
+
+  Do this once for both this and the award images above — they are the same
+  problem, and `PrizeImage.tsx` is already the shared render primitive.
+- **Store identity editable from the admin: name, tagline, colours.** Today the
+  storefront's identity is compile-time data: `BRAND_NAME` and `BRAND_TAGLINE`
+  are constants in `packages/player-core/src/brand.ts`, read by `GamePicker.tsx`
+  and rendered through `PageHeader`. Renaming the shop is a code edit and a
+  `ship.sh` run, which is fine for one store and absurd for two. Split by
+  difficulty, because the three are not one feature:
+  - **Name and tagline are easy and blocked on one missing endpoint.** They are
+    strings, and `domain.Setting` already models admin-editable strings — but
+    every settings route is behind `requireAdmin` (`httpapi/server.go:90-92`),
+    so the player app has no way to read one. A public `GET
+    /api/v1/settings/public` exposing an allowlisted subset is the prerequisite,
+    and the allowlist is the security-relevant part: `claim_ttl_hours` and the
+    anti-cheat limits must not become public reads by accident.
+  - **Colours fight the token pipeline.** The palette is TypeScript
+    (`packages/tokens/src/palette.ts`) generated into a committed `theme.css`
+    `@theme` block, and Tailwind resolves `bg-brand` against it **at build
+    time**. A runtime palette cannot come from that pipeline at all; it has to be
+    CSS custom properties overridden on the document at runtime, which the
+    package-boundary rule forbids inside `packages/` — so the setter belongs in
+    each app, next to `useRouter`, as the other thing allowed to touch `window`.
+    Worth doing deliberately: it introduces a *second* source of colour, and
+    "which one wins" needs an answer before the first bug.
+  - **Nothing currently guards the palette from drifting.** `npm run theme:check`
+    exists precisely to fail when `theme.css` no longer matches the tokens, and
+    **neither `ship.sh` nor `.github/workflows/ci.yml` runs it** — verified by
+    grep. That is the same failure the repo root's CLAUDE.md describes for the
+    broken `typecheck` script: a check nobody calls. Wire it into the gate before
+    adding a second way for colours to disagree, not after.
+  - **A refresh control on the player.** Settings would be fetched once on
+    mount, so a kiosk phone left running all day would never see a rename. A
+    small icon button top-right refetches them — `HeaderRow` (`ui/Layout.tsx`)
+    already has an `action` slot that encodes the anti-overlap rule
+    (`min-w-0 flex-1` on the text, `shrink-0` on the action), so it is the right
+    host rather than a bespoke absolute-positioned button. Pairs with **"Idle
+    reset for kiosk mode"** below: both exist because a kiosk screen is never
+    reloaded, and a timer that returns to the picker could refetch on the way.
+  - Note the cost side: this adds another per-load public fetch, joining the
+    three prize requests the **Caching** entry already flags.
 - **Config change history** and one-click rollback for settings/awards.
 - **A/B testing** thresholds and reward mixes to optimise retention.
 
@@ -307,12 +381,15 @@ rather than re-argued.
   the first game where **"server-authoritative scoring"** in the anti-abuse
   section buys something concrete: sending the phase seed with the session and
   the stop timestamp with the score would make it checkable.
-- **`precisionVerdict` is written, exported, and rendered nowhere.** It grades a
-  stop ("Perfect", "Dead on", "Close"…) the way `reactionVerdict` does, and like
-  `reactionVerdict` nothing on the result screen shows it. Two dead exports of
-  the same shape is a pattern now, not an oversight: the reveal's tier ladder
-  took over the job of grading a round, so either these feed it per-game copy or
-  they should go.
+- **`reactionVerdict` is written, exported, and rendered nowhere.** It grades a
+  reaction ("Lightning", "Sharp", "Solid"…) and nothing displays it — the
+  reveal's tier ladder took over the job of grading a round. Its twin
+  `precisionVerdict` was in the same state for about an hour: adding the
+  post-stop hold to Precision Stop gave it a surface (the track's readout, where
+  it names the landing before the score reveal opens), which is the argument for
+  what to do with this one. Either every game gets a moment that grades the
+  round in its own vocabulary, or the verdict helpers go and the tier ladder is
+  the only voice.
 - **Link previews for shared results.** Result URLs are now permanent and worth
   sharing, but the SPA serves the same empty `index.html` to every crawler, so a
   pasted link shows nothing. Needs a small server-rendered route emitting OG/
