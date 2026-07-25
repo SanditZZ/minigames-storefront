@@ -130,7 +130,30 @@ their default value are never written, so an unfiltered panel stays a bare path.
 Both apps use the same hand-rolled split: pure `parse.ts` (calculations, fully
 unit-tested) and a thin `useRouter.ts` (the only module touching `window`).
 
+## Roadmap — `docs/potential-features.md`
+
+**"Potential features", "the features doc", or a bare "this doc" in a roadmap
+conversation always means `docs/potential-features.md`.** It is the one list of
+unbuilt ideas; never start a second roadmap file, and read it before proposing
+new work so a suggestion is either already on it or genuinely new.
+
+Keeping it true is part of shipping a feature, not a follow-up to it:
+
+- **Strike through what shipped** — `~~**Name**~~ — **built.**` plus one line on
+  what it actually proved out. Deleting the entry throws away the reason it was
+  wanted in the first place.
+- **Correct what the feature invalidated.** A shipped change usually falsifies
+  some *other* entry rather than its own: the prize showcase started rendering
+  `Award.imageUrl`, which quietly made "award image URLs are unused" wrong while
+  leaving a narrower gap (the result screen) that nobody had written down.
+- **Add the follow-ups the work surfaced**, ordered by how soon they will bite.
+
+**Every claim in that doc is a claim about the code, so cite the file.** "Errors
+are not announced" is only actionable because it names `StatusMessage`; an entry
+that cannot be checked against a file is the kind that rots unnoticed.
+
 ## Related
 
 - `frontend/CLAUDE.md` — mandatory color palette + reusable-UI-component rules.
-- `docs/architecture.md`, `docs/potential-features.md` — design + roadmap.
+- `docs/architecture.md` — design.
+- `docs/potential-features.md` — the roadmap (see the section above).

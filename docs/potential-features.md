@@ -91,6 +91,9 @@ component each:
     once, not the count-up (which would babble every frame).
   - **Errors are not announced.** `StatusMessage` renders failures as ordinary
     text with no `role="alert"`, so a failed submit is silent.
+  - Both are small, and `Spinner` in the same file (`ui/Feedback.tsx`) already
+    models the pattern with `role="status"` + `aria-live="polite"` — there is no
+    design question left to answer here, only the edit.
 - **Scope the no-select rule.** `index.css` sets `user-select: none` on `body`
   to stop text selection during rapid tapping, which also means a player cannot
   copy their score — and will not be able to copy a claim code once the prize
@@ -99,13 +102,14 @@ component each:
   player ranked #23 sees ten strangers and no sign of themselves. Their row
   belongs below an ellipsis when they fall outside the visible window (the rank
   is already known — `result.rank`).
-- **Move the name prompt off the landing screen.** The name field currently sits
-  between the hero and the game list, so a kiosk phone pops a keyboard before
-  the customer has decided to play anything. Asking on the result screen — and
-  only when the score actually lands on the board — removes the friction and
-  asks at the moment the answer matters. Bigger flow change than it looks: the
-  name is currently read from `?name=` before the round and travels with the
-  submission, so it would have to become a post-submit rename.
+- **Move the name prompt off the landing screen.** The name field sits between
+  the prize showcase and the game list (`GamePicker.tsx`), so a kiosk phone pops
+  a keyboard at the exact moment the customer has just been sold on a prize and
+  is reaching for a game — the showcase made this worse, not better. Asking on
+  the result screen, and only when the score actually lands on the board,
+  removes the friction and asks at the moment the answer matters. Bigger flow
+  change than it looks: the name is read from `?name=` before the round and
+  travels with the submission, so it would have to become a post-submit rename.
 - **Global + per-store leaderboards**, weekly resets, and "beat the staff score".
 - **Offline-tolerant kiosk mode** with queued submissions.
 - **Idle reset for kiosk mode** — a result screen left open should return to the
@@ -126,10 +130,12 @@ component each:
   (serve both frontends from the Go binary on one port).
 - **Feature flags** to roll games/campaigns out gradually.
 
-## Follow-ups from the reveal + routing work
+## Follow-ups from shipped work
 
-Concrete, near-term items surfaced while building the score-reveal flow and the
-addressable result URL. Roughly ordered by how soon they will bite.
+Concrete, near-term items surfaced while building the score-reveal flow, the
+addressable result URL, and the admin award filters. Roughly ordered by how soon
+they will bite. Each names the file it is a claim about, so it can be re-checked
+rather than re-argued.
 
 ### Result URL polish
 
@@ -155,6 +161,34 @@ addressable result URL. Roughly ordered by how soon they will bite.
   they won, so "issue a claim code, mark redeemed at the counter, expire
   unclaimed" only needs a status column and an admin action — no schema rework.
   Today's "show this screen at the counter" is still screenshot-reusable.
+- **Deleting an award silently rewrites a player's history.** A score stores the
+  award *by id*, and `Service.awardByID` degrades a missing award to "no prize"
+  rather than erroring — the right call for the API, but it means a permanent
+  result URL that read "You won a Coffee" starts reading *"So close! No prize
+  this time"* the moment an admin deletes that prize. The result URL is only
+  honestly permanent if the win is: snapshot the award's name onto the score
+  row, or make admin delete a soft archive. Worth settling before claim codes
+  make a rewritten result an argument at the counter.
+
+### Admin lists at scale
+
+Surfaced while building the award filters. Nothing here is wrong today — these
+are the seams that give way as the catalog and the score table grow.
+
+- **Award filtering is entirely client-side.** `AwardsPanel` fetches the whole
+  unpaginated table via `listAwards()` and narrows it in `filterAwards`. Correct
+  at a few dozen prizes, and it keeps the filter logic pure and unit-tested; but
+  the URL already carries exactly the parameters a server-side query would need
+  (`?game=&status=&stock=&q=&sort=`), so moving the work behind the API later is
+  a swap of the data source, not a redesign of the panel.
+- **The scores panel has no filters and a hard-coded `limit=25`.** `?game=` is
+  the only parameter it honours — no date range, no pagination, and no way to
+  find one player's rounds. That is fine for a leaderboard and useless for the
+  question an admin will actually arrive with once prizes are claimable: "this
+  customer says they won a coffee on Tuesday."
+- **Award delete has no audit trail.** The panel confirms, then deletes; nothing
+  records who removed a prize or what its settings were. Pairs with "config
+  change history" and with the soft-delete note above — one change buys both.
 
 ### Testing
 
@@ -174,6 +208,10 @@ addressable result URL. Roughly ordered by how soon they will bite.
   so `RoundRunner` requests two sessions per round locally (visible in the API
   log). Harmless — the second token wins and sessions expire — but it makes dev
   logs misleading and would matter if session creation ever costs something.
-- **Award image URLs are unused by the player.** `Award.imageUrl` is admin-editable
-  and rendered nowhere; the prize card shows an emoji. Either show it or drop the
-  field (it pairs with "Award image uploads" above).
+- **The won prize is the one place its image never shows.** `Award.imageUrl` now
+  reaches the player — `PrizeShowcase` renders it with a 🎁 fallback — but
+  `ResultSummary` still hands `HighlightCard` a hard-coded `icon="🎉"`, and the
+  card has no image slot. So a customer sees the photo of the coffee while
+  deciding whether to play, then wins it and gets an emoji. Giving
+  `HighlightCard` an optional image (same fixed box as the showcase, so a
+  missing one never shifts the layout) closes it.
