@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ApiError } from "@minigames/api-client";
 import { makeApi, setToken } from "../api";
-import { Button, Input } from "../ui";
+import { Alert, Button, CenteredCard, Input } from "../ui";
 
 /**
  * A minimal auth gate for the shared-secret admin API. It validates the entered
@@ -29,8 +29,8 @@ export function TokenGate({ onAuthenticated }: { onAuthenticated: (token: string
   }
 
   return (
-    <div className="flex min-h-full items-center justify-center bg-brand-4 p-4">
-      <form onSubmit={submit} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg ring-1 ring-ink/5">
+    <CenteredCard>
+      <form onSubmit={submit}>
         <h1 className="text-xl font-bold text-ink">Admin sign in</h1>
         <p className="mt-1 text-sm text-ink/60">Enter the admin token to manage rewards and settings.</p>
         <Input
@@ -40,14 +40,13 @@ export function TokenGate({ onAuthenticated }: { onAuthenticated: (token: string
           placeholder="Admin token"
           className="mt-4"
         />
-        {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+        <div className="mt-2">
+          <Alert message={error} />
+        </div>
         <Button type="submit" disabled={busy || !token} className="mt-4 w-full">
           {busy ? "Checking…" : "Sign in"}
         </Button>
-        <p className="mt-3 text-xs text-ink/40">
-          Dev default: <code>dev-admin-token</code>
-        </p>
       </form>
-    </div>
+    </CenteredCard>
   );
 }

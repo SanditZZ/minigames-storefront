@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Award, AwardInput, Game } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
-import { Button, Field, Input, Select, Textarea } from "../ui";
+import { Button, Checkbox, Field, Input, Select, Textarea } from "../ui";
 
 interface Props {
   initial?: Award;
@@ -72,10 +72,7 @@ export function AwardForm({ initial, games, busy, onSubmit, onCancel }: Props) {
 
       <Field label="Stock">
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-ink/70">
-            <input type="checkbox" checked={unlimited} onChange={(e) => setUnlimited(e.target.checked)} />
-            Unlimited
-          </label>
+          <Checkbox label="Unlimited" checked={unlimited} onChange={setUnlimited} />
           {!unlimited && (
             <Input
               type="number"
@@ -92,11 +89,8 @@ export function AwardForm({ initial, games, busy, onSubmit, onCancel }: Props) {
         <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} />
       </Field>
 
-      <div className="flex items-center gap-2 sm:col-span-2">
-        <input id="active" type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-        <label htmlFor="active" className="text-sm text-ink/80">
-          Active (eligible to be awarded)
-        </label>
+      <div className="sm:col-span-2">
+        <Checkbox label="Active (eligible to be awarded)" checked={active} onChange={setActive} />
       </div>
 
       <div className="flex justify-end gap-3 sm:col-span-2">

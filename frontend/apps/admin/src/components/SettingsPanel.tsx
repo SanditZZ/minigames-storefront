@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiClient, Setting, SettingType } from "@minigames/api-client";
-import { Badge, Button, Card, Field, Input, Select } from "../ui";
+import { Alert, Badge, Button, Card, Field, Input, Loading, PanelHeader, Select, Stack } from "../ui";
 
 /**
  * Settings CRUD. Each setting is a typed knob the backend reads at runtime
@@ -22,15 +22,13 @@ export function SettingsPanel({ api }: { api: ApiClient }) {
   useEffect(load, [load]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-lg font-bold text-ink">Settings</h2>
-        <Button className="shrink-0 whitespace-nowrap" onClick={() => setAdding((v) => !v)}>
-          {adding ? "Close" : "+ New setting"}
-        </Button>
-      </div>
+    <Stack>
+      <PanelHeader
+        title="Settings"
+        action={<Button onClick={() => setAdding((v) => !v)}>{adding ? "Close" : "+ New setting"}</Button>}
+      />
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <Alert message={error} />
 
       {adding && (
         <NewSettingForm
@@ -43,15 +41,15 @@ export function SettingsPanel({ api }: { api: ApiClient }) {
       )}
 
       {settings === null ? (
-        <p className="text-ink/50">Loading…</p>
+        <Loading />
       ) : (
-        <div className="flex flex-col gap-3">
+        <Stack gap="sm">
           {settings.map((s) => (
             <SettingRow key={s.key} api={api} setting={s} onSaved={load} onDeleted={load} />
           ))}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 }
 
@@ -112,13 +110,7 @@ function ValueInput({ type, value, onChange }: { type: SettingType; value: strin
       </Select>
     );
   }
-  return (
-    <Input
-      type={type === "int" ? "number" : "text"}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
+  return <Input type={type === "int" ? "number" : "text"} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function NewSettingForm({ api, onSaved }: { api: ApiClient; onSaved: () => void }) {
@@ -162,7 +154,9 @@ function NewSettingForm({ api, onSaved }: { api: ApiClient; onSaved: () => void 
         <Field label="Description">
           <Input value={description} onChange={(e) => setDescription(e.target.value)} />
         </Field>
-        {error && <p className="text-sm text-red-700 sm:col-span-2">{error}</p>}
+        <div className="sm:col-span-2">
+          <Alert message={error} />
+        </div>
         <div className="sm:col-span-2">
           <Button type="submit" disabled={busy || !key.trim()}>
             {busy ? "Saving…" : "Add setting"}

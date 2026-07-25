@@ -23,6 +23,8 @@ export interface ScoreEntry {
   gameSlug: string;
   playerName: string;
   value: number;
+  /** Prize won at play time; absent when the round won nothing. */
+  awardId?: string;
   createdAt: string;
 }
 

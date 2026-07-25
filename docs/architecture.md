@@ -43,13 +43,22 @@ player app                         backend
    │  (play locally, count score)      │
    │  POST /games/{slug}/scores        │  1. validate value vs server-derived elapsed time (game.Validator)
    │   {token, playerName, value}      │  2. consume session atomically (replay -> 409)
-   │                                   │  3. persist score
-   │                                   │  4. reward.Select -> reserve stock atomically
+   │                                   │  3. reward.Select -> reserve stock atomically
+   │                                   │  4. persist score WITH the won award_id
    │◄──────────────────────────────────┤  { score, rank, award? }
+   │                                   │
+   │  GET /games/{slug}/scores/{id}    │  re-read a finished round (reload / shared link)
+   │◄──────────────────────────────────┤  { score, rank, award? }   same shape, no side effects
 ```
 
 Anti-cheat, ranking, and prize selection all happen server-side. The session is
 the trust anchor: it fixes when the round started and is single-use.
+
+The prize is reserved *before* the score row is written so the winning award id
+can be stored on the row. That link is what makes a result permanently
+addressable: re-reading it reports the prize actually granted, rather than one
+re-derived from today's thresholds and stock. Rank is the opposite — it is
+recomputed on every read, because it legitimately changes as other people play.
 
 ## Extension point 1 — adding a game
 
@@ -95,10 +104,46 @@ write.
 ## Frontend
 
 Two Vite + React + TS apps in an npm workspace sharing a typed `api-client`
-package (the request/response contract mirrors the Go domain). The **player**
-app is a kiosk-style state machine; the **admin** app is a shared-secret-gated
-CRUD dashboard. All UI is built from a small reusable kit and one central warm
-palette (see `frontend/CLAUDE.md`) so every game looks like one product.
+package (the request/response contract mirrors the Go domain). The **admin** app
+is a shared-secret-gated CRUD dashboard. All UI is built from a small reusable
+kit and one central warm palette (see `frontend/CLAUDE.md`) so every game looks
+like one product.
+
+### Player routing
+
+The player app is URL-driven rather than a phase state machine — the address bar
+IS the state:
+
+| Route | Screen |
+|-------|--------|
+| `/` | Pick a game |
+| `/play/:slug` | Play one round |
+| `/result/:slug/:scoreId` | A finished round |
+
+Two pieces of state ride in the query string: `?name=` (display name, written
+with `replaceState` so typing never adds history entries) and `?reveal=1` (a
+one-shot flag set when arriving fresh from a round, dropped from the URL once the
+animation finishes so a reload or shared link shows the score immediately).
+
+Routing is a hand-rolled ~120-line hook in `player/src/router/`, split by layer:
+`routes.ts` (data), `parse.ts` (pure URL↔Location, unit-tested, and the only
+place that validates slugs/ids before they reach an API path), `useRouter.ts`
+(the sole toucher of `window.history`).
+
+### The round ending
+
+A finished round does not show its score. `RoundRunner` switches to a
+celebration stage — and submits the score behind it, so the network round-trip
+costs the player nothing — then `/result/…?reveal=1` runs an arcade
+strength-tester reveal: the puck springs up a tower, overshoots, settles on the
+score. The puck bounces; the displayed number only ever climbs to the true value.
+Timing/easing/tier maths is pure and lives in `player/src/reveal/calc.ts`;
+`useAnimationProgress` supplies progress from rAF and honours
+`prefers-reduced-motion`, and any tap skips to the end.
+
+Because the result is addressed by id, the screen behaves identically whether the
+player just played, refreshed, or opened a link — it takes the result from a
+one-hop in-memory hand-off if available, and fetches it from the API otherwise.
 
 ## Deployment
 

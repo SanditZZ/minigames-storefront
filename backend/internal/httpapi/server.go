@@ -72,6 +72,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/games/{slug}/sessions", s.handleStartSession)
 	mux.HandleFunc("POST /api/v1/games/{slug}/scores", s.handleSubmitScore)
 	mux.HandleFunc("GET /api/v1/games/{slug}/scores", s.handleHighScores)
+	mux.HandleFunc("GET /api/v1/games/{slug}/scores/{id}", s.handleGetScore)
 
 	// --- Admin CRUD (guarded by the shared-secret header) ---
 	mux.HandleFunc("GET /api/v1/admin/awards", s.requireAdmin(s.handleListAwards))

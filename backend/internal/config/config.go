@@ -24,7 +24,7 @@ func Load() Config {
 		Addr:        env("APP_ADDR", ":8080"),
 		DBPath:      env("APP_DB_PATH", "minigames.db"),
 		CORSOrigins: env("APP_CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
-		AdminToken:  env("APP_ADMIN_TOKEN", "dev-admin-token"),
+		AdminToken:  env("APP_ADMIN_TOKEN", "admin"),
 	}
 }
 

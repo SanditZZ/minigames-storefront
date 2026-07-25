@@ -1,13 +1,21 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
 
-// Shared admin UI kit. Same palette tokens as the player app; keep all admin
-// screens consistent by composing these instead of restyling markup inline.
+// Form controls for the admin app. Same palette tokens as the player app; keep
+// all admin screens consistent by composing these instead of restyling markup.
 
 const control =
   "w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-ink outline-none focus:border-brand focus:ring-1 focus:ring-brand";
 
 type BtnVariant = "primary" | "ghost" | "danger";
-const btnBase = "inline-flex items-center justify-center rounded-lg font-semibold transition disabled:opacity-50";
+const btnBase =
+  "inline-flex items-center justify-center rounded-lg font-semibold transition disabled:opacity-50 " +
+  "outline-none focus-visible:ring-2 focus-visible:ring-brand";
 const btnVariants: Record<BtnVariant, string> = {
   primary: "bg-brand text-ink hover:bg-brand-2 px-4 py-2",
   ghost: "text-ink/70 hover:bg-ink/5 px-4 py-2",
@@ -34,6 +42,31 @@ export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
   return <select {...props} className={`${control} ${props.className ?? ""}`} />;
 }
 
+/** A labelled checkbox — the one styling for every boolean in the admin. */
+export function Checkbox({
+  label,
+  checked,
+  onChange,
+  className = "",
+}: {
+  label: ReactNode;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  className?: string;
+}) {
+  return (
+    <label className={`flex items-center gap-2 text-sm text-ink/80 ${className}`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="h-4 w-4 accent-brand"
+      />
+      {label}
+    </label>
+  );
+}
+
 export function Field({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
   return (
     <label className={`block ${className}`}>
@@ -41,17 +74,4 @@ export function Field({ label, className = "", children }: { label: string; clas
       {children}
     </label>
   );
-}
-
-export function Card({ className = "", children }: { className?: string; children: ReactNode }) {
-  return <div className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 ${className}`}>{children}</div>;
-}
-
-export function Badge({ tone = "neutral", children }: { tone?: "on" | "off" | "neutral"; children: ReactNode }) {
-  const tones = {
-    on: "bg-brand text-ink",
-    off: "bg-ink/10 text-ink/60",
-    neutral: "bg-brand-3 text-ink",
-  } as const;
-  return <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
 }

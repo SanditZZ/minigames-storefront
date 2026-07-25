@@ -16,6 +16,9 @@ import (
 //go:embed migrations/001_init.sql
 var schemaSQL string
 
+//go:embed migrations/002_score_award.sql
+var scoreAwardSQL string
+
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
 	db       *sql.DB
@@ -49,12 +52,58 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
-// Migrate applies the embedded schema. Idempotent (all statements use IF NOT EXISTS).
+// Migrate applies the embedded schema. Idempotent: the base schema uses
+// IF NOT EXISTS throughout, and each additive column migration is guarded by a
+// column-existence check (SQLite has no ADD COLUMN IF NOT EXISTS), so running
+// this on every boot — against a fresh or an already-migrated database — is safe.
 func (s *Store) Migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
 		return fmt.Errorf("apply schema: %w", err)
 	}
+	if err := s.addColumnIfMissing(ctx, "scores", "award_id", scoreAwardSQL); err != nil {
+		return err
+	}
 	return nil
+}
+
+// addColumnIfMissing runs an ALTER TABLE ... ADD COLUMN migration only when the
+// column is absent, making the migration re-runnable.
+func (s *Store) addColumnIfMissing(ctx context.Context, table, column, migration string) error {
+	has, err := s.hasColumn(ctx, table, column)
+	if err != nil {
+		return err
+	}
+	if has {
+		return nil
+	}
+	if _, err := s.db.ExecContext(ctx, migration); err != nil {
+		return fmt.Errorf("add %s.%s: %w", table, column, err)
+	}
+	return nil
+}
+
+// hasColumn reports whether a table already defines a column.
+func (s *Store) hasColumn(ctx context.Context, table, column string) (bool, error) {
+	// table is a package-internal constant, never user input.
+	rows, err := s.db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false, fmt.Errorf("inspect %s: %w", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			cid, notnull, pk int
+			name, ctype      string
+			dflt             sql.NullString
+		)
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return false, fmt.Errorf("scan %s column: %w", table, err)
+		}
+		if name == column {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 func (s *Store) Games() storage.GameRepository       { return s.games }

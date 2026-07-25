@@ -59,12 +59,32 @@ component each:
 
 ## Player experience
 
-- **Localization (i18n)** — e.g. Thai/English toggle for storefront use.
-- **Sound, haptics, and richer animations** for the reward reveal.
+- **Share score photo** — a "Share" button on the result screen that generates an
+  image of the player's score, decorated with the store theme and name (currently
+  **Fun Store**, from `player/src/brand.ts`). Render the card to a `<canvas>` from
+  the same palette tokens, then hand the blob to the Web Share API
+  (`navigator.share({ files })`) with a download fallback on desktop. The result
+  screen already has everything the card needs — score, unit, rank, prize, player
+  name — and the URL is permanent, so the image can carry a QR/short link back to
+  it. See "Result URL polish" below for the link preview that pairs with this.
+- **Image editor before sharing** — let the player decorate the generated card
+  before saving: stickers/icons, a caption, maybe a frame or filter. Keep the
+  editor's state as plain data (a list of placed items with position/scale/
+  rotation) and the render as a pure `draw(state) → canvas` function, so the same
+  description can be re-rendered at export resolution without a second code path.
+  Worth scoping the sticker set to store branding to keep moderation trivial.
+- **Localization (i18n)** — e.g. Thai/English toggle for storefront use. Note the
+  reveal added a fair amount of new copy (tier ladder, "Game complete", empty and
+  error states) — worth extracting strings before it grows further.
+- **Sound and haptics** for the reveal — the animation beats are already there to
+  hang them on (`navigator.vibrate` on the puck landing, a bell on a record).
 - **Accessibility** — larger tap targets, reduced-motion mode, screen-reader labels.
+  (Reduced motion and focus rings are done; the reveal meter is `aria-hidden` with
+  the score announced as text.)
 - **Global + per-store leaderboards**, weekly resets, and "beat the staff score".
-- **Shareable win cards** for social proof.
 - **Offline-tolerant kiosk mode** with queued submissions.
+- **Idle reset for kiosk mode** — a result screen left open should return to the
+  picker after N seconds so the next customer starts clean.
 
 ## Platform / infrastructure
 
@@ -76,5 +96,53 @@ component each:
   error rates), health/readiness probes.
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode
   (serve both frontends from the Go binary on one port).
-- **CI** — run `go test`, `tsc -b`, and the frontend builds on every push.
 - **Feature flags** to roll games/campaigns out gradually.
+
+## Follow-ups from the reveal + routing work
+
+Concrete, near-term items surfaced while building the score-reveal flow and the
+addressable result URL. Roughly ordered by how soon they will bite.
+
+### Result URL polish
+
+- **Per-game benchmark score.** The reveal meter is scaled against the current
+  leaderboard leader, so on an empty board the player is their own benchmark and
+  every round reads "Record breaker". Adding a `targetScore` to the game catalog
+  (`domain.Game`, alongside `durationMs`) would give the tower a fixed, honest
+  scale — exactly like a real strength tester — and fall back to the leaderboard
+  only when unset.
+- **Link previews for shared results.** Result URLs are now permanent and worth
+  sharing, but the SPA serves the same empty `index.html` to every crawler, so a
+  pasted link shows nothing. Needs a small server-rendered route emitting OG/
+  Twitter meta tags (title = "Po scored 37 taps at Fun Store", image = the
+  generated score card). This is the piece that makes the share feature above
+  actually spread.
+- **Rate-limit the public read.** `GET /games/{slug}/scores/{id}` is
+  unauthenticated and now linked publicly. Score ids are UUIDv4 so enumeration is
+  impractical, but a per-IP limit belongs here before real prizes are on the line.
+- **Prize claim lifecycle is now one step away.** Scores persist the `award_id`
+  they won, so "issue a claim code, mark redeemed at the counter, expire
+  unclaimed" only needs a status column and an admin action — no schema rework.
+  Today's "show this screen at the counter" is still screenshot-reusable.
+
+### Testing
+
+- **Visual regression.** Every layout bug found during this work was purely
+  visual (collapsed tier labels, a bell overlapping text, halo rings crossing a
+  caption) — none of which a DOM assertion would catch. Playwright's
+  `toHaveScreenshot()` would, but it needs a pinned container image for stable
+  font/emoji rendering; deliberately deferred rather than half-done.
+- **Reveal timing is untested end-to-end.** The maths is unit-tested and the flow
+  is E2E-tested, but "the animation lasts about 2.2s and can be skipped" is only
+  covered indirectly. A trace-based assertion could pin it if the feel starts
+  regressing.
+
+### Small cleanups
+
+- **Duplicate session on mount in dev.** React StrictMode double-invokes effects,
+  so `RoundRunner` requests two sessions per round locally (visible in the API
+  log). Harmless — the second token wins and sessions expire — but it makes dev
+  logs misleading and would matter if session creation ever costs something.
+- **Award image URLs are unused by the player.** `Award.imageUrl` is admin-editable
+  and rendered nowhere; the prize card shows an emoji. Either show it or drop the
+  field (it pairs with "Award image uploads" above).

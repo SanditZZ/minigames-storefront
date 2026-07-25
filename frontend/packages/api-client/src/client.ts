@@ -64,6 +64,9 @@ export function createClient(opts: ClientOptions) {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    /** Re-reads a finished round so /result/:slug/:id works on reload or share. */
+    scoreResult: (slug: string, scoreId: string) =>
+      request<SubmitResult>(`/api/v1/games/${slug}/scores/${scoreId}`),
     highScores: (slug: string, limit?: number) =>
       request<HighScores>(`/api/v1/games/${slug}/scores${limit ? `?limit=${limit}` : ""}`),
 

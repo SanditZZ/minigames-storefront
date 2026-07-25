@@ -1,5 +1,25 @@
 # Repo rules — minigames-storefront
 
+## Always run the full test suite before every push — REQUIRED
+
+**No commit reaches `origin/main` without the whole suite passing first.** This is
+not advisory: `scripts/ship.sh` enforces it, and `.github/workflows/ci.yml` runs
+the same checks again on the pushed commit.
+
+The gate, in order — each step must pass before the next runs:
+
+1. `go test ./...` — backend unit tests.
+2. `npm test` (frontend) — vitest over the calculation layers (URL router,
+   score-reveal maths).
+3. `npx playwright test` (e2e) — the real player flow in a browser, against an
+   isolated throwaway stack (own ports, own temp SQLite file — never `.prod/`).
+4. Build + redeploy via `scripts/serve-prod.sh` (typecheck included).
+5. Only then: `git add -A`, commit, `git push origin main`.
+
+**Never push on red.** If a test fails, fix it or report and stop — do not
+comment it out, do not `--no-verify`, and do not reach for `SKIP_E2E=1` (that
+escape hatch exists only for machines where browsers cannot run at all).
+
 ## Auto-ship after every change (build-gated) — REQUIRED
 
 After making **any** change to this repo (code, config, or docs), always run the
@@ -9,19 +29,10 @@ ship flow before considering the change done — do not skip it:
 ./scripts/ship.sh ["commit message"]
 ```
 
-It runs, in order, and **stops on the first failure**:
-
-1. `go test ./...` (backend) — must pass.
-2. Build + redeploy via `scripts/serve-prod.sh` — the backend binary and both
-   frontend bundles must build (TypeScript typecheck included), then the local
-   stack is redeployed so the running player/admin apps immediately reflect the
-   change (on their Tailscale-reachable ports).
-3. Only if 1–2 succeed: `git add -A`, commit, and `git push origin main`.
-
 ### Rules
 
-- **Never commit or push if tests or the build fail.** Fix the failure (or report
-  it and stop) instead — `main` must always stay green and deployable.
+- **Never commit or push if tests or the build fail.** `main` must always stay
+  green and deployable.
 - **Always push to `main`.** Every applied change ends up on the remote.
 - **No `Co-Authored-By`** lines in commit messages.
 - Redeploy is part of shipping — the user expects the running apps to update after
@@ -29,6 +40,26 @@ It runs, in order, and **stops on the first failure**:
 - The deploy binds servers to `0.0.0.0` and bakes the auto-detected Tailscale IP
   into the frontend builds (see `scripts/serve-prod.sh` and the global "Local
   Deployment" rules), so the apps stay reachable across the tailnet.
+
+## Testing layout
+
+- `backend/**/*_test.go` — Go unit tests. The app layer uses an in-memory
+  `storage.Store` fake (`internal/app/service_test.go`), so no DB is needed.
+- `frontend/apps/*/src/**/*.test.ts` — vitest, **calculations only** (pure
+  functions: no DOM, no components). Component and flow behaviour is covered by
+  the browser suite instead of a jsdom imitation of it.
+- `e2e/` — Playwright. A self-contained npm package, deliberately outside the
+  frontend workspace so it never enters an app build. It starts its own API and
+  player app via `webServer` and wipes its database before each run.
+
+When adding a game or a screen, add the pure logic to a calculation module and
+test it in vitest; add one E2E assertion only if it changes the player's path
+through the app.
+
+## Admin access
+
+The admin API is guarded by a shared secret (`APP_ADMIN_TOKEN`), defaulting to
+`admin` for local development. Set a real one in any deployment that matters.
 
 ## Related
 

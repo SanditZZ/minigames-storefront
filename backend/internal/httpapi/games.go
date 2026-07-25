@@ -72,6 +72,19 @@ func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, result)
 }
 
+// handleGetScore serves a single finished round, so the player app's result URL
+// survives a reload or being shared. Same response shape as a submission, minus
+// the side effects.
+func (s *Server) handleGetScore(w http.ResponseWriter, r *http.Request) {
+	slug := domain.GameSlug(r.PathValue("slug"))
+	result, err := s.svc.ScoreResult(r.Context(), slug, r.PathValue("id"))
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (s *Server) handleHighScores(w http.ResponseWriter, r *http.Request) {
 	slug := domain.GameSlug(r.PathValue("slug"))
 	limit := 0

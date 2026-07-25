@@ -6,6 +6,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -119,19 +120,24 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		return SubmitResult{}, ErrSessionConsumed
 	}
 
+	// The prize is reserved BEFORE the score row is written so the winning
+	// award id can be persisted on the row itself. That link is what lets the
+	// result be re-read later at a stable URL and still report the prize that
+	// was actually granted, rather than one re-derived from current stock.
+	award, err := s.reserveAward(ctx, def.Game, in.Value)
+	if err != nil {
+		return SubmitResult{}, err
+	}
+
 	entry := domain.ScoreEntry{
 		ID:         uuid.NewString(),
 		GameSlug:   in.GameSlug,
 		PlayerName: sanitizeName(in.PlayerName),
 		Value:      in.Value,
+		AwardID:    awardID(award),
 		CreatedAt:  now,
 	}
 	saved, err := s.store.Scores().Create(ctx, entry)
-	if err != nil {
-		return SubmitResult{}, err
-	}
-
-	award, err := s.reserveAward(ctx, def.Game, saved.Value)
 	if err != nil {
 		return SubmitResult{}, err
 	}
@@ -142,6 +148,65 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 	}
 
 	return SubmitResult{Score: saved, Rank: rank, Award: award}, nil
+}
+
+// ScoreResult re-reads a finished round so a result URL stays addressable
+// across reloads and shared links. The rank is recomputed against the live
+// leaderboard (it legitimately drifts as others play), while the award comes
+// from the id stored on the row — never re-selected — so the prize shown never
+// changes after the fact.
+func (s *Service) ScoreResult(ctx context.Context, slug domain.GameSlug, scoreID string) (SubmitResult, error) {
+	def, ok := s.registry.Get(slug)
+	if !ok {
+		return SubmitResult{}, ErrGameUnavailable
+	}
+
+	entry, err := s.store.Scores().Get(ctx, scoreID)
+	if err != nil {
+		return SubmitResult{}, err
+	}
+	// A score belongs to exactly one game; a mismatched slug is a bad URL, not
+	// a different view of the same result.
+	if entry.GameSlug != slug {
+		return SubmitResult{}, storage.ErrNotFound
+	}
+
+	rank, err := s.rankOf(ctx, def.Game, entry)
+	if err != nil {
+		return SubmitResult{}, err
+	}
+
+	award, err := s.awardByID(ctx, entry.AwardID)
+	if err != nil {
+		return SubmitResult{}, err
+	}
+
+	return SubmitResult{Score: entry, Rank: rank, Award: award}, nil
+}
+
+// awardByID resolves a stored award reference for display. An award deleted
+// since the round was played is reported as "no prize" rather than an error —
+// the score itself is still a valid result.
+func (s *Service) awardByID(ctx context.Context, id string) (*domain.Award, error) {
+	if id == "" {
+		return nil, nil
+	}
+	a, err := s.store.Awards().Get(ctx, id)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// awardID flattens an optional award to the id persisted on a score row.
+func awardID(a *domain.Award) string {
+	if a == nil {
+		return ""
+	}
+	return a.ID
 }
 
 // reserveAward selects the best eligible prize and atomically decrements its

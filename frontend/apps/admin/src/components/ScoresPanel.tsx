@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ApiClient, Game, ScoreEntry } from "@minigames/api-client";
-import { Card, Select } from "../ui";
+import { Card, EmptyState, Loading, PanelHeader, RankRow, Select, Stack } from "../ui";
 
 /**
  * Read-only leaderboard viewer for admins. Uses the same public high-scores
@@ -24,39 +24,37 @@ export function ScoresPanel({ api, games }: { api: ApiClient; games: Game[] }) {
   }, [api, slug]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-ink">High scores</h2>
-        <div className="min-w-48">
-          <Select value={slug} onChange={(e) => setSlug(e.target.value)}>
-            {games.map((g) => (
-              <option key={g.slug} value={g.slug}>
-                {g.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-      </div>
+    <Stack>
+      <PanelHeader
+        title="High scores"
+        action={
+          <div className="w-48">
+            <Select value={slug} onChange={(e) => setSlug(e.target.value)} aria-label="Game">
+              {games.map((g) => (
+                <option key={g.slug} value={g.slug}>
+                  {g.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        }
+      />
 
-      <Card>
-        {scores === null ? (
-          <p className="text-ink/50">Loading…</p>
-        ) : scores.length === 0 ? (
-          <p className="text-ink/60">No scores recorded for this game yet.</p>
-        ) : (
+      {scores === null ? (
+        <Card>
+          <Loading />
+        </Card>
+      ) : scores.length === 0 ? (
+        <EmptyState>No scores recorded for this game yet.</EmptyState>
+      ) : (
+        <Card>
           <ol className="flex flex-col divide-y divide-ink/10">
             {scores.map((s, i) => (
-              <li key={s.id} className="flex items-center gap-3 py-2 text-sm">
-                <span className="w-6 shrink-0 text-center font-bold tabular-nums text-ink/50">{i + 1}</span>
-                <span className="min-w-0 flex-1 truncate font-medium text-ink">{s.playerName}</span>
-                <span className="shrink-0 font-bold tabular-nums text-ink">
-                  {s.value} {unit}
-                </span>
-              </li>
+              <RankRow key={s.id} rank={i + 1} name={s.playerName} value={s.value} unit={unit} />
             ))}
           </ol>
-        )}
-      </Card>
-    </div>
+        </Card>
+      )}
+    </Stack>
   );
 }

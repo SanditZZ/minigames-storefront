@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiClient, Award, AwardInput, Game } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
 import { AwardForm } from "./AwardForm";
-import { Badge, Button, Card } from "../ui";
+import { Alert, Badge, Button, Card, EmptyState, Loading, PanelHeader, Stack } from "../ui";
 
 type Editing = Award | "new" | null;
 
@@ -70,24 +70,20 @@ export function AwardsPanel({ api, games }: { api: ApiClient; games: Game[] }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="min-w-0 flex-1 truncate text-lg font-bold text-ink">Awards</h2>
-        <Button className="shrink-0 whitespace-nowrap" onClick={() => setEditing("new")}>
-          + New award
-        </Button>
-      </div>
+    <Stack>
+      <PanelHeader
+        title="Awards"
+        action={<Button onClick={() => setEditing("new")}>+ New award</Button>}
+      />
 
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+      <Alert message={error} />
 
       {awards === null ? (
-        <p className="text-ink/50">Loading…</p>
+        <Loading />
       ) : awards.length === 0 ? (
-        <Card>
-          <p className="text-ink/60">No awards yet. Create the first prize.</p>
-        </Card>
+        <EmptyState>No awards yet. Create the first prize.</EmptyState>
       ) : (
-        <div className="flex flex-col gap-3">
+        <Stack gap="sm">
           {awards.map((a) => (
             <Card key={a.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
@@ -121,8 +117,8 @@ export function AwardsPanel({ api, games }: { api: ApiClient; games: Game[] }) {
               </div>
             </Card>
           ))}
-        </div>
+        </Stack>
       )}
-    </div>
+    </Stack>
   );
 }

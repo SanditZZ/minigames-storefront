@@ -10,6 +10,10 @@
     "dev:player": "npm run dev -w apps/player",
     "dev:admin": "npm run dev -w apps/admin",
     "build": "npm run build -w apps/player && npm run build -w apps/admin",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }

@@ -1,3 +1,14 @@
+// The shared UI kit. Every player screen and mini-game composes these — no
+// screen defines its own styled markup or colours (see frontend/CLAUDE.md).
+
 export { Button } from "./Button";
+export { Card, Eyebrow, HighlightCard, Panel } from "./Card";
+export { EmptyNote, Spinner, StatusMessage } from "./Feedback";
 export { GameStage } from "./GameStage";
-export { Screen, Card, Stat, ProgressBar, Spinner, CenterStack } from "./primitives";
+export { CenterStack, HeaderRow, Screen, Stack } from "./Layout";
+export { PageHeader } from "./PageHeader";
+export { RevealMeter } from "./RevealMeter";
+export { ScoreRow, SelectCard } from "./SelectCard";
+export { Badge, ProgressBar, Stat } from "./Stat";
+export { TextField } from "./TextField";
+export { AppearIn, Confetti, Halo, HaloBox } from "./Vfx";

@@ -43,6 +43,9 @@ type SessionRepository interface {
 // ScoreRepository persists results and answers leaderboard queries.
 type ScoreRepository interface {
 	Create(ctx context.Context, e domain.ScoreEntry) (domain.ScoreEntry, error)
+	// Get returns one round by id, or ErrNotFound. This backs the addressable
+	// result URL the player app links to after a round.
+	Get(ctx context.Context, id string) (domain.ScoreEntry, error)
 	// Top returns the best entries for a game, ordered by the game's direction.
 	Top(ctx context.Context, slug domain.GameSlug, direction domain.ScoreDirection, limit int) ([]domain.ScoreEntry, error)
 }

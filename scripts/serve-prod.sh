@@ -19,7 +19,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE_DIR="$ROOT/.prod"
 PID_FILE="$STATE_DIR/pids"
 LOG_DIR="$STATE_DIR/logs"
-ADMIN_TOKEN="${APP_ADMIN_TOKEN:-dev-admin-token}"
+ADMIN_TOKEN="${APP_ADMIN_TOKEN:-admin}"
 
 mkdir -p "$STATE_DIR" "$LOG_DIR"
 

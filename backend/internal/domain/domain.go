@@ -45,11 +45,18 @@ type Session struct {
 }
 
 // ScoreEntry is a persisted result of one completed round.
+//
+// AwardID records which prize (if any) this round actually won at the moment it
+// was played. Storing it — rather than re-deriving eligibility later — is what
+// makes a result permanently addressable: replaying the same score URL shows the
+// prize that was really granted, even after stock, thresholds, or the award
+// itself have changed.
 type ScoreEntry struct {
 	ID         string    `json:"id"`
 	GameSlug   GameSlug  `json:"gameSlug"`
 	PlayerName string    `json:"playerName"`
 	Value      int       `json:"value"` // raw score in the game's ScoreUnit
+	AwardID    string    `json:"awardId,omitempty"` // "" = no prize won
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
