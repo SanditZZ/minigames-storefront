@@ -12,6 +12,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 )
@@ -62,6 +63,31 @@ type AwardRepository interface {
 	DecrementStock(ctx context.Context, id string) error
 }
 
+// ClaimRepository stores the redeemable credentials winning rounds earn.
+//
+// Note what is deliberately ABSENT: there is no ListByStatus. A claim's status
+// is derived from (redeemed_at, expires_at, now), so a `WHERE status = ?` would
+// have to re-implement internal/claim.StatusAt in SQL — a second definition of
+// "expired" that drifts from the first the moment either is edited. The store
+// returns rows; the calculation decides what they are. See claim.Filter.
+type ClaimRepository interface {
+	// Create persists a newly issued claim. It must return ErrConflict when the
+	// code is already taken, which is what lets the caller retry with a fresh
+	// one rather than trusting ~39 bits of entropy never to collide.
+	Create(ctx context.Context, c domain.Claim) (domain.Claim, error)
+	// GetByCode resolves the code a player reads out at the counter.
+	GetByCode(ctx context.Context, code string) (domain.Claim, error)
+	// GetByScore finds the claim a round earned, so a result URL can show it
+	// on every visit and not just the first.
+	GetByScore(ctx context.Context, scoreID string) (domain.Claim, error)
+	// List returns every claim, newest first. Filtering is a calculation.
+	List(ctx context.Context) ([]domain.Claim, error)
+	// Redeem atomically stamps redeemed_at. It must return ErrConflict if the
+	// claim is already redeemed, so two admins scanning the same code at the
+	// same counter cannot both hand out the prize.
+	Redeem(ctx context.Context, code string, at time.Time) (domain.Claim, error)
+}
+
 // SettingRepository is the admin-CRUD store for configuration knobs.
 type SettingRepository interface {
 	List(ctx context.Context) ([]domain.Setting, error)
@@ -77,6 +103,7 @@ type Store interface {
 	Sessions() SessionRepository
 	Scores() ScoreRepository
 	Awards() AwardRepository
+	Claims() ClaimRepository
 	Settings() SettingRepository
 	// Migrate applies schema/setup for stores that need it (no-op otherwise).
 	Migrate(ctx context.Context) error

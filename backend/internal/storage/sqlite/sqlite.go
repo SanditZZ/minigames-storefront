@@ -19,6 +19,9 @@ var schemaSQL string
 //go:embed migrations/002_score_award.sql
 var scoreAwardSQL string
 
+//go:embed migrations/003_claims.sql
+var claimsSQL string
+
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
 	db       *sql.DB
@@ -26,6 +29,7 @@ type Store struct {
 	sessions *sessionRepo
 	scores   *scoreRepo
 	awards   *awardRepo
+	claims   *claimRepo
 	settings *settingRepo
 }
 
@@ -48,6 +52,7 @@ func Open(path string) (*Store, error) {
 	s.sessions = &sessionRepo{db: db}
 	s.scores = &scoreRepo{db: db}
 	s.awards = &awardRepo{db: db}
+	s.claims = &claimRepo{db: db}
 	s.settings = &settingRepo{db: db}
 	return s, nil
 }
@@ -62,6 +67,11 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	if err := s.addColumnIfMissing(ctx, "scores", "award_id", scoreAwardSQL); err != nil {
 		return err
+	}
+	// A whole new table, so it needs no column-existence guard — the file is
+	// CREATE ... IF NOT EXISTS throughout, like the base schema.
+	if _, err := s.db.ExecContext(ctx, claimsSQL); err != nil {
+		return fmt.Errorf("apply claims schema: %w", err)
 	}
 	return nil
 }
@@ -110,6 +120,7 @@ func (s *Store) Games() storage.GameRepository       { return s.games }
 func (s *Store) Sessions() storage.SessionRepository { return s.sessions }
 func (s *Store) Scores() storage.ScoreRepository     { return s.scores }
 func (s *Store) Awards() storage.AwardRepository     { return s.awards }
+func (s *Store) Claims() storage.ClaimRepository     { return s.claims }
 func (s *Store) Settings() storage.SettingRepository { return s.settings }
 
 func (s *Store) Close() error { return s.db.Close() }

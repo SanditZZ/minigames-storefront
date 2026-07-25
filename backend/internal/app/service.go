@@ -8,11 +8,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/sanditzz/minigames-storefront/backend/internal/claim"
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
 	"github.com/sanditzz/minigames-storefront/backend/internal/id"
@@ -80,11 +82,23 @@ type SubmitInput struct {
 	Value      int
 }
 
+// ClaimView is a claim plus its status at the moment it was read.
+//
+// The status travels with the claim rather than being re-derived by each
+// caller, because deriving it needs a clock and the service is the layer that
+// owns one. A handler computing it would be a second clock; a frontend
+// computing it would be a third, on a device whose time the player controls.
+type ClaimView struct {
+	Claim  domain.Claim       `json:"claim"`
+	Status domain.ClaimStatus `json:"status"` // derived, never stored
+}
+
 // SubmitResult is the outcome the player sees.
 type SubmitResult struct {
 	Score domain.ScoreEntry `json:"score"`
 	Rank  int               `json:"rank"`            // 1-based position on the leaderboard
 	Award *domain.Award     `json:"award,omitempty"` // nil if no prize won
+	Claim *ClaimView        `json:"claim,omitempty"` // nil if nothing was won
 }
 
 // SubmitScore validates and records a round, then (if the score qualifies)
@@ -154,7 +168,12 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		return SubmitResult{}, err
 	}
 
-	return SubmitResult{Score: saved, Rank: rank, Award: award}, nil
+	return SubmitResult{
+		Score: saved,
+		Rank:  rank,
+		Award: award,
+		Claim: s.viewClaim(s.issueClaim(ctx, saved, award)),
+	}, nil
 }
 
 // ScoreResult re-reads a finished round so a result URL stays addressable
@@ -188,7 +207,14 @@ func (s *Service) ScoreResult(ctx context.Context, slug domain.GameSlug, scoreID
 		return SubmitResult{}, err
 	}
 
-	return SubmitResult{Score: entry, Rank: rank, Award: award}, nil
+	// The claim is re-read rather than re-issued: one round earns exactly one
+	// claim, and revisiting the URL must show the same code, not mint another.
+	existing, err := s.claimForScore(ctx, entry.ID)
+	if err != nil {
+		return SubmitResult{}, err
+	}
+
+	return SubmitResult{Score: entry, Rank: rank, Award: award, Claim: s.viewClaim(existing)}, nil
 }
 
 // awardByID resolves a stored award reference for display. An award deleted
@@ -208,6 +234,132 @@ func (s *Service) awardByID(ctx context.Context, refID string) (*domain.Award, e
 		return nil, err
 	}
 	return &a, nil
+}
+
+// --- Claims ----------------------------------------------------------------
+
+// claimCodeAttempts caps the retry loop for a colliding claim code. Each draw
+// is independent from ~39 bits, so needing a sixth is not "unlucky" — it is
+// evidence something else is wrong (a stuck CSPRNG, a corrupted alphabet), and
+// looping harder would hide it.
+const claimCodeAttempts = 5
+
+// issueClaim mints the redeemable credential for a winning round.
+//
+// It returns nil — WITHOUT failing the submission — when there is nothing to
+// claim, and also when the claim cannot be written. That second case is a
+// deliberate asymmetry, and it is the interesting one: by the time this runs,
+// the score row is committed and the award's stock is already decremented.
+// Failing the request would tell the player their round did not count when it
+// did, and would not give the stock back. A win recorded without a code is a
+// degraded outcome an admin can repair from the score row; a round that
+// silently ate a prize and reported an error is not.
+//
+// The failure is logged rather than swallowed, because "some winners have no
+// claim" is invisible from the outside otherwise.
+func (s *Service) issueClaim(ctx context.Context, score domain.ScoreEntry, award *domain.Award) *domain.Claim {
+	if award == nil {
+		return nil
+	}
+	ttl := claim.TTL(s.settingInt(ctx, domain.SettingClaimTTLHours, domain.DefaultClaimTTLHours))
+
+	for attempt := 0; attempt < claimCodeAttempts; attempt++ {
+		fresh := claim.Issue(id.New(), id.NewClaimCode(), score, *award, ttl)
+		saved, err := s.store.Claims().Create(ctx, fresh)
+		if err == nil {
+			return &saved
+		}
+		if errors.Is(err, storage.ErrConflict) {
+			continue // the code was taken; the UNIQUE constraint did its job
+		}
+		log.Printf("claim: could not issue for score %s: %v", score.ID, err)
+		return nil
+	}
+	log.Printf("claim: %d code collisions in a row for score %s — check the generator", claimCodeAttempts, score.ID)
+	return nil
+}
+
+// claimForScore reads the claim a round earned. A round with no claim is not an
+// error: most rounds win nothing, and a win from before claims existed (or one
+// whose issue failed) legitimately has none.
+func (s *Service) claimForScore(ctx context.Context, scoreID string) (*domain.Claim, error) {
+	c, err := s.store.Claims().GetByScore(ctx, scoreID)
+	if errors.Is(err, storage.ErrNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+// viewClaim attaches the derived status, reading the clock once.
+func (s *Service) viewClaim(c *domain.Claim) *ClaimView {
+	if c == nil {
+		return nil
+	}
+	v := ClaimView{Claim: *c, Status: claim.StatusAt(*c, s.now())}
+	return &v
+}
+
+// ListClaims returns every claim, newest first, optionally narrowed to one
+// status. The filtering is a calculation over the rows rather than a WHERE
+// clause — see the note on storage.ClaimRepository for why it has to be.
+func (s *Service) ListClaims(ctx context.Context, status domain.ClaimStatus) ([]ClaimView, error) {
+	all, err := s.store.Claims().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	matching := claim.Filter(all, status, now)
+
+	out := make([]ClaimView, 0, len(matching))
+	for _, c := range matching {
+		out = append(out, ClaimView{Claim: c, Status: claim.StatusAt(c, now)})
+	}
+	return out, nil
+}
+
+// RedeemClaim hands a prize over: it marks the code used, once.
+//
+// The code arrives as a human typed it — lowercase, grouped with a dash,
+// padded with spaces — so it is normalized before anything else looks at it.
+// A code that could not exist is rejected without touching the database.
+//
+// The check-then-write is not a race: claim.CanRedeem answers "is this legal",
+// and the store's conditional UPDATE is what makes "redeem exactly once" true
+// when two admins scan the same code at the same moment.
+func (s *Service) RedeemClaim(ctx context.Context, code string) (ClaimView, error) {
+	normalized := id.NormalizeClaimCode(code)
+	if !id.LooksLikeClaimCode(normalized) {
+		return ClaimView{}, ErrClaimNotFound
+	}
+
+	found, err := s.store.Claims().GetByCode(ctx, normalized)
+	if errors.Is(err, storage.ErrNotFound) {
+		return ClaimView{}, ErrClaimNotFound
+	}
+	if err != nil {
+		return ClaimView{}, err
+	}
+
+	now := s.now()
+	if ok, reason := claim.CanRedeem(found, now); !ok {
+		// The claim is returned alongside the error: an admin refused at the
+		// counter still needs to see what the prize was and when it lapsed.
+		return ClaimView{Claim: found, Status: claim.StatusAt(found, now)},
+			fmt.Errorf("%w: %s", ErrClaimNotRedeemable, reason)
+	}
+
+	redeemed, err := s.store.Claims().Redeem(ctx, normalized, now)
+	if errors.Is(err, storage.ErrConflict) {
+		// Lost the race with another counter between the check and the write.
+		return ClaimView{}, fmt.Errorf("%w: %s", ErrClaimNotRedeemable, claim.ReasonAlreadyRedeemed)
+	}
+	if err != nil {
+		return ClaimView{}, err
+	}
+	return ClaimView{Claim: redeemed, Status: claim.StatusAt(redeemed, s.now())}, nil
 }
 
 // awardID flattens an optional award to the id persisted on a score row.

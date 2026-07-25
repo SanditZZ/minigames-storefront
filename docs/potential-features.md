@@ -27,8 +27,13 @@ component each:
 - **Daily / per-customer win caps** — limit prizes per person per day to control
   cost (needs customer identity, below).
 - **Time-boxed campaigns** — awards with start/end windows and schedules.
-- **Prize claim lifecycle** — issue a claim code/QR, mark redeemed at the
-  counter, expire unclaimed prizes. Prevents screenshot reuse.
+- **Prize claim lifecycle** — ~~issue a claim code~~ / QR, ~~mark redeemed at the
+  counter, expire unclaimed prizes~~. **Backend built** (`internal/claim`,
+  `claims` table, `GET|POST /api/v1/admin/claims`); a winning round now issues a
+  code and an admin can redeem it exactly once. **The frontends are not done** —
+  the player still sees "show this screen at the counter" in `ResultSummary.tsx`
+  and there is no admin claims panel, so the screenshot-reuse this was meant to
+  prevent is still possible in the running app. QR encoding was never started.
 - **Budget guardrails** — a global spend/units-per-day ceiling across all awards.
 - **Weighted award tiers** — configurable rarity weights and per-tier stock alerts.
 
@@ -158,18 +163,36 @@ rather than re-argued.
   UUIDv4's 122 — so guessing one is still impractical, but the margin that made
   "enumeration is impossible" a throwaway line is smaller, and a per-IP limit
   belongs here before real prizes are on the line.
-- **Prize claim lifecycle is now one step away.** Scores persist the `award_id`
-  they won, so "issue a claim code, mark redeemed at the counter, expire
-  unclaimed" only needs a status column and an admin action — no schema rework.
-  Today's "show this screen at the counter" is still screenshot-reusable.
-- **Deleting an award silently rewrites a player's history.** A score stores the
-  award *by id*, and `Service.awardByID` degrades a missing award to "no prize"
-  rather than erroring — the right call for the API, but it means a permanent
-  result URL that read "You won a Coffee" starts reading *"So close! No prize
-  this time"* the moment an admin deletes that prize. The result URL is only
-  honestly permanent if the win is: snapshot the award's name onto the score
-  row, or make admin delete a soft archive. Worth settling before claim codes
-  make a rewritten result an argument at the counter.
+- ~~**Prize claim lifecycle is now one step away.**~~ — **built (backend), and
+  the entry's own prediction was wrong.** It said this "only needs a status
+  column". It needed a table: a claim is a credential with its own lifecycle,
+  while a score is an immutable result, and seven fields bolted onto `scores`
+  mixes them. It also needed *fewer* columns than predicted, not more — status
+  is **derived** from `(redeemed_at, expires_at, now)` by `claim.StatusAt` and
+  never stored, because a stored status disagrees with reality the moment a
+  claim expires with nothing running to update the row. The knock-on: an admin
+  list cannot be filtered in SQL (`claim.Filter` does it), which is a real
+  constraint on the "admin lists at scale" section below.
+- ~~**Deleting an award silently rewrites a player's history.**~~ — **fixed, by
+  the first of the two routes this entry offered.** `claims.award_name` is a
+  snapshot taken at issue time, so a deleted award no longer changes what a
+  permanent result URL says was won (`TestClaimKeepsThePrizeNameAfterTheAwardIsDeleted`).
+  Note the fix is **partial in a way worth naming**: it protects rounds that
+  *won something*, because only those get a claim. A losing round has nothing to
+  snapshot, and `Service.awardByID` still degrades a deleted award to "no prize"
+  for anything issued before claims existed. Soft-delete/archive is still the
+  complete answer, and still pairs with the audit-trail item below.
+- **Backfill claims for wins that predate them.** Rounds already in
+  `.prod/minigames.db` carry an `award_id` but no claim, so their result URLs
+  show a prize with no code. A `cmd/backfill-claims` following the
+  `cmd/migrate-ids` rules (dry-run default, `-apply`, timestamped backup,
+  `-revert`) would close it. Until then the gap is silent.
+- **A claim that fails to write is invisible to the player.** `app.issueClaim`
+  logs and returns nil rather than failing the submission — deliberate, since
+  the score is committed and the stock already spent by that point (see its
+  comment), but the player sees a win with no code and no explanation. The
+  counter-side repair path is the backfill script above; the player-side one is
+  copy on the result screen that admits it.
 
 ### Admin lists at scale
 
@@ -186,7 +209,18 @@ are the seams that give way as the catalog and the score table grow.
   the only parameter it honours — no date range, no pagination, and no way to
   find one player's rounds. That is fine for a leaderboard and useless for the
   question an admin will actually arrive with once prizes are claimable: "this
-  customer says they won a coffee on Tuesday."
+  customer says they won a coffee on Tuesday." **Now live rather than
+  hypothetical** — prizes *are* claimable, and `GET /api/v1/admin/claims`
+  answers the counter's version of that question by code. The scores panel
+  still cannot answer it by person or by date.
+- **The claims list is unpaginated and filtered in memory.**
+  `ClaimRepository.List` returns every claim ever issued and `claim.Filter`
+  narrows it afterwards. That is forced rather than lazy — status is derived, so
+  it cannot be a `WHERE` clause — but the endpoint's cost grows with total
+  claims rather than with the size of the answer. Filtering `redeemed_at IS
+  NULL` in SQL and deriving only *expiry* in memory would bound the scan without
+  reintroducing a second definition of "redeemed"; worth doing before a venue
+  accumulates a season of them.
 - **Award delete has no audit trail.** The panel confirms, then deletes; nothing
   records who removed a prize or what its settings were. Pairs with "config
   change history" and with the soft-delete note above — one change buys both.

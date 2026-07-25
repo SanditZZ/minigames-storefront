@@ -30,6 +30,27 @@ func fmtNullTime(t *time.Time) sql.NullString {
 	return sql.NullString{String: fmtTime(*t), Valid: true}
 }
 
+// fmtOptionalTime renders a time.Time whose ZERO VALUE means "absent" as a
+// nullable column. It is the non-pointer counterpart to fmtNullTime, for fields
+// like Claim.ExpiresAt where a zero time is a meaningful state ("never
+// expires") rather than a missing one — a *time.Time there would make every
+// read site nil-check something that is never conceptually optional.
+func fmtOptionalTime(t time.Time) sql.NullString {
+	if t.IsZero() {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: fmtTime(t), Valid: true}
+}
+
+// parseOptionalTime reads a nullable timestamp back into a time.Time, mapping
+// NULL to the zero value.
+func parseOptionalTime(ns sql.NullString) time.Time {
+	if !ns.Valid || ns.String == "" {
+		return time.Time{}
+	}
+	return parseTime(ns.String)
+}
+
 // parseNullTime reads a nullable timestamp column into a *time.Time.
 func parseNullTime(ns sql.NullString) *time.Time {
 	if !ns.Valid || ns.String == "" {

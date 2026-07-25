@@ -167,11 +167,36 @@ assuming 39 bits never collides.
    - **The expiry boundary matches the session rule** (`now.After`), so a claim
      inspected at the exact nanosecond of expiry is still valid. One convention
      for "expired" across the repo.
-2. **Backend: storage, service wiring and HTTP endpoints** — next.
+2. ~~**Backend: storage, service wiring and HTTP endpoints**~~ — **done.**
+   `claims` table (migration 003), `claimRepo`, `SettingClaimTTLHours` seeded at
+   168, issue-on-win inside `SubmitScore`, `RedeemClaim`, `ListClaims`, and
+   `GET|POST /api/v1/admin/claims` behind `requireAdmin`. Decisions made while
+   wiring, none of which were in the plan:
+   - **A failed claim write does not fail the submission.** By the time
+     `issueClaim` runs, the score row is committed and the award's stock is
+     already decremented. Erroring would tell the player their round did not
+     count when it did, *and* would not return the stock. It logs and returns
+     nil instead — so a win can exist with no code. That is the reason the
+     roadmap now carries a `cmd/backfill-claims` entry.
+   - **The claim code is retried, not trusted.** Five attempts on
+     `storage.ErrConflict`; a sixth collision means something is wrong with the
+     generator rather than bad luck, so it gives up loudly.
+   - **`ScoreResult` re-reads the claim, never re-issues it.** One round earns
+     exactly one claim; revisiting the URL must show the same code.
+   - **SQLite gets its own tests** (`sqlite/claims_test.go`) — the first in the
+     repo. They exist precisely *because* `issueClaim` swallows write failures:
+     a broken INSERT would otherwise be invisible to the service tests (which
+     use a fake) and to Playwright (which would see a normal winning round).
 3. **Backend: run the gate and ship the claim API** — then pause for review
    before touching either frontend.
 
 Group C above is deliberately *not* in that list; it is the next session's work.
+
+**One correction to the §5 Group C plan:** `parse.ts` for the admin claims tab
+lives in `packages/admin-core`, and the panel must read the claim's `status`
+from the API response — do **not** re-derive it in TypeScript. It is derived
+from a clock, and the player's device clock is not one the backend controls.
+The API returns `{claim, status}` (`app.ClaimView`) for exactly this reason.
 
 ## 7. Environment notes (hard-won, do not rediscover)
 

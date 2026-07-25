@@ -82,6 +82,11 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("PUT /api/v1/admin/awards/{id}", s.requireAdmin(s.handleUpdateAward))
 	mux.HandleFunc("DELETE /api/v1/admin/awards/{id}", s.requireAdmin(s.handleDeleteAward))
 
+	// Claims are admin-only: the list is every outstanding prize in the venue,
+	// and redeeming is the act of giving one away.
+	mux.HandleFunc("GET /api/v1/admin/claims", s.requireAdmin(s.handleListClaims))
+	mux.HandleFunc("POST /api/v1/admin/claims/{code}/redeem", s.requireAdmin(s.handleRedeemClaim))
+
 	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAdmin(s.handleListSettings))
 	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", s.requireAdmin(s.handleUpsertSetting))
 	mux.HandleFunc("DELETE /api/v1/admin/settings/{key}", s.requireAdmin(s.handleDeleteSetting))

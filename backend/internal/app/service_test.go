@@ -3,11 +3,13 @@ package app
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
+	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 )
 
@@ -19,6 +21,7 @@ type memStore struct {
 	scores   *memScores
 	sessions *memSessions
 	awards   *memAwards
+	claims   *memClaims
 	settings *memSettings
 }
 
@@ -27,6 +30,7 @@ func newMemStore() *memStore {
 		scores:   &memScores{byID: map[string]domain.ScoreEntry{}},
 		sessions: &memSessions{byToken: map[string]domain.Session{}},
 		awards:   &memAwards{byID: map[string]domain.Award{}},
+		claims:   &memClaims{byCode: map[string]domain.Claim{}},
 		settings: &memSettings{},
 	}
 }
@@ -35,6 +39,7 @@ func (m *memStore) Games() storage.GameRepository       { return nil }
 func (m *memStore) Sessions() storage.SessionRepository { return m.sessions }
 func (m *memStore) Scores() storage.ScoreRepository     { return m.scores }
 func (m *memStore) Awards() storage.AwardRepository     { return m.awards }
+func (m *memStore) Claims() storage.ClaimRepository     { return m.claims }
 func (m *memStore) Settings() storage.SettingRepository { return m.settings }
 func (m *memStore) Migrate(context.Context) error       { return nil }
 func (m *memStore) Close() error                        { return nil }
@@ -157,6 +162,70 @@ func (a *memAwards) DecrementStock(_ context.Context, id string) error {
 	v.Stock--
 	a.byID[id] = v
 	return nil
+}
+
+// memClaims models the two guarantees the service leans on: a unique code, and
+// a redemption that can only happen once. Insertion order is kept so List can
+// return newest-first the way the SQL ORDER BY does.
+type memClaims struct {
+	byCode map[string]domain.Claim
+	order  []string
+	// failCreate makes every insert fail, to exercise the path where a win is
+	// recorded but no claim could be issued.
+	failCreate bool
+}
+
+func (c *memClaims) Create(_ context.Context, v domain.Claim) (domain.Claim, error) {
+	if c.failCreate {
+		return domain.Claim{}, errors.New("claims are down")
+	}
+	if _, taken := c.byCode[v.Code]; taken {
+		return domain.Claim{}, storage.ErrConflict
+	}
+	c.byCode[v.Code] = v
+	c.order = append(c.order, v.Code)
+	return v, nil
+}
+
+func (c *memClaims) GetByCode(_ context.Context, code string) (domain.Claim, error) {
+	v, ok := c.byCode[code]
+	if !ok {
+		return domain.Claim{}, storage.ErrNotFound
+	}
+	return v, nil
+}
+
+func (c *memClaims) GetByScore(_ context.Context, scoreID string) (domain.Claim, error) {
+	for _, code := range c.order {
+		if v := c.byCode[code]; v.ScoreID == scoreID {
+			return v, nil
+		}
+	}
+	return domain.Claim{}, storage.ErrNotFound
+}
+
+func (c *memClaims) List(context.Context) ([]domain.Claim, error) {
+	out := make([]domain.Claim, 0, len(c.order))
+	for i := len(c.order) - 1; i >= 0; i-- { // newest first
+		out = append(out, c.byCode[c.order[i]])
+	}
+	return out, nil
+}
+
+// Redeem mirrors the SQL guard: it only writes when redeemed_at is still unset,
+// so a second attempt conflicts rather than overwriting the first.
+func (c *memClaims) Redeem(_ context.Context, code string, at time.Time) (domain.Claim, error) {
+	v, ok := c.byCode[code]
+	if !ok {
+		return domain.Claim{}, storage.ErrNotFound
+	}
+	if v.RedeemedAt != nil {
+		return domain.Claim{}, storage.ErrConflict
+	}
+	stamp := at
+	v.RedeemedAt = &stamp
+	c.byCode[code] = v
+	return v, nil
 }
 
 // memSettings always misses, so the service falls back to its defaults.
@@ -366,4 +435,268 @@ func TestScoreResultRejectsUnknownAndMismatchedLookups(t *testing.T) {
 			t.Fatalf("err = %v, want ErrNotFound", err)
 		}
 	})
+}
+
+// --- claims -----------------------------------------------------------------
+
+// winningStore returns a store whose only award is winnable with a score of 40.
+func winningStore() *memStore {
+	store := newMemStore()
+	store.awards.byID["a1"] = domain.Award{
+		ID: "a1", Name: "Free Coffee", GameSlug: game.SlugTapFast,
+		MinScore: 30, Stock: domain.Unlimited, Active: true,
+	}
+	return store
+}
+
+func TestSubmitScoreIssuesAClaimForAWin(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+
+	res := playRound(t, svc, "Po", 40)
+
+	if res.Claim == nil {
+		t.Fatal("a winning round issued no claim")
+	}
+	if res.Claim.Status != domain.ClaimIssued {
+		t.Fatalf("status = %q, want %q", res.Claim.Status, domain.ClaimIssued)
+	}
+	if !id.LooksLikeClaimCode(res.Claim.Claim.Code) {
+		t.Fatalf("code %q is not in the claim-code format", res.Claim.Claim.Code)
+	}
+	if res.Claim.Claim.ScoreID != res.Score.ID {
+		t.Fatalf("claim points at score %q, want %q", res.Claim.Claim.ScoreID, res.Score.ID)
+	}
+	// The snapshot, not a reference — this is the whole point of the field.
+	if res.Claim.Claim.AwardName != "Free Coffee" {
+		t.Fatalf("award name = %q, want it copied onto the claim", res.Claim.Claim.AwardName)
+	}
+	// The default TTL applies (memSettings always misses), so it expires.
+	if res.Claim.Claim.ExpiresAt.IsZero() {
+		t.Fatal("claim has no expiry, but the default TTL is 168h")
+	}
+}
+
+func TestSubmitScoreIssuesNoClaimWithoutAPrize(t *testing.T) {
+	store := newMemStore()
+	store.awards.byID["a1"] = domain.Award{
+		ID: "a1", Name: "Free Coffee", GameSlug: game.SlugTapFast,
+		MinScore: 100, Stock: domain.Unlimited, Active: true,
+	}
+	svc := newTestService(store)
+
+	res := playRound(t, svc, "Po", 10)
+
+	if res.Claim != nil {
+		t.Fatalf("a losing round issued a claim: %+v", res.Claim)
+	}
+	if len(store.claims.byCode) != 0 {
+		t.Fatalf("store holds %d claims, want none", len(store.claims.byCode))
+	}
+}
+
+// A win whose claim could not be written must still be a win. The score row is
+// already committed and the award's stock already spent by this point, so
+// failing the submission would report a round that did not count when it did.
+func TestSubmitScoreSurvivesAClaimThatCannotBeIssued(t *testing.T) {
+	store := winningStore()
+	store.claims.failCreate = true
+	svc := newTestService(store)
+
+	res := playRound(t, svc, "Po", 40) // playRound fails the test on any error
+
+	if res.Award == nil {
+		t.Fatal("the prize was lost along with the claim")
+	}
+	if res.Claim != nil {
+		t.Fatalf("claim = %+v, want nil when it could not be written", res.Claim)
+	}
+}
+
+func TestScoreResultReturnsTheSameClaimOnEveryVisit(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	res := playRound(t, svc, "Po", 40)
+	issued := res.Claim.Claim.Code
+
+	for visit := 1; visit <= 3; visit++ {
+		again, err := svc.ScoreResult(ctx, game.SlugTapFast, res.Score.ID)
+		if err != nil {
+			t.Fatalf("visit %d: %v", visit, err)
+		}
+		if again.Claim == nil {
+			t.Fatalf("visit %d: the claim vanished", visit)
+		}
+		if again.Claim.Claim.Code != issued {
+			t.Fatalf("visit %d: code = %q, want the original %q", visit, again.Claim.Claim.Code, issued)
+		}
+	}
+	// Re-reading a result must never mint a second claim for the same round.
+	if len(store.claims.byCode) != 1 {
+		t.Fatalf("store holds %d claims after 3 visits, want 1", len(store.claims.byCode))
+	}
+}
+
+// The bug the snapshot exists to fix: deleting an award degrades the result to
+// "no prize", which would otherwise rewrite what a permanent URL says was won.
+func TestClaimKeepsThePrizeNameAfterTheAwardIsDeleted(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	res := playRound(t, svc, "Po", 40)
+	if err := store.awards.Delete(ctx, "a1"); err != nil {
+		t.Fatalf("delete award: %v", err)
+	}
+
+	after, err := svc.ScoreResult(ctx, game.SlugTapFast, res.Score.ID)
+	if err != nil {
+		t.Fatalf("ScoreResult: %v", err)
+	}
+	if after.Award != nil {
+		t.Fatalf("award = %+v, want nil once deleted", after.Award)
+	}
+	if after.Claim == nil || after.Claim.Claim.AwardName != "Free Coffee" {
+		t.Fatal("the claim lost the prize name when the award was deleted")
+	}
+}
+
+func TestRedeemClaimWorksExactlyOnce(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+
+	first, err := svc.RedeemClaim(ctx, code)
+	if err != nil {
+		t.Fatalf("first redeem: %v", err)
+	}
+	if first.Status != domain.ClaimRedeemed {
+		t.Fatalf("status = %q, want %q", first.Status, domain.ClaimRedeemed)
+	}
+	if first.Claim.RedeemedAt == nil {
+		t.Fatal("redeemed claim carries no timestamp")
+	}
+
+	_, err = svc.RedeemClaim(ctx, code)
+	if !errors.Is(err, ErrClaimNotRedeemable) {
+		t.Fatalf("second redeem err = %v, want ErrClaimNotRedeemable", err)
+	}
+}
+
+// The code is read off a screen and typed at a counter, so it arrives in
+// whatever shape a human produced.
+func TestRedeemClaimAcceptsCodeAsAHumanTypesIt(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+	typed := strings.ToLower(code[:4]) + "-" + strings.ToLower(code[4:])
+
+	if _, err := svc.RedeemClaim(context.Background(), " "+typed+" "); err != nil {
+		t.Fatalf("redeeming %q (from %q): %v", typed, code, err)
+	}
+}
+
+func TestRedeemClaimRejectsCodesThatDoNotResolve(t *testing.T) {
+	svc := newTestService(winningStore())
+	ctx := context.Background()
+
+	cases := []struct{ name, code string }{
+		// Well-formed but never issued.
+		{"unissued", "ABCD2345"},
+		// Malformed: rejected on shape, without touching the store. Both answer
+		// ErrClaimNotFound so a guesser learns nothing about which shapes exist.
+		{"too short", "ABCD234"},
+		{"a confusable character", "ABCO2345"},
+		{"an entity id", "V1StGXR8_Z5"},
+		{"empty", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := svc.RedeemClaim(ctx, c.code); !errors.Is(err, ErrClaimNotFound) {
+				t.Fatalf("err = %v, want ErrClaimNotFound", err)
+			}
+		})
+	}
+}
+
+func TestRedeemClaimRefusesAnExpiredClaimButStillReportsIt(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+
+	// Seeded directly: the service's clock starts in 2026, so a 2025 expiry is
+	// unreachable by playing a round.
+	store.claims.byCode["ABCD2345"] = domain.Claim{
+		ID: "c1", Code: "ABCD2345", ScoreID: "s1", AwardID: "a1", AwardName: "Free Coffee",
+		IssuedAt:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		ExpiresAt: time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC),
+	}
+	store.claims.order = append(store.claims.order, "ABCD2345")
+
+	view, err := svc.RedeemClaim(context.Background(), "ABCD2345")
+	if !errors.Is(err, ErrClaimNotRedeemable) {
+		t.Fatalf("err = %v, want ErrClaimNotRedeemable", err)
+	}
+	// An admin refused at the counter still has to see what it was.
+	if view.Status != domain.ClaimExpired {
+		t.Fatalf("status = %q, want %q", view.Status, domain.ClaimExpired)
+	}
+	if view.Claim.AwardName != "Free Coffee" {
+		t.Fatalf("award name = %q, want it returned with the refusal", view.Claim.AwardName)
+	}
+	if store.claims.byCode["ABCD2345"].RedeemedAt != nil {
+		t.Fatal("an expired claim was marked redeemed anyway")
+	}
+}
+
+func TestListClaimsFiltersOnDerivedStatus(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	live := playRound(t, svc, "Live", 40).Claim.Claim.Code
+	done := playRound(t, svc, "Done", 40).Claim.Claim.Code
+	if _, err := svc.RedeemClaim(ctx, done); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+	// An expired one cannot be produced by playing, so it is seeded.
+	store.claims.byCode["ABCD2345"] = domain.Claim{
+		ID: "c9", Code: "ABCD2345", ScoreID: "s9", AwardName: "Old Mug",
+		IssuedAt:  time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		ExpiresAt: time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC),
+	}
+	store.claims.order = append(store.claims.order, "ABCD2345")
+
+	cases := []struct {
+		status domain.ClaimStatus
+		want   []string
+	}{
+		{domain.ClaimIssued, []string{live}},
+		{domain.ClaimRedeemed, []string{done}},
+		{domain.ClaimExpired, []string{"ABCD2345"}},
+		{"", []string{"ABCD2345", done, live}}, // newest first
+	}
+	for _, c := range cases {
+		t.Run(string(c.status), func(t *testing.T) {
+			got, err := svc.ListClaims(ctx, c.status)
+			if err != nil {
+				t.Fatalf("ListClaims: %v", err)
+			}
+			if len(got) != len(c.want) {
+				t.Fatalf("got %d claims, want %d", len(got), len(c.want))
+			}
+			for i, code := range c.want {
+				if got[i].Claim.Code != code {
+					t.Fatalf("[%d] = %q, want %q", i, got[i].Claim.Code, code)
+				}
+				if got[i].Status == "" {
+					t.Fatalf("[%d] carries no derived status", i)
+				}
+			}
+		})
+	}
 }

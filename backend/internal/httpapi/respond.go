@@ -45,6 +45,12 @@ func writeAppError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, "session already used")
 	case errors.Is(err, app.ErrScoreRejected):
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
+	case errors.Is(err, app.ErrClaimNotFound):
+		writeError(w, http.StatusNotFound, "claim not found")
+	case errors.Is(err, app.ErrClaimNotRedeemable):
+		// The wrapped reason (already redeemed / expired) is the message: it is
+		// what the admin at the counter has to tell the person in front of them.
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, storage.ErrConflict):
 		writeError(w, http.StatusConflict, "conflict")
 	default:

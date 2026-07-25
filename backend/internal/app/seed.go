@@ -67,6 +67,7 @@ func defaultSettings() []domain.Setting {
 		{Key: domain.SettingMinReactionMs, Value: "80", Type: domain.SettingInt, Description: "Anti-cheat floor: reaction times faster than this (ms) are rejected as impossible."},
 		{Key: domain.SettingHighScoreLimit, Value: "10", Type: domain.SettingInt, Description: "How many entries a leaderboard returns by default."},
 		{Key: domain.SettingAllowReplays, Value: "true", Type: domain.SettingBool, Description: "Whether a player may start another session immediately after playing."},
+		{Key: domain.SettingClaimTTLHours, Value: "168", Type: domain.SettingInt, Description: "Hours a won prize stays claimable. 0 means claims never expire."},
 	}
 }
 
