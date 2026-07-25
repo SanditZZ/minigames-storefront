@@ -4,6 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Play & Win — Minigames Storefront</title>
+    <meta name="description" content="Play a quick game in store and win a prize." />
+
+    <!-- Icons. Everything referenced below is generated — see scripts/icons/.
+         The .ico is declared with an explicit size so browsers that understand
+         SVG prefer the scalable file, leaving the .ico for the ones that don't. -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- Installable. theme-color is the TOP of the app's own gradient, so the
+         status bar continues the page instead of banding across it. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#FFF0BE" />
+    <meta name="application-name" content="Play & Win" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <!-- iOS ignores the standard tag above and still needs its own pair. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Play & Win" />
   </head>
   <body>
     <div id="root"></div>

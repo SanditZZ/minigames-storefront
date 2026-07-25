@@ -29,6 +29,51 @@ editing those five vars only.
 7. Every game inherits these via the **shared UI kit** (`src/ui/`) — never define
    per-game colors. Add new games by composing kit primitives.
 
+## App icons + PWA — generated, never hand-edited
+
+Everything in `apps/*/public/` is **derived**. The source of truth is
+`scripts/icons/source.mjs` (the glyph path, the two themes, the render list);
+the PNGs, `favicon.ico`, `favicon.svg` and `manifest.webmanifest` are snapshots
+of it, committed so no build step depends on a browser.
+
+```bash
+node scripts/icons/gen-icons.mjs           # re-render both apps
+node scripts/icons/gen-icons.mjs --check    # fail if the committed files drifted
+```
+
+Re-theme by editing `source.mjs` and re-running — the same edit-one-place rule
+as the colour tokens above. A hand-edited PNG is silently reverted the next time
+anyone regenerates.
+
+### Rules
+
+- **The two apps must stay visually distinct.** Player is the palette's
+  primary-CTA pairing (coral field, ink mark); admin inverts it (ink field,
+  apricot mark). The inversion is deliberate — an operator with both installed
+  picks between two home-screen tiles, and the palette's "ink on light surfaces"
+  rule assumes a light surface. Do not "fix" the admin icon back to the light
+  scheme.
+- **No transparent icons.** Every render paints a full-bleed background rect. A
+  transparent mark is composited onto whatever the platform chooses and loses
+  contrast on someone's device.
+- **Maskable is a separate file, drawn smaller.** Android clips it to the
+  launcher's shape and only guarantees the centred 80%-diameter circle. The
+  glyph is wide, so the generator checks its *diagonal* against that circle
+  (`fitsSafeZone`) and throws rather than shipping a cropped icon. Never merge it
+  into the `any` entry with `purpose: "any maskable"`.
+- **Rounding is off wherever the platform masks.** `apple-touch-icon` and the
+  maskable render are square; pre-rounding them inside an OS mask produces a
+  shrunken tile with pale corners.
+- **PWA is install-only — there is no service worker.** Installability and
+  offline are separate features: a cache would have to be invalidated on every
+  `ship.sh` redeploy, and a kiosk that queues score submissions is the real
+  offline story (see `docs/potential-features.md`). Don't add a service worker
+  as a side effect of an icon change.
+
+The generator borrows Chromium from `e2e/node_modules` because this box has no
+`rsvg-convert` and ImageMagick's fallback SVG renderer mangles the glyph's arcs.
+It is a dev tool only — no app build and no CI job runs it.
+
 ## Component rule
 
 Always build with reusable UI components. Shared primitives live in `src/ui/`
