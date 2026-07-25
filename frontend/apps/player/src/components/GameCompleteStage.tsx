@@ -30,7 +30,9 @@ export function GameCompleteStage({ pending, onContinue }: { pending: boolean; o
   return (
     <section
       aria-label="Game complete. Your score is on its way."
-      className="relative flex flex-1 flex-col items-center justify-center gap-6"
+      // Still inside the tap-storm's blast radius, and not inside GameStage —
+      // this renders in its place — so it carries `no-select` itself.
+      className="no-select relative flex flex-1 flex-col items-center justify-center gap-6"
     >
       <div className="relative grid place-items-center">
         <HaloBox>

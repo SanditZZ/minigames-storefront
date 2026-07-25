@@ -27,13 +27,18 @@ component each:
 - **Daily / per-customer win caps** — limit prizes per person per day to control
   cost (needs customer identity, below).
 - **Time-boxed campaigns** — awards with start/end windows and schedules.
-- **Prize claim lifecycle** — ~~issue a claim code~~ / QR, ~~mark redeemed at the
-  counter, expire unclaimed prizes~~. **Backend built** (`internal/claim`,
-  `claims` table, `GET|POST /api/v1/admin/claims`); a winning round now issues a
-  code and an admin can redeem it exactly once. **The frontends are not done** —
-  the player still sees "show this screen at the counter" in `ResultSummary.tsx`
-  and there is no admin claims panel, so the screenshot-reuse this was meant to
-  prevent is still possible in the running app. QR encoding was never started.
+- ~~**Prize claim lifecycle**~~ — **built.** A winning round issues an
+  8-character code (`internal/claim`, the `claims` table); the player sees it on
+  the result screen with a copy button (`ClaimCard.tsx`); an admin redeems it
+  exactly once from the claims panel (`ClaimsPanel.tsx`, `/claims`). The
+  screenshot reuse it existed to prevent is closed: the credential is now a
+  server-issued code that can be marked used, not the screen itself.
+  **QR encoding was never started** — the code is typed, which is fine at a
+  counter and slow at a queue.
+- **A claim has no owner.** Anyone holding the code can redeem it, which is the
+  same trust model as a paper voucher and was the deliberate scope (this is a
+  portfolio piece — no real prizes). If prizes ever have value, the gap to close
+  first is that a code shared in a group chat is as good as the original.
 - **Budget guardrails** — a global spend/units-per-day ceiling across all awards.
 - **Weighted award tiers** — configurable rarity weights and per-tier stock alerts.
 
@@ -100,10 +105,20 @@ component each:
   - Both are small, and `Spinner` in the same file (`ui/Feedback.tsx`) already
     models the pattern with `role="status"` + `aria-live="polite"` — there is no
     design question left to answer here, only the edit.
-- **Scope the no-select rule.** `index.css` sets `user-select: none` on `body`
-  to stop text selection during rapid tapping, which also means a player cannot
-  copy their score — and will not be able to copy a claim code once the prize
-  lifecycle lands. It should apply to the game surfaces rather than globally.
+- ~~**Scope the no-select rule.**~~ — **built**, and the claim code is what
+  forced it. `index.css` now defines `.no-select`, applied by `GameStage` (which
+  wraps every live game) and by the two end-of-round stages, instead of sitting
+  on `body`. Everything else selects normally. The entry predicted this would
+  matter "once the prize lifecycle lands", and it did: an eight-character
+  credential nobody can select or copy is not much of a credential.
+- **Copying works without a secure context, deliberately.**
+  `apps/player/src/clipboard/copy.ts` tries `navigator.clipboard` and falls back
+  to `execCommand("copy")`. The fallback is the path this app normally takes,
+  not a safety net: the clipboard API requires HTTPS or `localhost`, and the
+  stack is served over plain HTTP on a Tailscale address, so on a phone across
+  the tailnet the modern API is simply absent. If HTTPS ever arrives the first
+  path starts winning by itself. Do not "modernise" this by deleting the
+  fallback.
 - **Pin the player's own leaderboard row.** `Leaderboard` shows the top ten; a
   player ranked #23 sees ten strangers and no sign of themselves. Their row
   belongs below an ellipsis when they fall outside the visible window (the rank
@@ -213,6 +228,18 @@ are the seams that give way as the catalog and the score table grow.
   hypothetical** — prizes *are* claimable, and `GET /api/v1/admin/claims`
   answers the counter's version of that question by code. The scores panel
   still cannot answer it by person or by date.
+- **The admin claims panel has no browser coverage.** `e2e/` starts the API and
+  the PLAYER app only, so nothing exercises `ClaimsPanel.tsx` in a browser — the
+  redeem box, the status filter and the row buttons are covered by unit tests on
+  their pure parts (`admin-core/claims/present.ts`) and by nothing else. The
+  player's claim code is E2E-tested; the counter's side of the same transaction
+  is not. Adding the admin app to the Playwright `webServer` list is the fix,
+  and it would also cover the awards and settings panels, which have the same
+  gap and always have.
+- **The native admin still has no claims screen.** `mobile/admin` remains a
+  one-screen skeleton (awards list). A phone at a counter is exactly the right
+  device for redeeming a code, and the API is ready for it; it needs its own
+  Maestro flow, and the Maestro step only runs when a device is attached.
 - **The claims list is unpaginated and filtered in memory.**
   `ClaimRepository.List` returns every claim ever issued and `claim.Filter`
   narrows it afterwards. That is forced rather than lazy — status is derived, so

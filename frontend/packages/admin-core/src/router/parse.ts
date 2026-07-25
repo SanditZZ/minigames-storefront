@@ -3,6 +3,7 @@
 // which is what makes the admin's routing testable without a browser.
 
 import {
+  CLAIM_STATUS_VALUES,
   DEFAULT_LOCATION,
   DEFAULT_TAB,
   GAME_FILTER_TABS,
@@ -16,6 +17,7 @@ import {
   STOCK_PARAM,
   STOCK_VALUES,
   TABS,
+  type ClaimStatusFilter,
   type Location,
   type SortOrder,
   type StatusFilter,
@@ -95,6 +97,15 @@ export function parseStock(search: string): StockFilter {
   return parseEnum(search, STOCK_PARAM, STOCK_VALUES, "all");
 }
 
+/**
+ * Reads the claims tab's status filter. Shares the ?status= key with
+ * parseStatus above but accepts a different vocabulary, so each rejects the
+ * other's values and degrades to "all" — see ClaimStatusFilter.
+ */
+export function parseClaimStatus(search: string): ClaimStatusFilter {
+  return parseEnum(search, STATUS_PARAM, CLAIM_STATUS_VALUES, "all");
+}
+
 export function parseSort(search: string): SortOrder {
   return parseEnum(search, SORT_PARAM, SORT_VALUES, "order");
 }
@@ -113,6 +124,7 @@ export function parseLocation(pathname: string, search: string): Location {
     gameSlug: parseGameSlug(search),
     status: parseStatus(search),
     stock: parseStock(search),
+    claimStatus: parseClaimStatus(search),
     query: parseQuery(search),
     sort: parseSort(search),
   };
@@ -144,6 +156,11 @@ export function hrefFor(location: Location): string {
 
   if (location.gameSlug && usesGameFilter(location.tab)) {
     params.set(GAME_PARAM, location.gameSlug);
+  }
+
+  // The claims tab writes its own vocabulary under the same ?status= key.
+  if (location.tab === "claims" && location.claimStatus !== DEFAULT_LOCATION.claimStatus) {
+    params.set(STATUS_PARAM, location.claimStatus);
   }
 
   // The remaining filters belong to the awards list alone.
@@ -187,6 +204,7 @@ export function hasActiveFilters(location: Location): boolean {
     location.gameSlug !== "" ||
     location.status !== DEFAULT_LOCATION.status ||
     location.stock !== DEFAULT_LOCATION.stock ||
+    location.claimStatus !== DEFAULT_LOCATION.claimStatus ||
     location.query !== ""
   );
 }

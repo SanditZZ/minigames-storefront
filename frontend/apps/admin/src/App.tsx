@@ -4,6 +4,7 @@ import { ApiError } from "@minigames/api-client";
 import { clearToken, getToken, makeApi } from "./api";
 import { TokenGate } from "./components/TokenGate";
 import { AwardsPanel } from "./components/AwardsPanel";
+import { ClaimsPanel } from "./components/ClaimsPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ScoresPanel } from "./components/ScoresPanel";
 import { TABS, useRouter } from "./router";
@@ -72,6 +73,13 @@ export function App() {
       }
     >
       {router.tab === "awards" && <AwardsPanel api={api} games={games} router={router} />}
+      {router.tab === "claims" && (
+        <ClaimsPanel
+          api={api}
+          status={router.location.claimStatus}
+          onStatusChange={(claimStatus) => router.setFilters({ claimStatus })}
+        />
+      )}
       {router.tab === "settings" && <SettingsPanel api={api} />}
       {router.tab === "scores" && (
         <ScoresPanel

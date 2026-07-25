@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
-import { END_OF_ROUND_MS, playRound, revealScore, SETTLED_RESULT_URL, shownScore, ui } from "../helpers/round";
+import {
+  CLAIM_CODE_PATTERN,
+  END_OF_ROUND_MS,
+  playRound,
+  revealScore,
+  SETTLED_RESULT_URL,
+  shownScore,
+  ui,
+} from "../helpers/round";
 
 test.describe("play flow", () => {
   test("a finished round celebrates first and withholds the score until the reveal", async ({ page }) => {
@@ -60,6 +68,39 @@ test.describe("play flow", () => {
 
     await revealScore(page);
     await expect(page).toHaveURL(/name=Urlname/);
+  });
+
+  test("a winning round hands the player a claim code, not a screenshot", async ({ page }) => {
+    await playRound(page, "Winner");
+    await revealScore(page);
+
+    // The round taps for the full server-timed 5s, which clears the lowest
+    // prize threshold — so this round always wins something.
+    const code = ui.claimCode(page);
+    await expect(code).toBeVisible();
+    await expect(code).toHaveText(CLAIM_CODE_PATTERN);
+
+    // The point of the whole feature: the credential is a server-issued code
+    // that can be marked used, not "show this screen at the counter".
+    await expect(page.getByText(/show this screen/i)).toBeHidden();
+    await expect(ui.copyCode(page)).toBeVisible();
+
+    // The code is the one thing on this screen a player has to transcribe, so
+    // it must survive the global no-select rule being scoped to game surfaces.
+    const selectable = await code.evaluate((el) => getComputedStyle(el).userSelect);
+    expect(selectable).not.toBe("none");
+  });
+
+  test("the claim code survives a reload of the result URL", async ({ page }) => {
+    await playRound(page, "Reclaim");
+    await revealScore(page);
+    const before = await ui.claimCode(page).innerText();
+
+    await page.reload();
+
+    // One round earns exactly one claim — a revisit must not mint another.
+    await expect(ui.playAgain(page)).toBeVisible();
+    expect(await ui.claimCode(page).innerText()).toBe(before);
   });
 
   test("quitting a live round takes two presses, then returns to the picker", async ({ page }) => {

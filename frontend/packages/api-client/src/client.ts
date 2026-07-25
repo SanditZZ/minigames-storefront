@@ -1,6 +1,8 @@
 import type {
   Award,
   AwardInput,
+  ClaimStatus,
+  ClaimView,
   Game,
   HighScores,
   Prize,
@@ -81,6 +83,28 @@ export function createClient(opts: ClientOptions) {
       request<Award>(`/api/v1/admin/awards/${id}`, { method: "PUT", body: JSON.stringify(body) }),
     deleteAward: (id: string) =>
       request<void>(`/api/v1/admin/awards/${id}`, { method: "DELETE" }),
+
+    /**
+     * Every claim, newest first, optionally narrowed to one status.
+     *
+     * The status filter is applied server-side because status is derived there
+     * from the server's clock — passing it through rather than filtering the
+     * response keeps one definition of "expired".
+     */
+    listClaims: (status?: ClaimStatus) =>
+      request<ClaimView[]>(`/api/v1/admin/claims${status ? `?status=${status}` : ""}`),
+    /**
+     * Marks a prize handed over. The code may be passed exactly as a human
+     * typed it — case and the grouping dash are normalised by the backend.
+     *
+     * Throws ApiError(404) for a code that does not resolve and ApiError(409)
+     * for one that cannot be redeemed, whose message is the reason to read out
+     * at the counter ("this claim has already been redeemed").
+     */
+    redeemClaim: (code: string) =>
+      request<ClaimView>(`/api/v1/admin/claims/${encodeURIComponent(code)}/redeem`, {
+        method: "POST",
+      }),
 
     listSettings: () => request<Setting[]>("/api/v1/admin/settings"),
     upsertSetting: (key: string, body: SettingInput) =>

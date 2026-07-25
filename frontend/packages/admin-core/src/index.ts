@@ -9,5 +9,6 @@
 // into a screen.
 
 export * from "./awards/filter";
+export * from "./claims/present";
 export * from "./router/parse";
 export * from "./router/routes";

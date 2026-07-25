@@ -6,6 +6,7 @@ import {
   isSafeSlug,
   isTab,
   parseAwardId,
+  parseClaimStatus,
   parseGameSlug,
   parseLocation,
   parseQuery,
@@ -171,6 +172,9 @@ describe("round trip", () => {
       at({ gameSlug: "tap-fast", status: "inactive", stock: "out", query: "coffee", sort: "name" }),
       at({ awardId: NEW_AWARD }),
       at({ awardId: "V1StGXR8_Z5", gameSlug: "tap-fast" }),
+      at({ tab: "claims" }),
+      at({ tab: "claims", claimStatus: "issued" }),
+      at({ tab: "claims", claimStatus: "expired" }),
     ];
     for (const loc of cases) {
       const [pathname, search] = hrefFor(loc).split("?");
@@ -244,5 +248,53 @@ describe("sameLocation", () => {
     expect(sameLocation(at(), at({ tab: "scores" }))).toBe(false);
     expect(sameLocation(at(), at({ status: "active" }))).toBe(false);
     expect(sameLocation(at(), at({ awardId: NEW_AWARD }))).toBe(false);
+  });
+});
+
+// The claims tab reads ?status= with a different vocabulary from the awards
+// list. They share the key deliberately (see ClaimStatusFilter), so the thing
+// worth proving is that neither can be put into the other's state.
+describe("the claims tab's status filter", () => {
+  it("parses its own vocabulary", () => {
+    expect(parseClaimStatus("?status=issued")).toBe("issued");
+    expect(parseClaimStatus("?status=redeemed")).toBe("redeemed");
+    expect(parseClaimStatus("?status=expired")).toBe("expired");
+  });
+
+  it("defaults to all when absent or unrecognised", () => {
+    expect(parseClaimStatus("")).toBe("all");
+    expect(parseClaimStatus("?status=banana")).toBe("all");
+  });
+
+  // Each parser rejects the other's words, so a stale or hand-edited URL
+  // degrades to an unfiltered list rather than to a filter no control shows.
+  it("does not bleed into the awards filter, or the other way round", () => {
+    expect(parseClaimStatus("?status=active")).toBe("all");
+    expect(parseStatus("?status=issued")).toBe("all");
+  });
+
+  it("is written only on the claims tab", () => {
+    expect(hrefFor(at({ tab: "claims", claimStatus: "issued" }))).toBe("/claims?status=issued");
+    // Carried in the Location but not emitted elsewhere — switching tabs must
+    // not drag a claims filter onto the awards list.
+    expect(hrefFor(at({ tab: "awards", claimStatus: "issued" }))).toBe("/awards");
+    expect(hrefFor(at({ tab: "settings", claimStatus: "expired" }))).toBe("/settings");
+  });
+
+  it("leaves an unfiltered claims panel as a bare path", () => {
+    expect(hrefFor(at({ tab: "claims" }))).toBe("/claims");
+    expect(hrefFor(at({ tab: "claims", claimStatus: "all" }))).toBe("/claims");
+  });
+
+  // Claims have no game of their own — the shared ?game= filter must not follow
+  // an admin onto this panel and silently narrow nothing.
+  it("ignores the shared game filter", () => {
+    expect(hrefFor(at({ tab: "claims", gameSlug: "tap-fast" }))).toBe("/claims");
+  });
+
+  it("counts as an active filter, so Clear filters reaches it", () => {
+    expect(hasActiveFilters(at({ tab: "claims", claimStatus: "issued" }))).toBe(true);
+    expect(hasActiveFilters(at({ tab: "claims" }))).toBe(false);
+    expect(clearedFilters(at({ tab: "claims", claimStatus: "redeemed" })).claimStatus).toBe("all");
   });
 });

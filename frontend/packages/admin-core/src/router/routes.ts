@@ -27,12 +27,13 @@
 // re-picking the same game on arrival.
 
 /** The panels the admin shell can show. Also the path segment for each. */
-export type Tab = "awards" | "settings" | "scores";
+export type Tab = "awards" | "claims" | "settings" | "scores";
 
 /** Tabs in display order, with their labels. The single source for both the
  *  tab strip and the set of paths the router recognises. */
 export const TABS: { id: Tab; label: string }[] = [
   { id: "awards", label: "Awards" },
+  { id: "claims", label: "Claims" },
   { id: "settings", label: "Settings" },
   { id: "scores", label: "Scores" },
 ];
@@ -49,10 +50,27 @@ export type StatusFilter = "all" | "active" | "inactive";
 /** Stock filter. "all" is the default and is never written to the URL. */
 export type StockFilter = "all" | "in" | "out" | "unlimited";
 
+/**
+ * Claim status filter. "all" is the default and is never written to the URL.
+ *
+ * These values are the backend's own `?status=` vocabulary, passed straight
+ * through to GET /api/v1/admin/claims rather than translated. The status is
+ * derived from the SERVER's clock, so the filtering has to happen there; this
+ * type exists to make the URL and the API speak the same words.
+ *
+ * It shares the ?status= key with StatusFilter above, which belongs to the
+ * awards list. That is safe because the two never appear on the same tab and
+ * each parser rejects the other's vocabulary — /claims?status=active and
+ * /awards?status=issued both degrade to "all" rather than to a filter no
+ * dropdown can represent.
+ */
+export type ClaimStatusFilter = "all" | "issued" | "redeemed" | "expired";
+
 /** List ordering. "order" is the admin-configured sortOrder — the default. */
 export type SortOrder = "order" | "name" | "threshold" | "stock";
 
 export const STATUS_VALUES: StatusFilter[] = ["all", "active", "inactive"];
+export const CLAIM_STATUS_VALUES: ClaimStatusFilter[] = ["all", "issued", "redeemed", "expired"];
 export const STOCK_VALUES: StockFilter[] = ["all", "in", "out", "unlimited"];
 export const SORT_VALUES: SortOrder[] = ["order", "name", "threshold", "stock"];
 
@@ -87,6 +105,10 @@ export interface Location {
   gameSlug: string;
   status: StatusFilter;
   stock: StockFilter;
+  /** Claim status from ?status= on the claims tab. Separate field from
+   *  `status` because the two tabs read the same key with different
+   *  vocabularies — see ClaimStatusFilter. */
+  claimStatus: ClaimStatusFilter;
   /** Name search from ?q=; "" when unset. */
   query: string;
   sort: SortOrder;
@@ -99,6 +121,7 @@ export const DEFAULT_LOCATION: Location = {
   gameSlug: "",
   status: "all",
   stock: "all",
+  claimStatus: "all",
   query: "",
   sort: "order",
 };

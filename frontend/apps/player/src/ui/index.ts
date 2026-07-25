@@ -3,6 +3,7 @@
 
 export { Button } from "./Button";
 export { Card, Eyebrow, HighlightCard, Panel } from "./Card";
+export { CopyButton } from "./CopyButton";
 export { Countdown } from "./Countdown";
 export { EmptyNote, Spinner, StatusMessage } from "./Feedback";
 export { GameStage } from "./GameStage";

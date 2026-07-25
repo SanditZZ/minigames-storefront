@@ -54,7 +54,11 @@ export function GameStage({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-2">
+    // `no-select` is scoped here rather than set on `body`: this frame wraps
+    // every live game, which is the only place rapid tapping happens and the
+    // only place a stray text selection is a problem. Outside it — the result
+    // screen, the leaderboard, the claim code — selection works normally.
+    <div className="no-select flex flex-1 flex-col gap-2">
       <HeaderRow
         title={title}
         subtitle={subtitle}

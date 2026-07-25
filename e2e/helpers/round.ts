@@ -10,11 +10,20 @@ export const ui = {
   completeStage: (page: Page) => page.getByRole("region", { name: /Game complete/i }),
   revealStage: (page: Page) => page.getByRole("region", { name: /Revealing your score/i }),
   playAgain: (page: Page) => page.getByRole("button", { name: "Play again" }),
+  /** The claim code on a winning result, in its grouped display form. */
+  claimCode: (page: Page) => page.getByText(CLAIM_CODE_PATTERN),
+  copyCode: (page: Page) => page.getByRole("button", { name: /Copy the claim code/i }),
   quit: (page: Page) => page.getByRole("button", { name: "Quit" }),
   confirmQuit: (page: Page) => page.getByRole("button", { name: "Confirm quitting this round" }),
   /** Reaction Timer's pre-flip state. */
   waitButton: (page: Page) => page.getByRole("button", { name: /Wait for the signal/i }),
 };
+
+/**
+ * A claim code as the player sees it: two groups of four, from the backend's
+ * confusable-free alphabet (no O/0, no I/L/1) — see internal/id.
+ */
+export const CLAIM_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/;
 
 /** Matches a settled result URL — the reveal flag must be gone by then. */
 export const SETTLED_RESULT_URL = /\/result\/tap-fast\/[\w-]+(\?name=[^&]*)?$/;

@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
-import { Card } from "./Surface";
+import type { ClaimView } from "@minigames/api-client";
+import { claimStatusLabel, claimStatusTone } from "@minigames/admin-core";
+import { Button } from "./Controls";
+import { Badge, Card } from "./Surface";
 
 /** Page frame: tinted background plus the centred content column. */
 export function AppShell({ header, children }: { header: ReactNode; children: ReactNode }) {
@@ -69,6 +72,45 @@ export function PanelHeader({ title, action }: { title: ReactNode; action?: Reac
 /** Vertical stack with the panels' standard rhythm. */
 export function Stack({ gap = "md", className = "", children }: { gap?: "sm" | "md"; className?: string; children: ReactNode }) {
   return <div className={`flex flex-col ${gap === "sm" ? "gap-3" : "gap-4"} ${className}`}>{children}</div>;
+}
+
+/**
+ * One claim in the claims list.
+ *
+ * Same anti-overlap contract as every other row here: the row owns the gap, the
+ * text block is `min-w-0 flex-1` so a long prize name truncates instead of
+ * shoving the action off-screen, and the action is `shrink-0 whitespace-nowrap`.
+ * At 320px this row carries a code, a prize name, a badge and a button, so it
+ * is the one most likely to break the rule if edited carelessly.
+ *
+ * `status` is passed through from the API, never recomputed — see ClaimView.
+ */
+export function ClaimRow({
+  view,
+  busy = false,
+  onRedeem,
+}: {
+  view: ClaimView;
+  busy?: boolean;
+  onRedeem: () => void;
+}) {
+  const { claim, status } = view;
+  return (
+    <li className="flex items-center gap-3 py-3 text-sm">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-mono font-bold tracking-wider text-ink">{claim.code}</span>
+          <Badge tone={claimStatusTone(status)}>{claimStatusLabel(status)}</Badge>
+        </div>
+        <div className="mt-0.5 truncate text-ink/60">{claim.awardName}</div>
+      </div>
+      {status === "issued" && (
+        <Button onClick={onRedeem} disabled={busy} className="shrink-0 whitespace-nowrap">
+          Redeem
+        </Button>
+      )}
+    </li>
+  );
 }
 
 /** One leaderboard line in the admin scores view. */

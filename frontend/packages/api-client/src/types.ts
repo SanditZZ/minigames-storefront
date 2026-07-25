@@ -71,10 +71,48 @@ export interface SubmitScoreInput {
   value: number;
 }
 
+/**
+ * The redeemable credential a winning round earns.
+ *
+ * `awardName` is a SNAPSHOT taken when the claim was issued, not a lookup — an
+ * award deleted afterwards must not rewrite what a permanent result URL says
+ * was won. Read the prize name from here, never by re-resolving `awardId`.
+ *
+ * `expiresAt` is absent when claims never expire (the admin set the TTL to 0).
+ */
+export interface Claim {
+  id: string;
+  code: string;
+  scoreId: string;
+  awardId: string;
+  awardName: string;
+  issuedAt: string;
+  expiresAt?: string;
+  redeemedAt?: string;
+}
+
+export type ClaimStatus = "issued" | "redeemed" | "expired";
+
+/**
+ * A claim plus its status at the moment the server read it.
+ *
+ * The status is DERIVED from (redeemedAt, expiresAt, now) and arrives already
+ * computed — do not re-derive it here. Deriving needs a clock, and the only
+ * clock available to this code is the device's, which the player controls. A
+ * phone with its date wound back would otherwise show an expired prize as
+ * claimable.
+ */
+export interface ClaimView {
+  claim: Claim;
+  status: ClaimStatus;
+}
+
 export interface SubmitResult {
   score: ScoreEntry;
   rank: number;
   award?: Award;
+  /** Absent when the round won nothing, or when issuing the claim failed. */
+  claim?: ClaimView;
 }
 
 /**

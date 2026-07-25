@@ -48,7 +48,9 @@ export function ScoreReveal({ value, unit, direction, best, isRecord, onDone }: 
   return (
     <section
       aria-label="Revealing your score."
-      className="relative flex flex-1 flex-col items-center justify-center gap-8"
+      // The tap-storm can still be running through the reveal. The score is
+      // shown again, selectably, on the result screen right after this.
+      className="no-select relative flex flex-1 flex-col items-center justify-center gap-8"
     >
       <div className="text-center">
         <Eyebrow>{settled ? tier.label : "Measuring…"}</Eyebrow>

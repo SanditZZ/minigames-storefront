@@ -113,9 +113,22 @@ body,
 body {
   margin: 0;
   -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Disables text selection, and is applied to the GAME SURFACES only.
+
+   It used to sit on `body`. Stopping rapid tapping from selecting text and
+   popping a copy menu mid-round is genuinely necessary — but applied globally
+   it also meant nothing in the app could be selected, including the player's
+   own score, and later the claim code they need to read out at a counter. A
+   credential you cannot select or copy is a bad credential.
+
+   So it is scoped to where the tapping happens. Everything outside a live game
+   selects normally, and .select-text (Tailwind) can re-enable it inside one. */
+.no-select {
   -webkit-user-select: none;
   user-select: none;
-  overscroll-behavior: none;
 }
 
 /* Accessibility: honour the OS "reduce motion" setting globally. The reveal

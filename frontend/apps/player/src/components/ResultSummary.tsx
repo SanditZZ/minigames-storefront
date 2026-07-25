@@ -1,6 +1,7 @@
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { isNewRecord } from "@minigames/player-core";
 import { AppearIn, Badge, Button, HighlightCard, Stack, Stat } from "../ui";
+import { ClaimCard } from "./ClaimCard";
 
 interface Props {
   game: Game;
@@ -31,13 +32,21 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
       </AppearIn>
 
       <AppearIn delayMs={140} className="w-full flex justify-center">
-        {won ? (
+        {result.claim ? (
+          <ClaimCard view={result.claim} />
+        ) : won ? (
+          // A win with no claim. Rare but real: issuing the code is the one
+          // step allowed to fail without failing the submission, because by
+          // then the score is written and the prize stock already spent (see
+          // app.issueClaim). Rounds played before claims existed land here too.
+          // Saying so is better than showing a prize with no way to collect it
+          // and letting the player discover that at the counter.
           <HighlightCard
             icon="🎉"
             eyebrow="You won"
             title={result.award!.name}
             body={result.award!.description || undefined}
-            note="Show this screen at the counter to claim your prize."
+            note="No claim code was issued for this round — show this screen to staff and they can sort it out."
           />
         ) : (
           <HighlightCard

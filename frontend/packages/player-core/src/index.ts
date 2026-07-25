@@ -13,6 +13,7 @@
 // only the thing that pushes it onto history is per-platform.
 
 export * from "./brand";
+export * from "./claims/present";
 export * from "./games/reaction";
 export * from "./prizes/merge";
 export * from "./reveal/calc";
