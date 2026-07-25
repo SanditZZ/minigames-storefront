@@ -1,0 +1,35 @@
+appId: com.funstore.minigames.admin
+name: Keeps the admin token in the keychain across a relaunch
+---
+# The one behaviour that has no web equivalent and therefore no existing
+# coverage: expo-secure-store round-tripping through the Android keystore.
+#
+# The web app uses localStorage, which is synchronous and effectively cannot
+# fail. SecureStore is async and CAN fail — wrong plugin, missing keystore
+# entry, a value written before the store is ready — and every one of those
+# failure modes looks identical to "signed out" at runtime. A staff member
+# retyping the shared secret on every cold start is exactly the kind of bug
+# that never gets reported as a bug.
+
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: "admin-token-input"
+- inputText: "${ADMIN_TOKEN}"
+- hideKeyboard
+- tapOn:
+    id: "admin-signin-button"
+- assertVisible:
+    id: "awards-list"
+
+# Cold start with app data intact — the token must come back out of the
+# keychain and go straight to the list.
+- launchApp:
+    clearState: false
+
+- assertVisible:
+    id: "awards-list"
+- assertVisible: "Free Coffee"
+- assertNotVisible:
+    id: "sign-in-screen"

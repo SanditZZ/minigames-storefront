@@ -67,11 +67,31 @@ fi
 # an unrelated docs push. Once mobile/admin/node_modules exists, this becomes a
 # hard gate — the shared packages it consumes change often, and a rename in
 # admin-core must not be discovered by a phone.
-echo "▸ [4/6] Mobile typecheck…"
-if [[ -d "$ROOT/mobile/admin/node_modules" ]]; then
-  (cd "$ROOT/mobile/admin" && npx tsc --noEmit)
-else
+echo "▸ [4/6] Mobile typecheck + E2E…"
+if [[ ! -d "$ROOT/mobile/admin/node_modules" ]]; then
   echo "  SKIPPED — run 'npm install' in mobile/admin to enable."
+else
+  (cd "$ROOT/mobile/admin" && npx tsc --noEmit)
+
+  # Find the tools where their installers actually put them. Neither ends up on
+  # PATH by default, and a gate that skips because of PATH rather than because
+  # of a missing device is the worst of both worlds: it looks like it ran.
+  export PATH="$HOME/.maestro/bin:${ANDROID_HOME:-$HOME/android-sdk}/platform-tools:$PATH"
+
+  # The Maestro suite needs a booted emulator or an attached phone, which is not
+  # something every machine has — the same shape of constraint as SKIP_E2E for
+  # the browser suite, and handled the same way: skip loudly, never silently.
+  #
+  # A skip here means the native client was COMPILED and not RUN. If the change
+  # touched mobile/ or a package it consumes, boot an emulator and re-run before
+  # pushing; a green ship.sh alone does not cover it.
+  if ! command -v maestro >/dev/null; then
+    echo "  ⚠ E2E SKIPPED — maestro not installed (https://maestro.mobile.dev)."
+  elif [[ -z "$(adb devices 2>/dev/null | awk 'NR>1 && $2=="device"')" ]]; then
+    echo "  ⚠ E2E SKIPPED — no emulator or device attached."
+  else
+    "$ROOT/mobile/admin/scripts/run-e2e.sh"
+  fi
 fi
 
 echo "▸ [5/6] Build + redeploy…"

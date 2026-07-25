@@ -6,10 +6,12 @@
   "description": "React Native admin client. Deliberately OUTSIDE the frontend npm workspace — see mobile/CLAUDE.md — so Expo's dependency tree never enters a web build or CI's frontend install.",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "bundle": "expo export --platform android --output-dir .expo-export"
+    "bundle": "expo export --platform android --output-dir .expo-export",
+    "test:e2e": "./scripts/run-e2e.sh",
+    "test:e2e:rebuild": "./scripts/run-e2e.sh --rebuild"
   },
   "dependencies": {
     "@minigames/admin-core": "file:../../frontend/packages/admin-core",

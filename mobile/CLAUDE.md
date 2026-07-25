@@ -80,20 +80,79 @@ that a shared secret living on staff phones is a weaker position than one in a
 browser tab that gets closed; this is the strongest argument for the "Real auth"
 item in `docs/potential-features.md`.
 
-## Testing — the honest gap
+## Testing
 
-`scripts/ship.sh` step 4 **typechecks** this app. Nothing runs it.
+Two layers, mirroring the web side:
 
-The web player is exercised in a real browser by the Playwright suite before
-every push, and the repo's rule is never to push around that. The native client
-has no equivalent: a screen that compiles and then crashes on device ships
-green. Until a Maestro suite exists, treat a green `ship.sh` as saying nothing
-about whether the Expo app works, and check a real device before trusting a
-native change.
+| Layer | Command | Runs where |
+|---|---|---|
+| Typecheck | `npm run typecheck` | `ship.sh` step 4, always |
+| Maestro E2E | `npm run test:e2e` | `ship.sh` step 4, when a device is attached |
 
-`npm run bundle` is the deeper local check — it runs Metro end to end and is
+`npm run bundle` is a third, occasional check: it runs Metro end to end and is
 what catches broken module resolution after moving a shared package or editing
 `metro.config.js`. The typecheck alone will not.
+
+### Booting an emulator for the suite
+
+```bash
+# The user must be in the kvm group (already true here). A shell started before
+# that took effect has stale credentials, so re-exec with `sg` rather than
+# reaching for sudo — no ACL change or re-login is needed.
+sg kvm -c "$HOME/android-sdk/emulator/emulator -avd minigames-test \
+  -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot"
+```
+
+`ship.sh` adds `~/.maestro/bin` and `$ANDROID_HOME/platform-tools` to PATH
+itself, so the gate fires without any shell setup once a device is attached.
+
+### The E2E suite
+
+`scripts/run-e2e.sh` is the native counterpart to `e2e/playwright.config.ts`,
+and follows it deliberately: an **isolated** API on its own port with a
+throwaway SQLite file, deleted after the run. A test must never land on the real
+leaderboard or burn real prize stock, on either platform.
+
+The fixtures are the backend's own starter awards (`internal/app/seed.go`),
+which are seeded deterministically into an empty database — so flows can assert
+on *"Free Coffee"* and *"reach 60"* rather than on "some row exists". The runner
+fails fast if it does not find exactly six, because a silently-changed seed
+would otherwise turn into a confusing flow failure.
+
+**`10.0.2.2` is not a placeholder.** It is the emulator's alias for the host's
+loopback; the app runs inside the emulator, so `127.0.0.1` there means the
+emulator itself. The APK is built with that address baked in. On a physical
+device, rebuild with the Tailscale IP instead.
+
+Flows live in `.maestro/` and are keyed on `testID`s, never on layout. Note the
+row ids are composed from `gameSlug` + `sortOrder` rather than `award.id`: ids
+are nanoids minted at seed time and differ on every fresh database, so a flow
+keyed on one would pass once and never again.
+
+### What the suite is actually for
+
+`keychain-persists.yaml` is the flow to keep if you ever keep only one. It
+covers the single behaviour with **no web equivalent and therefore no existing
+coverage**: `expo-secure-store` round-tripping through the Android keystore. The
+web app's `localStorage` is synchronous and effectively cannot fail; SecureStore
+is async and can, and every one of its failure modes looks identical to "signed
+out" at runtime. A staff member retyping the shared secret on every cold start
+is exactly the kind of bug nobody reports as a bug.
+
+The other two earn their place by covering what a typecheck structurally cannot:
+that Metro really resolved `@minigames/admin-core`, that the ATS/cleartext
+exception really took, and that a rejected token is really cleared rather than
+left in the keychain to fail on every later request.
+
+### The remaining gap
+
+A skip is still possible: no emulator, no `maestro`, no run. `ship.sh` says so
+loudly rather than silently, but **a green gate on a machine with no device
+means the native client was compiled, not run.** If a change touches `mobile/`
+or a package it consumes, boot an emulator before pushing.
+
+iOS has no coverage at all — these flows are Android-only, and nothing in this
+repo has ever run on an iOS simulator.
 
 ## Icons
 

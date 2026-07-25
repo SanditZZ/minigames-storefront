@@ -1,0 +1,36 @@
+appId: com.funstore.minigames.admin
+name: Rejects a wrong admin token and stays signed out
+---
+# A wrong secret must fail HERE, visibly, and must not be kept. The web app's
+# TokenGate validates before storing for the same reason; this asserts the
+# native path does too, including that the rejected token was cleared rather
+# than left in the keychain to fail again on every later request.
+
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: "admin-token-input"
+- inputText: "definitely-not-the-secret"
+- hideKeyboard
+
+- tapOn:
+    id: "admin-signin-button"
+
+- assertVisible:
+    id: "sign-in-error"
+- assertVisible: "That admin token was rejected."
+
+# Still on the gate, not showing a half-loaded list behind an error.
+- assertVisible:
+    id: "sign-in-screen"
+- assertNotVisible:
+    id: "awards-list"
+
+# The rejected token was NOT persisted: relaunching returns to the gate rather
+# than retrying the bad secret. Without the clearToken() call in the 401 branch
+# this passes the assertions above and fails right here.
+- launchApp:
+    clearState: false
+- assertVisible:
+    id: "sign-in-screen"

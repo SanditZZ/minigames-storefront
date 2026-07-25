@@ -201,6 +201,18 @@ are the seams that give way as the catalog and the score table grow.
   is E2E-tested, but "the animation lasts about 2.2s and can be skipped" is only
   covered indirectly. A trace-based assertion could pin it if the feel starts
   regressing.
+- **iOS has no coverage whatsoever.** The Maestro suite
+  (`mobile/admin/.maestro/`) is Android-only, and nothing in this repo has ever
+  run on an iOS simulator — which also means the `NSAllowsLocalNetworking`
+  exception in `app.config.ts` is *reasoned about* rather than *observed*. It
+  needs a macOS runner, so it is deferred rather than half-done, but the ATS
+  behaviour in particular should be confirmed on a real device before anyone
+  relies on the iOS build.
+- **The native suite can silently not run.** `ship.sh` skips the Maestro step
+  when no emulator is attached. It says so, but a push from a machine without
+  one still reports green — the same class of hole `SKIP_E2E` opens for the
+  browser suite, and worth remembering before trusting a native change that was
+  only ever compiled.
 
 ### Small cleanups
 

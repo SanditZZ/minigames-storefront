@@ -75,6 +75,7 @@ export default function AwardsScreen() {
         <Centered><ActivityIndicator color="#4A2B20" /></Centered>
       ) : (
         <FlatList
+          testID="awards-list"
           data={visibleAwards(awards, DEFAULT_LOCATION, DEFAULT_LOCATION.sort)}
           keyExtractor={(a) => a.id}
           contentContainerClassName="p-4 gap-3"
@@ -93,7 +94,14 @@ function AwardRow({ award }: { award: Award }) {
   return (
     // gap-3 + min-w-0 + shrink-0, same rule as the web app: a long prize name
     // must truncate rather than push the stock badge off a narrow screen.
-    <View className="flex-row items-center gap-3 rounded-2xl bg-white p-4">
+    //
+    // The testID is composed from game + sortOrder rather than award.id: ids are
+    // nanoids minted at seed time, so they differ on every fresh test database,
+    // and a flow keyed on one would pass once and never again.
+    <View
+      testID={`award-${award.gameSlug || "any"}-${award.sortOrder}`}
+      className="flex-row items-center gap-3 rounded-2xl bg-white p-4"
+    >
       <View className="min-w-0 flex-1">
         <Text numberOfLines={1} className="text-base font-bold text-ink">
           {award.name}
@@ -116,12 +124,13 @@ function SignIn({ error, onSubmit }: { error: string; onSubmit: (token: string) 
   const [value, setValue] = useState("");
   return (
     <Centered>
-      <View className="w-full max-w-sm gap-3">
+      <View testID="sign-in-screen" className="w-full max-w-sm gap-3">
         <Text className="text-xl font-bold text-ink">Admin sign in</Text>
         <Text className="text-sm text-ink/60">
           The shared secret for {baseUrl}. Stored in the device keychain, not in app storage.
         </Text>
         <TextInput
+          testID="admin-token-input"
           value={value}
           onChangeText={setValue}
           placeholder="Admin token"
@@ -131,8 +140,13 @@ function SignIn({ error, onSubmit }: { error: string; onSubmit: (token: string) 
           autoCorrect={false}
           className="rounded-xl bg-white px-4 py-3 text-ink"
         />
-        {error !== "" && <Text className="text-sm font-semibold text-ink">{error}</Text>}
+        {error !== "" && (
+          <Text testID="sign-in-error" className="text-sm font-semibold text-ink">
+            {error}
+          </Text>
+        )}
         <Pressable
+          testID="admin-signin-button"
           disabled={value === ""}
           onPress={() => onSubmit(value)}
           className={`rounded-xl px-4 py-3 ${value === "" ? "bg-ink/10" : "bg-brand"}`}

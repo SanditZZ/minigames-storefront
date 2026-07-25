@@ -1,0 +1,45 @@
+appId: com.funstore.minigames.admin
+name: Signs in and lists the seeded awards
+---
+# The happy path, and the only test that proves the whole native stack is
+# actually wired: a real APK, talking to a real API over cleartext HTTP,
+# rendering rows through a CALCULATION (visibleAwards) that is shared verbatim
+# with the web admin. If Metro silently failed to resolve @minigames/admin-core,
+# or the ATS/cleartext exception did not take, this is what goes red.
+
+- launchApp:
+    clearState: true
+
+- assertVisible:
+    id: "sign-in-screen"
+
+- tapOn:
+    id: "admin-token-input"
+- inputText: "${ADMIN_TOKEN}"
+- hideKeyboard
+
+- tapOn:
+    id: "admin-signin-button"
+
+- assertVisible:
+    id: "awards-list"
+
+# Pinned to the backend's starter ladder (backend/internal/app/seed.go), which
+# is deterministic on a fresh database — the throwaway stack deletes the SQLite
+# file before every run, so these six awards are seeded identically each time.
+- assertVisible: "Free Coffee"
+- assertVisible: "Store Tote Bag"
+- assertVisible: "10% Off Coupon"
+
+# Keyed on game + sortOrder, so this also asserts the row's SUBTITLE is built
+# from the right award: tap-fast's tier 3 is the tote at 60 taps.
+- assertVisible:
+    id: "award-tap-fast-3"
+- assertVisible: "tap-fast · reach 60"
+
+# Reaction Timer's ladder runs the other way — its hardest prize has the
+# SMALLEST threshold. Asserting both directions here is what would catch a
+# port that quietly reused the tap-fast ordering for every game.
+- assertVisible:
+    id: "award-reaction-timer-3"
+- assertVisible: "reaction-timer · reach 220"

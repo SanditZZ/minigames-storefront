@@ -4,3 +4,13 @@ node_modules/
 dist/
 expo-env.d.ts
 *.log
+
+# Continuous native generation: android/ and ios/ are OUTPUT of `expo prebuild`
+# from app.config.ts, not source. Committing them would create a second place
+# where the ATS/cleartext settings live, and the two would drift.
+android/
+ios/
+
+# Maestro run artifacts (screenshots/recordings of failures).
+.maestro/**/screenshots/
+maestro-*.log

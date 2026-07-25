@@ -27,11 +27,12 @@ typecheck of the E2E specs; it does not run the browser suite, which would cost
 minutes of runner time per push. That makes step 3 above the only place the
 player flow is exercised in a browser — so never push around it.
 
-**The native clients are typechecked, not run.** `ship.sh` adds a mobile
-typecheck when `mobile/admin/node_modules` exists, and CI skips the Expo tree
-entirely. Nothing anywhere drives the React Native app, so a green gate says
-nothing about whether it works on a device — check one before trusting a native
-change, and see `mobile/CLAUDE.md`.
+**The native client has its own suite, on the same terms.** `ship.sh` step 4
+typechecks the Expo app and then runs its Maestro flows against an isolated API
+— the same throwaway-stack discipline as step 3 — but only when an emulator or
+phone is attached. CI skips the Expo tree entirely. A skip is announced, never
+silent; on a machine with no device, a green gate means the native client
+compiled and did not run. See `mobile/CLAUDE.md`.
 
 **Never push on red.** If a test fails, fix it or report and stop — do not
 comment it out, do not `--no-verify`, and do not reach for `SKIP_E2E=1` (that
