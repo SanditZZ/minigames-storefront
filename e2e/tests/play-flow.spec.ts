@@ -41,13 +41,55 @@ test.describe("play flow", () => {
     await expect(page).toHaveURL(/name=Urlname/);
   });
 
-  test("quitting a round returns to the picker without recording a score", async ({ page }) => {
+  test("quitting a live round takes two presses, then returns to the picker", async ({ page }) => {
     await page.goto("/");
     await ui.gameCard(page).click();
+    // The tap button only appears once the countdown has handed over, so its
+    // presence is what tells us the round is genuinely live.
     await expect(ui.tapButton(page)).toBeVisible();
 
-    await page.getByRole("button", { name: "Quit" }).click();
+    // Quit sits a stray thumb away from a rapid-tap target, so one press must
+    // not throw the round away — it arms a confirmation instead.
+    await ui.quit(page).click();
+    await expect(ui.confirmQuit(page)).toBeVisible();
+    await expect(ui.tapButton(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/play\/tap-fast/);
+
+    await ui.confirmQuit(page).click();
     await expect(page).toHaveURL(/\/(\?.*)?$/);
     await expect(ui.gameCard(page)).toBeVisible();
+  });
+});
+
+test.describe("game catalog", () => {
+  test("both games are offered and each carries its own icon", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(ui.gameCard(page, "Tap Fast")).toBeVisible();
+    await expect(ui.gameCard(page, "Reaction Timer")).toBeVisible();
+  });
+
+  test("the landing screen advertises prizes before a game is chosen", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByText("Today's prizes")).toBeVisible();
+    // Seeded starter awards. `exact` matters: the prize blurb also contains the
+    // words "free coffee", so a loose match resolves to two elements.
+    await expect(page.getByText("Free Coffee", { exact: true })).toBeVisible();
+    // Both games seed the same three prizes, so the merge must show three
+    // rather than six.
+    await expect(page.getByRole("listitem")).toHaveCount(3);
+  });
+
+  test("Reaction Timer counts in, then withholds the signal until it flips", async ({ page }) => {
+    await page.goto("/");
+    await ui.gameCard(page, "Reaction Timer").click();
+
+    // The shared countdown runs first, then the game mounts already counted in.
+    await expect(ui.waitButton(page)).toBeVisible();
+    // Tapping early is a false start: it must not end the round.
+    await ui.waitButton(page).dispatchEvent("pointerdown");
+    await expect(page.getByText("Too soon!")).toBeVisible();
+    await expect(page).toHaveURL(/\/play\/reaction-timer/);
   });
 });

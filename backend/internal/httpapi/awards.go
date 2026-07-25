@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
+	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 )
 
 // awardRequest is the admin-editable shape of an award. IDs and timestamps are
@@ -55,7 +54,7 @@ func (s *Server) handleCreateAward(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	a := domain.Award{
-		ID:          uuid.NewString(),
+		ID:          id.New(),
 		Name:        req.Name,
 		Description: req.Description,
 		ImageURL:    req.ImageURL,

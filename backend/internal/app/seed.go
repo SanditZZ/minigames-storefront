@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
-
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
+	"github.com/sanditzz/minigames-storefront/backend/internal/game"
+	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 )
 
 // Seed makes the store usable on first boot: it registers the catalog games,
@@ -34,16 +34,27 @@ func (s *Service) Seed(ctx context.Context) error {
 		}
 	}
 
-	// Starter awards only when the store has none, so re-seeding won't duplicate.
+	// Starter awards are seeded PER GAME, and only for a game that has none.
+	//
+	// Per-game rather than "only when the store is empty" so that adding a game
+	// to the catalog gives it a demonstrable prize ladder on an existing
+	// database too — otherwise a new game ships with an empty prize showcase
+	// forever. Still idempotent: a game whose awards an admin has edited (or
+	// added to) is never touched again.
 	existing, err := s.store.Awards().List(ctx)
 	if err != nil {
 		return err
 	}
-	if len(existing) == 0 {
-		for _, a := range starterAwards(now) {
-			if _, err := s.store.Awards().Create(ctx, a); err != nil {
-				return err
-			}
+	seeded := make(map[domain.GameSlug]bool, len(existing))
+	for _, a := range existing {
+		seeded[a.GameSlug] = true
+	}
+	for _, a := range starterAwards(now) {
+		if seeded[a.GameSlug] {
+			continue
+		}
+		if _, err := s.store.Awards().Create(ctx, a); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -53,19 +64,23 @@ func defaultSettings() []domain.Setting {
 	return []domain.Setting{
 		{Key: domain.SettingSessionTTLSeconds, Value: "120", Type: domain.SettingInt, Description: "Seconds a play session stays valid before a score must be submitted."},
 		{Key: domain.SettingMaxTapsPerSecond, Value: "20", Type: domain.SettingInt, Description: "Anti-cheat ceiling: taps/second above which a score is rejected."},
+		{Key: domain.SettingMinReactionMs, Value: "80", Type: domain.SettingInt, Description: "Anti-cheat floor: reaction times faster than this (ms) are rejected as impossible."},
 		{Key: domain.SettingHighScoreLimit, Value: "10", Type: domain.SettingInt, Description: "How many entries a leaderboard returns by default."},
 		{Key: domain.SettingAllowReplays, Value: "true", Type: domain.SettingBool, Description: "Whether a player may start another session immediately after playing."},
 	}
 }
 
 func starterAwards(now time.Time) []domain.Award {
-	// Three tiers for tap-fast so the reward flow is demonstrable out of the box.
-	mk := func(name, desc string, min, stock, order int) domain.Award {
+	// A three-tier ladder per game so the reward flow is demonstrable out of the
+	// box. Note the thresholds run in opposite directions: tap-fast is
+	// higher-is-better (more taps), reaction-timer is lower-is-better (a faster
+	// time), so its hardest prize carries the SMALLEST MinScore.
+	mk := func(slug domain.GameSlug, name, desc string, min, stock, order int) domain.Award {
 		return domain.Award{
-			ID:          uuid.NewString(),
+			ID:          id.New(),
 			Name:        name,
 			Description: desc,
-			GameSlug:    domain.GameSlug("tap-fast"),
+			GameSlug:    slug,
 			MinScore:    min,
 			Stock:       stock,
 			Active:      true,
@@ -75,8 +90,12 @@ func starterAwards(now time.Time) []domain.Award {
 		}
 	}
 	return []domain.Award{
-		mk("10% Off Coupon", "A small thank-you for playing.", 20, domain.Unlimited, 1),
-		mk("Free Coffee", "Reach 40 taps to earn a free coffee.", 40, 100, 2),
-		mk("Store Tote Bag", "Reach 60 taps for a limited-edition tote.", 60, 25, 3),
+		mk(game.SlugTapFast, "10% Off Coupon", "A small thank-you for playing.", 20, domain.Unlimited, 1),
+		mk(game.SlugTapFast, "Free Coffee", "Reach 40 taps to earn a free coffee.", 40, 100, 2),
+		mk(game.SlugTapFast, "Store Tote Bag", "Reach 60 taps for a limited-edition tote.", 60, 25, 3),
+
+		mk(game.SlugReactionTimer, "10% Off Coupon", "React in under 400ms for a thank-you discount.", 400, domain.Unlimited, 1),
+		mk(game.SlugReactionTimer, "Free Coffee", "React in under 300ms to earn a free coffee.", 300, 100, 2),
+		mk(game.SlugReactionTimer, "Store Tote Bag", "React in under 220ms for a limited-edition tote.", 220, 25, 3),
 	}
 }

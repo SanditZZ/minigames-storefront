@@ -28,11 +28,14 @@ type Validator func(value int, elapsedMs int, limits Limits) error
 // and passed in explicitly so this layer stays pure.
 type Limits struct {
 	MaxTapsPerSecond int
+	// MinReactionMs is the fastest visual reaction treated as human. Below it a
+	// submission is a pre-tap or a fabrication, not a result.
+	MinReactionMs int
 }
 
 // DefaultLimits are conservative fallbacks when a setting is missing.
 func DefaultLimits() Limits {
-	return Limits{MaxTapsPerSecond: 20}
+	return Limits{MaxTapsPerSecond: 20, MinReactionMs: 80}
 }
 
 // Registry indexes definitions by slug. It is plain data assembled once at

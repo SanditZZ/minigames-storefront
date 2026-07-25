@@ -71,6 +71,33 @@ export function HaloBox({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Transient "+1" marks lifting away from a tap.
+ *
+ * The caller owns the list and drops each entry when its animation is over, so
+ * this stays presentational. Purely decorative and aria-hidden — the running
+ * count is already announced by the Stat readout, and a screen reader does not
+ * need one announcement per tap.
+ *
+ * Rendered as a sibling of the tap target rather than inside it, so these never
+ * become part of the button's accessible name.
+ */
+export function TapMarks({ marks, label = "+1" }: { marks: { id: number; x: number }[]; label?: string }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden>
+      {marks.map((m) => (
+        <span
+          key={m.id}
+          style={{ left: `${m.x}%`, "--drift": `${(m.id % 5) * 8 - 16}px` } as CSSProperties}
+          className="animate-float-up absolute top-1/3 text-2xl font-black text-ink"
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** Wraps content that should animate in when it first appears. */
 export function AppearIn({
   variant = "rise",

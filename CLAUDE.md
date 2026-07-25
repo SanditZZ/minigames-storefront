@@ -67,6 +67,47 @@ When adding a game or a screen, add the pure logic to a calculation module and
 test it in vitest; add one E2E assertion only if it changes the player's path
 through the app.
 
+## Identifiers — nanoid(11) for entities, UUID for credentials
+
+**Every persisted entity id is an 11-character nanoid, minted by `internal/id`.**
+Never call a generator inline and never introduce a second id format.
+
+```go
+import "github.com/sanditzz/minigames-storefront/backend/internal/id"
+
+entry := domain.ScoreEntry{ID: id.New(), /* … */}
+```
+
+- **Entity ids** (`scores.id`, `awards.id`, and anything added later) → `id.New()`.
+  Eleven characters of nanoid's URL-safe alphabet carry 66 bits of entropy: short
+  enough to read aloud, type, or print on a receipt, and unguessable in a public
+  URL. `id.Length` and `id.Alphabet` are the only place those choices live.
+- **Session tokens stay UUIDv4.** A token is a *credential* — an unguessable
+  single-use permit to submit a score — not a name for something. It is never
+  displayed, typed, or put in a URL, so shortening it buys nothing and would
+  trade away entropy on the only secret in the play flow. See
+  `id.TokenLengthNote`; the exception is deliberate, so don't "tidy" it away.
+- `id.Looks(s)` is the pure shape check. It is what makes the data migration
+  idempotent — use it rather than re-deriving "is this already a nanoid?".
+
+### Migrating ids on existing data
+
+`cmd/migrate-ids` converts a database in place. It follows the repo's script
+rules: **dry run by default**, `-apply` to commit, a timestamped JSON backup
+written before any write, and `-revert <file>` to undo. It is idempotent (rows
+that already look like nanoids are skipped) and runs in one transaction, so a
+failure leaves the database untouched rather than half-converted.
+
+```bash
+go run ./cmd/migrate-ids -db ../.prod/minigames.db          # dry run
+go run ./cmd/migrate-ids -db ../.prod/minigames.db -apply   # commit
+```
+
+Stop the stack (`./scripts/serve-prod.sh --stop`) before applying, and remember
+that rewriting `awards.id` must carry `scores.award_id` with it — the migration
+does this in the same transaction; anything new that references an entity id
+must be added to that carry list too.
+
 ## Admin access
 
 The admin API is guarded by a shared secret (`APP_ADMIN_TOKEN`), defaulting to

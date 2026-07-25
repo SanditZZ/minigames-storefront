@@ -9,6 +9,10 @@ export const ui = {
   revealStage: (page: Page) => page.getByRole("button", { name: /Revealing your score/i }),
   playAgain: (page: Page) => page.getByRole("button", { name: "Play again" }),
   skipHint: (page: Page) => page.getByText("Tap to skip"),
+  quit: (page: Page) => page.getByRole("button", { name: "Quit" }),
+  confirmQuit: (page: Page) => page.getByRole("button", { name: "Confirm quitting this round" }),
+  /** Reaction Timer's pre-flip state. */
+  waitButton: (page: Page) => page.getByRole("button", { name: /Wait for the signal/i }),
 };
 
 /** Matches a settled result URL — the reveal flag must be gone by then. */

@@ -77,6 +77,21 @@ export interface SubmitResult {
   award?: Award;
 }
 
+/**
+ * A prize as shown to a player BEFORE they play — the trimmed, public view the
+ * backend serves from GET /games/{slug}/awards. Deliberately narrower than
+ * Award: remaining stock never leaves the server, so scarcity arrives as a
+ * boolean instead.
+ */
+export interface Prize {
+  name: string;
+  description: string;
+  imageUrl: string;
+  /** Threshold to win, in the game's scoreUnit. */
+  minScore: number;
+  soldOut: boolean;
+}
+
 export interface HighScores {
   game: Game;
   scores: ScoreEntry[];

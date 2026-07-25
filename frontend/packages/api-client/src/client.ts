@@ -3,6 +3,7 @@ import type {
   AwardInput,
   Game,
   HighScores,
+  Prize,
   Setting,
   SettingInput,
   StartSessionResponse,
@@ -67,6 +68,8 @@ export function createClient(opts: ClientOptions) {
     /** Re-reads a finished round so /result/:slug/:id works on reload or share. */
     scoreResult: (slug: string, scoreId: string) =>
       request<SubmitResult>(`/api/v1/games/${slug}/scores/${scoreId}`),
+    /** Prizes on offer for a game, for the landing screen's showcase. Public. */
+    gamePrizes: (slug: string) => request<Prize[]>(`/api/v1/games/${slug}/awards`),
     highScores: (slug: string, limit?: number) =>
       request<HighScores>(`/api/v1/games/${slug}/scores${limit ? `?limit=${limit}` : ""}`),
 

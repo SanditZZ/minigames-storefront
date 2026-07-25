@@ -1,11 +1,13 @@
 import type { MiniGame } from "./types";
+import { ReactionTimer } from "./ReactionTimer";
 import { TapFast } from "./TapFast";
 
 // The client-side registry mirrors the backend's game registry. To add a game:
 //   1. build a <Play> component implementing PlayProps,
 //   2. add a MiniGame entry here keyed by the same slug the backend uses.
-// Everything else (session, submit, reward reveal, leaderboard) is shared.
-const games: MiniGame[] = [TapFast];
+// Everything else (session, submit, countdown, reward reveal, leaderboard) is
+// shared, so nothing outside those two steps changes.
+const games: MiniGame[] = [TapFast, ReactionTimer];
 
 const bySlug = new Map(games.map((g) => [g.slug, g]));
 
@@ -13,4 +15,18 @@ const bySlug = new Map(games.map((g) => [g.slug, g]));
  *  backend offers a game this client build does not yet know how to render. */
 export function getMiniGame(slug: string): MiniGame | undefined {
   return bySlug.get(slug);
+}
+
+/** Icon shown for a backend game this build cannot render yet. */
+const UNKNOWN_ICON = "🎮";
+
+/**
+ * The icon to show for a slug.
+ *
+ * Falls back rather than throwing, because the picker deliberately lists games
+ * this client cannot play (rendered disabled) so a version mismatch is visible
+ * during a rollout instead of silently hiding content.
+ */
+export function gameIcon(slug: string): string {
+  return bySlug.get(slug)?.icon ?? UNKNOWN_ICON;
 }

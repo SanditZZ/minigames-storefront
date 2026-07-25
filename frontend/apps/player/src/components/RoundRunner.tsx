@@ -3,7 +3,7 @@ import type { Game, SubmitResult } from "@minigames/api-client";
 import { ApiError } from "@minigames/api-client";
 import { api } from "../api";
 import { getMiniGame } from "../games/registry";
-import { GameStage, Spinner, StatusMessage } from "../ui";
+import { Countdown, GameStage, Spinner, StatusMessage } from "../ui";
 import { GameCompleteStage } from "./GameCompleteStage";
 
 interface Props {
@@ -13,7 +13,7 @@ interface Props {
   onCancel: () => void;
 }
 
-type Phase = "loading" | "ready" | "complete" | "error";
+type Phase = "loading" | "countdown" | "playing" | "complete" | "error";
 
 /**
  * RoundRunner owns the shared play plumbing for ANY game: it requests a
@@ -40,7 +40,7 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
         if (!alive) return;
         tokenRef.current = s.token;
         durationRef.current = s.durationMs;
-        setPhase("ready");
+        setPhase("countdown");
       })
       .catch((e) => {
         if (!alive) return;
@@ -51,6 +51,11 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
       alive = false;
     };
   }, [game.slug]);
+
+  // The countdown finishing is what starts the round. Games therefore mount
+  // already-counted-in and can begin timing on their first frame, instead of
+  // each inventing its own "tap to start" gate.
+  const startPlaying = useCallback(() => setPhase("playing"), []);
 
   // The round ends → celebrate immediately and upload in the background, so the
   // network round-trip happens behind the confetti instead of behind a spinner.
@@ -99,8 +104,21 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
 
   const Play = mini.Play;
   return (
-    <GameStage title={game.name} subtitle={`Playing as ${playerName}`} onQuit={onCancel}>
-      <Play durationMs={durationRef.current} onFinish={handleFinish} />
+    // `confirmQuit` once the round is live: Quit sits a stray thumb away from a
+    // rapid-tap target, and one mis-tap should not silently destroy a round in
+    // progress. Before the round starts it still quits on the first press —
+    // backing out before you begin costs nothing and needs no ceremony.
+    <GameStage
+      title={game.name}
+      subtitle={`Playing as ${playerName}`}
+      onQuit={onCancel}
+      confirmQuit={phase === "playing"}
+    >
+      {phase === "countdown" ? (
+        <Countdown label={game.name} onDone={startPlaying} />
+      ) : (
+        <Play durationMs={durationRef.current} onFinish={handleFinish} />
+      )}
     </GameStage>
   );
 }

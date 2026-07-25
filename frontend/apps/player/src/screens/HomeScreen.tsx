@@ -1,5 +1,6 @@
 import type { Game } from "@minigames/api-client";
 import { GamePicker } from "../components/GamePicker";
+import { usePrizes } from "../state/usePrizes";
 import { Spinner, StatusMessage } from "../ui";
 
 interface Props {
@@ -13,6 +14,11 @@ interface Props {
 
 /** Route: "/" — choose a game. */
 export function HomeScreen({ games, error, playerName, onNameChange, onPick, onRetry }: Props) {
+  // Loaded here rather than in App: prizes are this screen's concern only, and
+  // the hook tolerates a null catalog so it can be called before the early
+  // returns below (hooks cannot live behind a condition).
+  const prizes = usePrizes(games);
+
   if (error) {
     return (
       <StatusMessage
@@ -25,5 +31,13 @@ export function HomeScreen({ games, error, playerName, onNameChange, onPick, onR
   }
   if (games === null) return <Spinner label="Loading games…" />;
 
-  return <GamePicker games={games} playerName={playerName} onNameChange={onNameChange} onPick={onPick} />;
+  return (
+    <GamePicker
+      games={games}
+      prizes={prizes}
+      playerName={playerName}
+      onNameChange={onNameChange}
+      onPick={onPick}
+    />
+  );
 }

@@ -1,0 +1,52 @@
+import type { ShowcasePrize } from "../prizes/merge";
+import { Panel } from "../ui";
+
+/**
+ * "Today's prizes" — what a customer can win, shown BEFORE they pick a game.
+ *
+ * This is the landing screen's only piece of motivation. Without it the app
+ * opens on a list of games with no stated reason to play one, while the prizes
+ * an admin carefully configured stay invisible until after a round is over.
+ *
+ * Purely presentational: the screen owns the fetch (see state/usePrizes), and
+ * renders nothing at all when there is nothing on offer, so an unconfigured
+ * store gets a clean picker rather than an empty box.
+ */
+export function PrizeShowcase({ prizes }: { prizes: ShowcasePrize[] }) {
+  if (prizes.length === 0) return null;
+
+  return (
+    <Panel title="Today's prizes" tone="muted">
+      <ul className="flex flex-col gap-2">
+        {prizes.map((p) => (
+          <li key={p.name} className={`flex items-center gap-3 ${p.soldOut ? "opacity-50" : ""}`}>
+            {/* The admin-set image when there is one, a gift otherwise. Fixed
+                box either way so a missing image never shifts the row. */}
+            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-brand-4 text-lg">
+              {p.imageUrl ? (
+                <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span aria-hidden>🎁</span>
+              )}
+            </span>
+
+            {/* min-w-0 so a long prize name truncates instead of pushing the
+                sold-out badge off a 320px screen. */}
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold text-ink">{p.name}</span>
+              {p.description && (
+                <span className="line-clamp-1 block text-xs text-ink/60">{p.description}</span>
+              )}
+            </span>
+
+            {p.soldOut && (
+              <span className="shrink-0 whitespace-nowrap rounded-full bg-ink/10 px-2 py-1 text-[11px] font-bold text-ink/60">
+                Sold out
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}

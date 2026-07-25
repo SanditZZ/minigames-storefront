@@ -85,6 +85,19 @@ func (s *Server) handleGetScore(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// handlePrizes serves the prizes a game is offering, for the landing screen's
+// showcase. Public by design — it is advertising — and it returns the trimmed
+// reward.PublicAward shape, never raw awards with their stock levels.
+func (s *Server) handlePrizes(w http.ResponseWriter, r *http.Request) {
+	slug := domain.GameSlug(r.PathValue("slug"))
+	prizes, err := s.svc.Prizes(r.Context(), slug)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prizes)
+}
+
 func (s *Server) handleHighScores(w http.ResponseWriter, r *http.Request) {
 	slug := domain.GameSlug(r.PathValue("slug"))
 	limit := 0

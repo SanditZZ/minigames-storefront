@@ -27,9 +27,9 @@ type Game struct {
 	Slug        GameSlug       `json:"slug"`
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
-	ScoreUnit   string         `json:"scoreUnit"`   // e.g. "taps", "ms"
-	Direction   ScoreDirection `json:"direction"`   // higher- or lower-is-better
-	DurationMs  int            `json:"durationMs"`  // suggested round length
+	ScoreUnit   string         `json:"scoreUnit"`  // e.g. "taps", "ms"
+	Direction   ScoreDirection `json:"direction"`  // higher- or lower-is-better
+	DurationMs  int            `json:"durationMs"` // suggested round length
 	Enabled     bool           `json:"enabled"`
 }
 
@@ -37,10 +37,10 @@ type Game struct {
 // game. It exists so the backend — not the client — is the source of truth for
 // when a round started and whether a submission has already been consumed.
 type Session struct {
-	Token      string    `json:"token"`
-	GameSlug   GameSlug  `json:"gameSlug"`
-	IssuedAt   time.Time `json:"issuedAt"`
-	ExpiresAt  time.Time `json:"expiresAt"`
+	Token      string     `json:"token"`
+	GameSlug   GameSlug   `json:"gameSlug"`
+	IssuedAt   time.Time  `json:"issuedAt"`
+	ExpiresAt  time.Time  `json:"expiresAt"`
 	ConsumedAt *time.Time `json:"consumedAt,omitempty"`
 }
 
@@ -55,7 +55,7 @@ type ScoreEntry struct {
 	ID         string    `json:"id"`
 	GameSlug   GameSlug  `json:"gameSlug"`
 	PlayerName string    `json:"playerName"`
-	Value      int       `json:"value"` // raw score in the game's ScoreUnit
+	Value      int       `json:"value"`             // raw score in the game's ScoreUnit
 	AwardID    string    `json:"awardId,omitempty"` // "" = no prize won
 	CreatedAt  time.Time `json:"createdAt"`
 }
@@ -68,11 +68,11 @@ type Award struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	ImageURL    string    `json:"imageUrl"`
-	GameSlug    GameSlug  `json:"gameSlug"`   // "" = any game
-	MinScore    int       `json:"minScore"`   // threshold to qualify
-	Stock       int       `json:"stock"`      // remaining units; -1 = unlimited
+	GameSlug    GameSlug  `json:"gameSlug"` // "" = any game
+	MinScore    int       `json:"minScore"` // threshold to qualify
+	Stock       int       `json:"stock"`    // remaining units; -1 = unlimited
 	Active      bool      `json:"active"`
-	SortOrder   int       `json:"sortOrder"`  // tie-break / display ordering
+	SortOrder   int       `json:"sortOrder"` // tie-break / display ordering
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
@@ -104,6 +104,7 @@ const (
 const (
 	SettingSessionTTLSeconds = "session_ttl_seconds"
 	SettingMaxTapsPerSecond  = "max_taps_per_second"
+	SettingMinReactionMs     = "min_reaction_ms"
 	SettingHighScoreLimit    = "high_score_limit"
 	SettingAllowReplays      = "allow_replays"
 )

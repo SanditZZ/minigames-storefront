@@ -15,6 +15,7 @@ import (
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
+	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 	"github.com/sanditzz/minigames-storefront/backend/internal/reward"
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 )
@@ -56,6 +57,8 @@ func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domai
 	ttl := time.Duration(s.settingInt(ctx, domain.SettingSessionTTLSeconds, 120)) * time.Second
 	now := s.now()
 	sess := domain.Session{
+		// Deliberately NOT internal/id: a token is a credential rather than a
+		// name for something, so it keeps UUIDv4's 122 bits. See id.TokenLengthNote.
 		Token:     uuid.NewString(),
 		GameSlug:  slug,
 		IssuedAt:  now,
@@ -108,7 +111,11 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 
 	// Server-authoritative elapsed time drives the plausibility check.
 	elapsedMs := int(now.Sub(sess.IssuedAt).Milliseconds())
-	limits := game.Limits{MaxTapsPerSecond: s.settingInt(ctx, domain.SettingMaxTapsPerSecond, game.DefaultLimits().MaxTapsPerSecond)}
+	defaults := game.DefaultLimits()
+	limits := game.Limits{
+		MaxTapsPerSecond: s.settingInt(ctx, domain.SettingMaxTapsPerSecond, defaults.MaxTapsPerSecond),
+		MinReactionMs:    s.settingInt(ctx, domain.SettingMinReactionMs, defaults.MinReactionMs),
+	}
 	if def.Validator != nil {
 		if err := def.Validator(in.Value, elapsedMs, limits); err != nil {
 			return SubmitResult{}, fmt.Errorf("%w: %v", ErrScoreRejected, err)
@@ -130,7 +137,7 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 	}
 
 	entry := domain.ScoreEntry{
-		ID:         uuid.NewString(),
+		ID:         id.New(),
 		GameSlug:   in.GameSlug,
 		PlayerName: sanitizeName(in.PlayerName),
 		Value:      in.Value,
@@ -187,11 +194,13 @@ func (s *Service) ScoreResult(ctx context.Context, slug domain.GameSlug, scoreID
 // awardByID resolves a stored award reference for display. An award deleted
 // since the round was played is reported as "no prize" rather than an error —
 // the score itself is still a valid result.
-func (s *Service) awardByID(ctx context.Context, id string) (*domain.Award, error) {
-	if id == "" {
+// The parameter is refID rather than id so it does not shadow the internal/id
+// package, which this file now depends on for minting score ids.
+func (s *Service) awardByID(ctx context.Context, refID string) (*domain.Award, error) {
+	if refID == "" {
 		return nil, nil
 	}
-	a, err := s.store.Awards().Get(ctx, id)
+	a, err := s.store.Awards().Get(ctx, refID)
 	if errors.Is(err, storage.ErrNotFound) {
 		return nil, nil
 	}
@@ -261,6 +270,22 @@ func (s *Service) HighScores(ctx context.Context, slug domain.GameSlug, limit in
 	}
 	scores, err := s.store.Scores().Top(ctx, slug, def.Game.Direction, limit)
 	return scores, def.Game, err
+}
+
+// Prizes lists what a game is currently offering, in the trimmed public shape.
+// It exists so the landing screen can advertise prizes without the player app
+// needing an admin token — the filtering and ordering are the reward package's
+// pure Showcase calculation, so this only fetches and delegates.
+func (s *Service) Prizes(ctx context.Context, slug domain.GameSlug) ([]reward.PublicAward, error) {
+	def, ok := s.registry.Get(slug)
+	if !ok {
+		return nil, ErrGameUnavailable
+	}
+	awards, err := s.store.Awards().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return reward.Showcase(awards, slug, def.Game.Direction), nil
 }
 
 // settingInt reads an int setting, falling back to def on any miss/parse error.

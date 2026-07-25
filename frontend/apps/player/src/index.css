@@ -21,6 +21,8 @@
   --animate-bob: bob 2.4s ease-in-out infinite;
   --animate-confetti: confetti 1.6s cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
   --animate-flash: flash 700ms ease-in-out infinite;
+  --animate-float-up: float-up 650ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-urgent: urgent 400ms ease-in-out infinite;
 }
 
 @keyframes pop-in {
@@ -86,6 +88,30 @@
   }
   50% {
     opacity: 0.35;
+  }
+}
+
+/* A "+1" lifting away from the spot the player just tapped. --drift shifts it
+   sideways so a burst of taps fans out instead of stacking into one blur. */
+@keyframes float-up {
+  0% {
+    opacity: 0.9;
+    transform: translate(-50%, 0) scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--drift, 0px)), -64px) scale(1.25);
+  }
+}
+
+/* Final-seconds pulse on the timer readout. */
+@keyframes urgent {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.14);
   }
 }
 

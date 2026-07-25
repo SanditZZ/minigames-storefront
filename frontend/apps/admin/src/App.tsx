@@ -6,24 +6,22 @@ import { TokenGate } from "./components/TokenGate";
 import { AwardsPanel } from "./components/AwardsPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { ScoresPanel } from "./components/ScoresPanel";
+import { TABS, useRouter } from "./router";
 import { AppShell, Button, Tabs, TopBar } from "./ui";
-
-type Tab = "awards" | "settings" | "scores";
-const TABS: { id: Tab; label: string }[] = [
-  { id: "awards", label: "Awards" },
-  { id: "settings", label: "Settings" },
-  { id: "scores", label: "Scores" },
-];
 
 /**
  * Admin shell: gates on the shared secret, then presents the CRUD panels. It
  * owns only navigation + session; all data work lives in the panels, which talk
  * to the backend through the typed client.
+ *
+ * Which panel is showing comes from the URL rather than component state, so an
+ * admin can bookmark a panel, deep-link a colleague to one, and use Back and
+ * Forward instead of re-clicking tabs after every reload.
  */
 export function App() {
   const [token, setTokenState] = useState(getToken());
   const api = useMemo(() => makeApi(token), [token]);
-  const [tab, setTab] = useState<Tab>("awards");
+  const router = useRouter();
   const [games, setGames] = useState<Game[]>([]);
 
   useEffect(() => {
@@ -69,13 +67,20 @@ export function App() {
               </Button>
             }
           />
-          <Tabs tabs={TABS} active={tab} onSelect={setTab} />
+          <Tabs tabs={TABS} active={router.tab} onSelect={router.setTab} />
         </>
       }
     >
-      {tab === "awards" && <AwardsPanel api={api} games={games} />}
-      {tab === "settings" && <SettingsPanel api={api} />}
-      {tab === "scores" && <ScoresPanel api={api} games={games} />}
+      {router.tab === "awards" && <AwardsPanel api={api} games={games} />}
+      {router.tab === "settings" && <SettingsPanel api={api} />}
+      {router.tab === "scores" && (
+        <ScoresPanel
+          api={api}
+          games={games}
+          slug={router.gameSlug}
+          onSlugChange={router.setGameSlug}
+        />
+      )}
     </AppShell>
   );
 }
