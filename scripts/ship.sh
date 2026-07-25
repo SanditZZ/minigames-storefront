@@ -36,8 +36,11 @@ MSG="${1:-chore: auto-ship $(date '+%Y-%m-%d %H:%M:%S')}"
 echo "▸ [1/5] Backend tests…"
 (cd "$ROOT/backend" && go test ./...)
 
-echo "▸ [2/5] Frontend unit tests…"
-(cd "$ROOT/frontend" && npm test --silent)
+echo "▸ [2/5] Frontend typecheck + unit tests…"
+# Runs the SAME npm scripts CI runs, not equivalent-looking ad-hoc commands.
+# A broken `typecheck` script once sat unnoticed precisely because the gate and
+# CI invoked different things.
+(cd "$ROOT/frontend" && npm run typecheck --silent && npm test --silent)
 
 if [[ "${SKIP_E2E:-}" == "1" ]]; then
   echo "▸ [3/5] E2E browser tests… SKIPPED (SKIP_E2E=1)"
@@ -47,7 +50,8 @@ else
     echo "  installing e2e dependencies…"
     (cd "$ROOT/e2e" && npm install --silent && npx playwright install chromium)
   fi
-  (cd "$ROOT/e2e" && npx playwright test)
+  # Playwright transpiles specs without typechecking them; do it explicitly.
+  (cd "$ROOT/e2e" && npx tsc --noEmit && npx playwright test)
 fi
 
 echo "▸ [4/5] Build + redeploy…"

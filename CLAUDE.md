@@ -9,12 +9,18 @@ the same checks again on the pushed commit.
 The gate, in order — each step must pass before the next runs:
 
 1. `go test ./...` — backend unit tests.
-2. `npm test` (frontend) — vitest over the calculation layers (URL router,
-   score-reveal maths).
-3. `npx playwright test` (e2e) — the real player flow in a browser, against an
-   isolated throwaway stack (own ports, own temp SQLite file — never `.prod/`).
-4. Build + redeploy via `scripts/serve-prod.sh` (typecheck included).
+2. `npm run typecheck && npm test` (frontend) — project-wide TS build, then
+   vitest over the calculation layers (URL router, score-reveal maths).
+3. `npx tsc --noEmit && npx playwright test` (e2e) — the real player flow in a
+   browser, against an isolated throwaway stack (own ports, own temp SQLite file
+   — never `.prod/`).
+4. Build + redeploy via `scripts/serve-prod.sh`.
 5. Only then: `git add -A`, commit, `git push origin main`.
+
+**The gate and CI must run the same commands.** `ship.sh` invokes the npm
+scripts by name rather than re-spelling them, so the two cannot drift. A
+lookalike command that "does the same thing" is how a broken `typecheck` script
+survived unnoticed — the gate never called it.
 
 **Never push on red.** If a test fails, fix it or report and stop — do not
 comment it out, do not `--no-verify`, and do not reach for `SKIP_E2E=1` (that

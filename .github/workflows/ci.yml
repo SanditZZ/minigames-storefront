@@ -17,7 +17,7 @@ jobs:
     name: Backend tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
@@ -33,8 +33,8 @@ jobs:
     name: Frontend typecheck + unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -56,12 +56,12 @@ jobs:
     name: End-to-end browser tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -72,6 +72,11 @@ jobs:
       - name: Install e2e deps
         working-directory: e2e
         run: npm ci
+      # Playwright transpiles specs without typechecking them, so a broken
+      # helper would only surface as a confusing runtime error mid-suite.
+      - name: Typecheck e2e
+        working-directory: e2e
+        run: npx tsc --noEmit
       - name: Install Chromium
         working-directory: e2e
         run: npx playwright install --with-deps chromium
