@@ -1,5 +1,5 @@
 import type { ShowcasePrize } from "@minigames/player-core";
-import { Panel } from "../ui";
+import { Panel, PrizeImage } from "../ui";
 
 /**
  * "Today's prizes" — what a customer can win, shown BEFORE they pick a game.
@@ -20,15 +20,10 @@ export function PrizeShowcase({ prizes }: { prizes: ShowcasePrize[] }) {
       <ul className="flex flex-col gap-2">
         {prizes.map((p) => (
           <li key={p.name} className={`flex items-center gap-3 ${p.soldOut ? "opacity-50" : ""}`}>
-            {/* The admin-set image when there is one, a gift otherwise. Fixed
-                box either way so a missing image never shifts the row. */}
-            <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-lg bg-brand-4 text-lg">
-              {p.imageUrl ? (
-                <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span aria-hidden>🎁</span>
-              )}
-            </span>
+            {/* The admin-set image when there is one, a gift otherwise — the
+                same primitive the result screen uses, so a prize looks like
+                itself on both sides of a round. */}
+            <PrizeImage src={p.imageUrl} fallback="🎁" />
 
             {/* min-w-0 so a long prize name truncates instead of pushing the
                 sold-out badge off a 320px screen. */}

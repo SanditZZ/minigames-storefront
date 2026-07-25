@@ -1,6 +1,6 @@
 import type { ClaimView } from "@minigames/api-client";
 import { claimCopy, groupClaimCode } from "@minigames/player-core";
-import { Badge, Card, CopyButton, Eyebrow } from "../ui";
+import { Badge, Card, CopyButton, Eyebrow, PrizeImage } from "../ui";
 
 /** Renders an ISO timestamp as a plain date. Formatting a date is presentation;
  *  judging whether it has passed is not, and never happens here. */
@@ -25,16 +25,24 @@ function onDate(iso: string): string {
  * `expiresAt` to the clock: the only clock available is the device's, and a
  * phone with its date wound back would show a lapsed prize as collectable.
  */
-export function ClaimCard({ view }: { view: ClaimView }) {
+export function ClaimCard({ view, imageUrl }: { view: ClaimView; imageUrl?: string }) {
   const copy = claimCopy(view.status);
   const { claim } = view;
   const code = groupClaimCode(claim.code);
 
   return (
     <Card tone={copy.redeemable ? "solid" : "muted"} className="w-full max-w-sm text-center">
-      <div className="text-4xl" aria-hidden>
-        {copy.redeemable ? "🎉" : "🎟️"}
-      </div>
+      {/* Unlike `awardName`, the image is NOT snapshotted — it is read from the
+          award as it exists now, so deleting the prize drops back to the emoji.
+          That asymmetry is deliberate: what the player won has to stay true
+          forever, whereas a missing photo costs them nothing. */}
+      <PrizeImage
+        src={imageUrl}
+        fallback={copy.redeemable ? "🎉" : "🎟️"}
+        size="lg"
+        muted={!copy.redeemable}
+        className="mx-auto"
+      />
       <Eyebrow className="mt-2">You won</Eyebrow>
       <div className="mt-1 text-2xl font-black text-ink">{claim.awardName}</div>
 

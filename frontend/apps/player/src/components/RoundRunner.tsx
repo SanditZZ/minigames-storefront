@@ -91,7 +91,17 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
   }
 
   if (phase === "error") {
-    return <StatusMessage icon="😕" title="Something went wrong" detail={error} action={{ label: "Back", onClick: onCancel }} />;
+    // tone="error" is the failed submit the roadmap called silent: the player
+    // finished a round, the score did not land, and nothing said so out loud.
+    return (
+      <StatusMessage
+        tone="error"
+        icon="😕"
+        title="Something went wrong"
+        detail={error}
+        action={{ label: "Back", onClick: onCancel }}
+      />
+    );
   }
 
   if (phase === "loading") {

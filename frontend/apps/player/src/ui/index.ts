@@ -9,6 +9,7 @@ export { EmptyNote, Spinner, StatusMessage } from "./Feedback";
 export { GameStage } from "./GameStage";
 export { CenterStack, HeaderRow, Screen, Stack } from "./Layout";
 export { PageHeader } from "./PageHeader";
+export { PrizeImage } from "./PrizeImage";
 export { RevealMeter } from "./RevealMeter";
 export { RingTimer } from "./RingTimer";
 export { ScoreRow, SelectCard } from "./SelectCard";

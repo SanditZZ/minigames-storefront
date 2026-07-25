@@ -33,7 +33,10 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
 
       <AppearIn delayMs={140} className="w-full flex justify-center">
         {result.claim ? (
-          <ClaimCard view={result.claim} />
+          // The image comes from the live award, the name from the claim's
+          // snapshot inside ClaimCard — see the note there on why only one of
+          // the two has to survive the prize being deleted.
+          <ClaimCard view={result.claim} imageUrl={result.award?.imageUrl} />
         ) : won ? (
           // A win with no claim. Rare but real: issuing the code is the one
           // step allowed to fail without failing the submission, because by
@@ -43,6 +46,7 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           // and letting the player discover that at the counter.
           <HighlightCard
             icon="🎉"
+            imageUrl={result.award!.imageUrl}
             eyebrow="You won"
             title={result.award!.name}
             body={result.award!.description || undefined}

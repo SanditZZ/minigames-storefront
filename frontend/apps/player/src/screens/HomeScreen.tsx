@@ -22,6 +22,7 @@ export function HomeScreen({ games, error, playerName, onNameChange, onPick, onR
   if (error) {
     return (
       <StatusMessage
+        tone="error"
         icon="📡"
         title="Can’t reach the games"
         detail={error}

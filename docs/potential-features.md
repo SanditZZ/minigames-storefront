@@ -117,11 +117,19 @@ component each:
     the *button's* label, so removing the button removed the only thing a screen
     reader was told. The accessibility fix was not optional cleanup afterwards —
     it was part of not regressing.
-  - **Errors are not announced.** `StatusMessage` renders failures as ordinary
-    text with no `role="alert"`, so a failed submit is silent.
-  - Both are small, and `Spinner` in the same file (`ui/Feedback.tsx`) already
-    models the pattern with `role="status"` + `aria-live="polite"` — there is no
-    design question left to answer here, only the edit.
+  - ~~**Errors are not announced.**~~ — **built**, and it needed one decision
+    the entry did not anticipate. `StatusMessage` is the *only* full-screen
+    message state, so blanket `role="alert"` would have made "Page not found"
+    interrupt whatever a screen reader was saying. It now takes
+    `tone: "info" | "error"`: failures announce assertively (`role="alert"`),
+    dead ends the player navigated to themselves announce politely
+    (`role="status"`). Two of the six call sites are real failures — the games
+    fetch (`HomeScreen`) and the failed submit (`RoundRunner`, the one this
+    entry was about). The region wraps the copy only, not the emoji
+    (`aria-hidden` already) or the action, whose label is read as a button.
+    The admin's equivalent surface was already fine: `Alert` in
+    `admin/src/ui/Surface.tsx` has carried `role="alert"` all along, so the
+    silence was the player app's alone.
 - ~~**Scope the no-select rule.**~~ — **built**, and the claim code is what
   forced it. `index.css` now defines `.no-select`, applied by `GameStage` (which
   wraps every live game) and by the two end-of-round stages, instead of sitting
@@ -276,12 +284,20 @@ are the seams that give way as the catalog and the score table grow.
   identities behind it, so "who handed this prize over?" is unanswerable by
   construction. Same root cause as the award-delete audit gap below, and the
   same fix buys both: admin identities, then an audit log.
-- **The admin's token field has no label.** `TokenGate.tsx` renders the password
-  `Input` with a placeholder and nothing else, so a screen reader announces an
-  unlabelled edit box on the app's first and only gate. Found while driving the
-  panel with Playwright — `getByLabel` could not see it, which is exactly what a
-  screen reader experiences. One `aria-label` fixes it; the same check is worth
-  running over the other admin `Input`s, which mostly sit inside `Field`.
+- ~~**The admin's token field has no label.**~~ — **built**, one `aria-label`
+  on `TokenGate.tsx`, exactly as the entry predicted. The sweep it suggested
+  found everything else labelled — inside `Field` (`AwardForm`,
+  `NewSettingForm`), wrapped in its own `<label>` (`AwardFilters`), carrying an
+  `aria-label` (`ScoresPanel`, the claims status filter) or an `id` its label
+  points at (`ClaimsPanel`'s redeem box) — **except one**, below.
+- **The settings row's value editor is unlabelled.** `SettingRow` renders
+  `<ValueInput>` bare (`SettingsPanel.tsx:89`); the setting's key sits next to it
+  in a `<code>` element that nothing associates with the control, so a screen
+  reader hears an edit box with no name, once per setting. Unlike the token gate
+  this is not a one-attribute fix: `ValueInput` is not given the key it would
+  need to name itself, so it wants a `label` prop threaded from the row. Found
+  while sweeping for the entry above; deliberately left rather than folded into
+  it.
 - **The admin claims panel has no browser coverage.** `e2e/` starts the API and
   the PLAYER app only, so nothing exercises `ClaimsPanel.tsx` in a browser — the
   redeem box, the status filter and the row buttons are covered by unit tests on
@@ -354,10 +370,17 @@ are the seams that give way as the catalog and the score table grow.
   so `RoundRunner` requests two sessions per round locally (visible in the API
   log). Harmless — the second token wins and sessions expire — but it makes dev
   logs misleading and would matter if session creation ever costs something.
-- **The won prize is the one place its image never shows.** `Award.imageUrl` now
-  reaches the player — `PrizeShowcase` renders it with a 🎁 fallback — but
-  `ResultSummary` still hands `HighlightCard` a hard-coded `icon="🎉"`, and the
-  card has no image slot. So a customer sees the photo of the coffee while
-  deciding whether to play, then wins it and gets an emoji. Giving
-  `HighlightCard` an optional image (same fixed box as the showcase, so a
-  missing one never shifts the layout) closes it.
+- ~~**The won prize is the one place its image never shows.**~~ — **built**, and
+  the entry named the wrong component. `HighlightCard` did need an optional
+  `imageUrl`, but that card only renders the *rare* win — the one where issuing
+  the claim failed. Every normal win goes through `ClaimCard`, which is not a
+  `HighlightCard` at all and had its own hard-coded 🎉/🎟️. Fixing only what the
+  entry named would have left the emoji on the path virtually every winner
+  takes.
+  The fixed box is now a kit primitive (`ui/PrizeImage.tsx`) used by all three
+  surfaces, so the showcase and the result screen cannot drift apart. Two
+  decisions worth keeping: the image is read from the **live** award while the
+  name still comes from the claim's snapshot — a deleted prize drops to the
+  emoji rather than rewriting what was won — and a redeemed or expired claim
+  renders it `muted` (grayscale), because the photo is still what was won but
+  should not compete with the live parts of the screen.

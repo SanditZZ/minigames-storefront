@@ -33,8 +33,13 @@ export function TokenGate({ onAuthenticated }: { onAuthenticated: (token: string
       <form onSubmit={submit}>
         <h1 className="text-xl font-bold text-ink">Admin sign in</h1>
         <p className="mt-1 text-sm text-ink/60">Enter the admin token to manage rewards and settings.</p>
+        {/* aria-label, not a placeholder alone: a placeholder is not a label,
+            and it disappears the moment anything is typed. This is the app's
+            first and only gate, so an unnamed edit box here is where a screen
+            reader user stops. `getByLabel` in a test sees exactly what they do. */}
         <Input
           type="password"
+          aria-label="Admin token"
           value={token}
           onChange={(e) => setTok(e.target.value)}
           placeholder="Admin token"
