@@ -64,7 +64,61 @@ component each:
   screenshot reuse it existed to prevent is closed: the credential is now a
   server-issued code that can be marked used, not the screen itself.
   **QR encoding was never started** — the code is typed, which is fine at a
-  counter and slow at a queue.
+  counter and slow at a queue. Scoped as its own entry directly below, because
+  the render is trivial and the scanner is not.
+- **Scan-to-redeem: a QR on the result screen, a camera in the admin.** The
+  counter flow today is a player reading eight characters aloud and an admin
+  typing them into the redeem box (`ClaimsPanel.tsx`) — fine one at a time, slow
+  at a queue, and every transcription is a chance to redeem the wrong claim,
+  which is terminal (see "A redemption cannot be undone" below). Three parts,
+  and they are worth separating because only two of them are hard:
+
+  - **Render the claim code as a QR** on the result screen, beside the existing
+    grouped code and copy button in `ClaimCard.tsx`. Pure rendering from data
+    already on screen — no new API, no permissions, no secure context. This half
+    works on the current plain-HTTP local stack as-is.
+  - **Scan it in the admin**, filling the redeem box from the camera instead of
+    the keyboard. Web: `getUserMedia` plus a decoder. Native: `expo-camera` in
+    `mobile/admin`, which is the device that actually belongs at a counter and
+    which currently has no claims screen at all (see the follow-up below).
+  - **Confirm before redeeming, always.** A scan is a trigger a stray camera
+    angle can pull, so it must land on "Redeem *Free Coffee* for `ABCD-2345`?"
+    rather than on the POST. This is not UI polish: `POST
+    /api/v1/admin/claims/{code}/redeem` has no inverse, so a mis-scan is
+    unrepairable outside SQLite.
+
+  **Deciding what the QR encodes is the security question, not a detail.** The
+  bare code keeps the blast radius where it is. A deep link into the admin
+  (`/claims?code=…`) is faster for staff and turns the prize credential into a
+  URL, which spreads the way the "score id is a bearer capability" entry below
+  describes. Prefer the bare code until claims have owners.
+
+  **Testing it on the local stack is the part that will bite**, so plan for it
+  before building:
+
+  - `navigator.mediaDevices` is **undefined on an insecure origin**, exactly like
+    `navigator.clipboard` (see "Copying works without a secure context" below).
+    `scripts/serve-prod.sh` serves plain HTTP on the Tailscale IP, so the web
+    scanner is not merely awkward to test across the tailnet — the API it needs
+    is absent. `localhost` *is* a secure context, but this box is headless and
+    has no camera, so that exemption buys nothing.
+  - The clean fix is real HTTPS on the tailnet (`tailscale cert` / `tailscale
+    serve` issue a genuine cert for the `*.ts.net` name), which would also let
+    the clipboard's modern path start winning by itself. Chrome's
+    `--unsafely-treat-insecure-origin-as-secure` works per-device for a dev
+    phone and is not a deployment.
+  - **The native admin sidesteps all of it.** `expo-camera` asks the OS for
+    permission and is not bound by web secure-context rules — only by the
+    cleartext/ATS exceptions `mobile/CLAUDE.md` already documents for the API
+    call. If scan-to-redeem is built once, the phone is the honest place.
+  - For the browser suite, Playwright can feed a fake camera
+    (`--use-fake-device-for-media-stream --use-file-for-fake-video-capture`) with
+    a pre-rendered QR video, so the scan path is testable without hardware —
+    but `e2e/` does not start the admin app at all yet, which is a prerequisite
+    listed under "Admin lists at scale".
+  - Decoding in the browser needs a dependency decision: `BarcodeDetector` is
+    Chromium-only, so portable decoding means shipping a wasm/JS decoder into an
+    app whose only runtime dependency today is React.
 - **A claim has no owner.** Anyone holding the code can redeem it, which is the
   same trust model as a paper voucher and was the deliberate scope (this is a
   portfolio piece — no real prizes). If prizes ever have value, the gap to close
@@ -347,6 +401,11 @@ are the seams that give way as the catalog and the score table grow.
   customer who walked off before collecting — is terminal, and the only repair
   is editing SQLite by hand. An un-redeem action (admin-only, and itself
   audited) is the obvious pair to the audit-trail item below.
+  **Scan-to-redeem makes this a prerequisite rather than a nicety.** Typing a
+  wrong code that happens to collide with a real claim is unlikely; a camera
+  pointed at the wrong screen is not, which is why that entry insists on a
+  confirmation step — and why the inverse should exist before the trigger gets
+  that much easier to pull.
 - **`redeemed_at` records when, never who.** The claims table has no actor
   column (`003_claims.sql`), and the admin API is one shared secret with no
   identities behind it, so "who handed this prize over?" is unanswerable by
@@ -378,6 +437,11 @@ are the seams that give way as the catalog and the score table grow.
   one-screen skeleton (awards list). A phone at a counter is exactly the right
   device for redeeming a code, and the API is ready for it; it needs its own
   Maestro flow, and the Maestro step only runs when a device is attached.
+  **It is also the only client that can scan one.** `expo-camera` is not subject
+  to the web's secure-context rule, so the phone is where scan-to-redeem works
+  without first putting HTTPS on the tailnet — see that entry under "Reward
+  system depth". The Maestro caveat cuts the other way, though: a camera flow is
+  precisely what a device-less CI run cannot verify.
 - **The claims list is unpaginated and filtered in memory.**
   `ClaimRepository.List` returns every claim ever issued and `claim.Filter`
   narrows it afterwards. That is forced rather than lazy — status is derived, so
