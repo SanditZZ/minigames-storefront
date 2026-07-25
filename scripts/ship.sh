@@ -8,10 +8,12 @@
 #   2. frontend unit tests        (vitest — router + reveal calculations)
 #   3. end-to-end browser tests   (Playwright, against an isolated throwaway
 #                                  stack on its own ports and its own DB)
-#   4. build + redeploy           (scripts/serve-prod.sh — builds API binary +
+#   4. mobile typecheck           (tsc over the Expo client, only when its deps
+#                                  are already installed — see below)
+#   5. build + redeploy           (scripts/serve-prod.sh — builds API binary +
 #                                  both frontend bundles incl. typecheck, then
 #                                  restarts the local stack so it reflects the change)
-#   5. commit + push to main      (only reached if 1–4 succeed)
+#   6. commit + push to main      (only reached if 1–5 succeed)
 #
 # The full suite runs BEFORE every push, by design — see CLAUDE.md.
 #
@@ -24,6 +26,12 @@
 # NOT for stepping past a failing test — a red E2E means the player flow is
 # broken, which is exactly what the gate is for.
 #
+# KNOWN GAP: step 4 typechecks the native client but does not RUN it. There is
+# no Maestro/Detox suite yet, so nothing here catches a mobile screen that
+# compiles and then crashes on a device — unlike the web player, which step 3
+# actually drives in a browser. Until that suite exists, a green ship.sh says
+# nothing about whether the Expo app works. See mobile/CLAUDE.md.
+#
 # set -e ensures any failing step aborts before the commit/push — main stays green.
 
 set -euo pipefail
@@ -33,19 +41,19 @@ cd "$ROOT"
 
 MSG="${1:-chore: auto-ship $(date '+%Y-%m-%d %H:%M:%S')}"
 
-echo "▸ [1/5] Backend tests…"
+echo "▸ [1/6] Backend tests…"
 (cd "$ROOT/backend" && go test ./...)
 
-echo "▸ [2/5] Frontend typecheck + unit tests…"
+echo "▸ [2/6] Frontend typecheck + unit tests…"
 # Runs the SAME npm scripts CI runs, not equivalent-looking ad-hoc commands.
 # A broken `typecheck` script once sat unnoticed precisely because the gate and
 # CI invoked different things.
 (cd "$ROOT/frontend" && npm run typecheck --silent && npm test --silent)
 
 if [[ "${SKIP_E2E:-}" == "1" ]]; then
-  echo "▸ [3/5] E2E browser tests… SKIPPED (SKIP_E2E=1)"
+  echo "▸ [3/6] E2E browser tests… SKIPPED (SKIP_E2E=1)"
 else
-  echo "▸ [3/5] E2E browser tests…"
+  echo "▸ [3/6] E2E browser tests…"
   if [[ ! -d "$ROOT/e2e/node_modules" ]]; then
     echo "  installing e2e dependencies…"
     (cd "$ROOT/e2e" && npm install --silent && npx playwright install chromium)
@@ -54,10 +62,22 @@ else
   (cd "$ROOT/e2e" && npx tsc --noEmit && npx playwright test)
 fi
 
-echo "▸ [4/5] Build + redeploy…"
+# Deliberately NOT auto-installing: the Expo tree is ~600 packages, and a
+# contributor who has never touched the native client should not pay for it on
+# an unrelated docs push. Once mobile/admin/node_modules exists, this becomes a
+# hard gate — the shared packages it consumes change often, and a rename in
+# admin-core must not be discovered by a phone.
+echo "▸ [4/6] Mobile typecheck…"
+if [[ -d "$ROOT/mobile/admin/node_modules" ]]; then
+  (cd "$ROOT/mobile/admin" && npx tsc --noEmit)
+else
+  echo "  SKIPPED — run 'npm install' in mobile/admin to enable."
+fi
+
+echo "▸ [5/6] Build + redeploy…"
 "$ROOT/scripts/serve-prod.sh"
 
-echo "▸ [5/5] Commit + push to main…"
+echo "▸ [6/6] Commit + push to main…"
 if [[ -n "$(git status --porcelain)" ]]; then
   git add -A
   git commit -m "$MSG"

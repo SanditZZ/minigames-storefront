@@ -27,6 +27,12 @@ typecheck of the E2E specs; it does not run the browser suite, which would cost
 minutes of runner time per push. That makes step 3 above the only place the
 player flow is exercised in a browser — so never push around it.
 
+**The native clients are typechecked, not run.** `ship.sh` adds a mobile
+typecheck when `mobile/admin/node_modules` exists, and CI skips the Expo tree
+entirely. Nothing anywhere drives the React Native app, so a green gate says
+nothing about whether it works on a device — check one before trusting a native
+change, and see `mobile/CLAUDE.md`.
+
 **Never push on red.** If a test fails, fix it or report and stop — do not
 comment it out, do not `--no-verify`, and do not reach for `SKIP_E2E=1` (that
 escape hatch exists only for machines where browsers cannot run at all).
@@ -191,5 +197,6 @@ that cannot be checked against a file is the kind that rots unnoticed.
 ## Related
 
 - `frontend/CLAUDE.md` — mandatory color palette + reusable-UI-component rules.
+- `mobile/CLAUDE.md` — the Expo clients: sharing rules, ATS/cleartext, test gap.
 - `docs/architecture.md` — design.
 - `docs/potential-features.md` — the roadmap (see the section above).

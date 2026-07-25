@@ -1,0 +1,21 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    // @minigames/tokens spells its internal imports with explicit .ts
+    // extensions so Node's type stripping can load it in the theme generator
+    // (see scripts/tokens/). Metro resolves them fine; tsc needs telling.
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@minigames/api-client": ["../../frontend/packages/api-client/src"],
+      "@minigames/admin-core": ["../../frontend/packages/admin-core/src"],
+      "@minigames/tokens": ["../../frontend/packages/tokens/src"],
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "exclude": ["node_modules", ".expo-export"]
+}

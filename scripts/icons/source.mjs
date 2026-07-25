@@ -70,3 +70,26 @@ export const RENDERS = [
 
 /** Sizes bundled into the legacy favicon.ico, largest last. */
 export const ICO_SIZES = [16, 32, 48];
+
+/**
+ * The native clients' icons, written into each Expo app's assets/.
+ *
+ * `adaptive-icon.png` is the Android foreground LAYER, not a finished icon:
+ * the launcher composites it over the `backgroundColor` set in app.config.ts,
+ * so it must be transparent — a painted background here would show as a square
+ * card floating inside the launcher's mask. It is also drawn smaller than the
+ * web maskable render, because Android's adaptive safe zone (66 of 108dp) is
+ * tighter than the web's 80%.
+ */
+export const MOBILE_RENDERS = [
+  { file: "icon.png", size: 1024, scale: 0.72, rounded: false },
+  { file: "adaptive-icon.png", size: 1024, scale: 0.5, rounded: false, transparent: true },
+];
+
+/** Which Expo app carries which theme. Player joins this when it is built. */
+export const MOBILE_APPS = {
+  admin: "mobile/admin/assets",
+};
+
+/** Android adaptive icons only guarantee the inner 66/108dp circle survives. */
+export const ADAPTIVE_SAFE_ZONE = 66 / 108;

@@ -31,10 +31,10 @@ export function glyphTransform(size, scale) {
  * checking the width alone would pass a scale that loses the gamepad's corners
  * on a circular launcher.
  */
-export function fitsSafeZone(scale) {
+export function fitsSafeZone(scale, diameter = 0.8) {
   const w = (scale * 22) / GLYPH_VIEWBOX; // drawn shape spans x 1→23
   const h = (scale * 14) / GLYPH_VIEWBOX; // …and y 5→19
-  return Math.hypot(w, h) <= 0.8;
+  return Math.hypot(w, h) <= diameter;
 }
 
 /**
@@ -45,11 +45,15 @@ export function fitsSafeZone(scale) {
  * feels like (black on iOS, white in a light tab strip, the wallpaper on some
  * launchers), so the mark would lose contrast somewhere.
  */
-export function iconSvg({ theme, size, scale, rounded }) {
+export function iconSvg({ theme, size, scale, rounded, transparent = false }) {
   const radius = rounded ? round(size * RADIUS_RATIO) : 0;
+  // `transparent` drops the background rect for Android's adaptive foreground
+  // LAYER only. The launcher paints theme.background behind it (set as
+  // adaptiveIcon.backgroundColor in app.config.ts), so the mark stays
+  // theme.mark and the pairing comes out identical to every other render.
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">`,
-    `<rect width="${size}" height="${size}" rx="${radius}" fill="${theme.background}"/>`,
+    transparent ? "" : `<rect width="${size}" height="${size}" rx="${radius}" fill="${theme.background}"/>`,
     `<path transform="${glyphTransform(size, scale)}" fill="${theme.mark}" d="${GLYPH_PATH}"/>`,
     `</svg>`,
   ].join("");

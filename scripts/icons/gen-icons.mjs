@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { manifestJson } from "./manifest.mjs";
-import { ICO_SIZES, RENDERS, THEMES } from "./source.mjs";
+import { ADAPTIVE_SAFE_ZONE, ICO_SIZES, MOBILE_APPS, MOBILE_RENDERS, RENDERS, THEMES } from "./source.mjs";
 import { faviconSvg, fitsSafeZone, iconSvg } from "./svg.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +68,11 @@ function assertSafeZones() {
       throw new Error(`${r.file}: scale ${r.scale} escapes the maskable safe zone`);
     }
   }
+  for (const r of MOBILE_RENDERS) {
+    if (r.transparent && !fitsSafeZone(r.scale, ADAPTIVE_SAFE_ZONE)) {
+      throw new Error(`${r.file}: scale ${r.scale} escapes Android's adaptive safe zone`);
+    }
+  }
 }
 
 async function buildApp(browser, theme) {
@@ -87,6 +92,32 @@ async function buildApp(browser, theme) {
   await emit(join(dir, "favicon.svg"), Buffer.from(faviconSvg(theme)));
   await emit(join(dir, "manifest.webmanifest"), Buffer.from(manifestJson(theme, { orientation: ORIENTATION[theme.app] })));
   await buildIco(dir);
+
+  await buildMobile(browser, theme);
+}
+
+/**
+ * The Expo client's assets, for themes that have a native app yet.
+ *
+ * Same glyph, same theme, same generator — so the native icon cannot drift from
+ * the web one by being made separately in an image editor, which is exactly how
+ * two surfaces of one product end up looking like two products.
+ */
+async function buildMobile(browser, theme) {
+  const relative = MOBILE_APPS[theme.app];
+  if (!relative) return;
+
+  const dir = join(REPO, relative);
+  await mkdir(dir, { recursive: true });
+
+  const page = await browser.newPage();
+  try {
+    for (const r of MOBILE_RENDERS) {
+      await emit(join(dir, r.file), await rasterize(page, iconSvg({ theme, ...r }), r.size));
+    }
+  } finally {
+    await page.close();
+  }
 }
 
 /**
