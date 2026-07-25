@@ -52,7 +52,16 @@ export async function playRound(page: Page, playerName = "E2E"): Promise<void> {
   // a broken timer fails the test rather than looping forever.
   for (let i = 0; i < 80; i++) {
     if (await complete.isVisible()) break;
-    await tap.dispatchEvent("pointerdown").catch(() => {
+    // The timeout is load-bearing, not defensive. There is a window of a few ms
+    // between the check above and this dispatch resolving its element, and if
+    // the round ends inside it the "TAP!" button is unmounted for good — so
+    // this dispatch is waiting for something that is never coming back. Left
+    // unbounded (Playwright's default) it waits for the TEST timeout, turning
+    // an 11.6s test into a 60s one; worse, the catch below then swallows the
+    // real error and the failure surfaces on the NEXT call instead. One flake
+    // was traced to exactly that. actionTimeout in playwright.config.ts is the
+    // belt to this pair of braces.
+    await tap.dispatchEvent("pointerdown", {}, { timeout: 1_000 }).catch(() => {
       /* the button unmounts the moment the round ends */
     });
     await page.waitForTimeout(120);

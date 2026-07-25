@@ -560,23 +560,35 @@ are the seams that give way as the catalog and the score table grow.
   `result-url.spec.ts` today, plus the new Precision Stop test, which reaches
   the same sequence by a different route (it ends the round on a tap instead of
   waiting out a clock). The cost grows every time a game is added.
-  **It has now produced its first flake**, which is the reason to stop treating
-  this entry as bookkeeping: the run that shipped the post-stop hold reported
-  `play flow › a winning round hands the player a claim code` as flaky — a
-  60s per-test timeout (`playwright.config.ts:30`) blown inside `playRound`'s
-  wait loop, passing on the single configured retry. The page snapshot in
-  `test-results/…/error-context.md` shows it had in fact reached the winning
-  result with a valid code, so the assertion was never the problem; the budget
-  was. Note the test does not touch Precision Stop, and `workers: 1` rules out
-  contention inside Playwright, so this reads as the suite's own slack running
-  out rather than a specific regression — the root cause was not chased and
-  should be, from a trace, before the retry starts hiding something real.
-  `playRound` paces up to 80 dispatch-and-wait iterations at 120ms against a
-  round the *server* times at 5s, which is the obvious place to look.
   Acceptable today;
   if the suite grows, the reveal needs a test-only way to shorten the beats that
   is not the skip that was just removed — emulating `prefers-reduced-motion`
   already collapses both holds to zero (`holdMs`) and is the obvious lever.
+- ~~**The suite produced its first flake, and it was blamed on the wrong
+  thing.**~~ — **fixed, and the first guess written here was wrong**, which is
+  the part worth keeping. The run that shipped the post-stop hold reported
+  `play flow › a winning round hands the player a claim code` as flaky: a 60s
+  test timeout, passing on the single retry. This entry originally called it the
+  suite's own slack running out as games are added — plausible, adjacent to a
+  real entry above it, and false.
+  **Two measurements killed it.** The test runs in 11.5–12.1s over eight
+  consecutive samples, so 60s is 5× its honest duration rather than drift; and
+  subtracting the timeout plus its retry from the slow run leaves the other 18
+  tests at 126s, against 132s for 19 tests in the clean run — the rest of the
+  suite was not slower at all. One call stalled.
+  **The cause was a Playwright default, not this repo's pacing.**
+  `Locator.dispatchEvent` has *no* action timeout unless one is configured, so
+  the tap loop in `helpers/round.ts` — which dispatches to a "TAP!" button that
+  unmounts the instant the round ends — waited for the test timeout whenever the
+  round ended in the few-ms window between its `isVisible()` check and the
+  dispatch resolving. The `.catch(() => {})` on that dispatch then swallowed the
+  teardown error, so the failure was reported against the `waitForTimeout` on
+  the next line. A catch written to absorb an unmount hid the stall instead.
+  Fixed on both layers: `actionTimeout: 5_000` in `playwright.config.ts` so no
+  action can ever consume a test budget again, and an explicit `{ timeout }` on
+  that one dispatch. **The general lesson outlives the bug** — every `.catch()`
+  in this suite is a candidate for the same disguise, and an unbounded default
+  turns "fails fast and says why" into "fails late and blames its neighbour".
 - **iOS has no coverage whatsoever.** The Maestro suite
   (`mobile/admin/.maestro/`) is Android-only, and nothing in this repo has ever
   run on an iOS simulator — which also means the `NSAllowsLocalNetworking`

@@ -32,6 +32,14 @@ export default defineConfig({
 
   use: {
     baseURL: WEB_URL,
+    // Playwright's default action timeout is NO LIMIT: an action waiting for an
+    // element that will never appear waits for the `timeout` above instead, so
+    // a single stalled click consumes the whole test budget and reports itself
+    // as whatever call happened to run next. That is not hypothetical — it is
+    // exactly how the tap loop in helpers/round.ts produced a 60s flake while
+    // the test's honest duration was 11.6s. Bounding it here means an action
+    // that cannot succeed fails as itself, quickly, and says so.
+    actionTimeout: 5_000,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     // The storefront is a phone-first kiosk app; test it at that size.
