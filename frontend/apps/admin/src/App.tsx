@@ -71,14 +71,14 @@ export function App() {
         </>
       }
     >
-      {router.tab === "awards" && <AwardsPanel api={api} games={games} />}
+      {router.tab === "awards" && <AwardsPanel api={api} games={games} router={router} />}
       {router.tab === "settings" && <SettingsPanel api={api} />}
       {router.tab === "scores" && (
         <ScoresPanel
           api={api}
           games={games}
-          slug={router.gameSlug}
-          onSlugChange={router.setGameSlug}
+          slug={router.location.gameSlug}
+          onSlugChange={(gameSlug) => router.setFilters({ gameSlug })}
         />
       )}
     </AppShell>

@@ -1,13 +1,40 @@
 export {
+  clearedFilters,
+  hasActiveFilters,
   hrefFor,
   isSafeSlug,
   isTab,
+  parseAwardId,
   parseGameSlug,
   parseLocation,
+  parseQuery,
+  parseSort,
+  parseStatus,
+  parseStock,
   parseTab,
   pathFor,
   resolveGameSlug,
   sameLocation,
+  usesGameFilter,
 } from "./parse";
-export { DEFAULT_TAB, GAME_PARAM, TABS, type Location, type Tab } from "./routes";
-export { useRouter, type AdminRouter } from "./useRouter";
+export {
+  DEFAULT_LOCATION,
+  DEFAULT_TAB,
+  GAME_PARAM,
+  MAX_QUERY_LENGTH,
+  NEW_AWARD,
+  QUERY_PARAM,
+  SORT_PARAM,
+  SORT_VALUES,
+  STATUS_PARAM,
+  STATUS_VALUES,
+  STOCK_PARAM,
+  STOCK_VALUES,
+  TABS,
+  type Location,
+  type SortOrder,
+  type StatusFilter,
+  type StockFilter,
+  type Tab,
+} from "./routes";
+export { useRouter, type AdminRouter, type FilterPatch } from "./useRouter";

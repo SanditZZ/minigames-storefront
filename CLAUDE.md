@@ -113,6 +113,23 @@ must be added to that carry list too.
 The admin API is guarded by a shared secret (`APP_ADMIN_TOKEN`), defaulting to
 `admin` for local development. Set a real one in any deployment that matters.
 
+**Every admin view is addressable.** Panel, filters and the award being edited
+all live in the URL (`apps/admin/src/router/`), never in component state, so a
+view can be bookmarked, linked to a colleague, and survives a reload:
+
+```
+/awards?game=tap-fast&status=active   list, filtered
+/awards/new                           create
+/awards/V1StGXR8_Z5                   edit one prize
+/scores?game=tap-fast                 leaderboard
+```
+
+`?game=` is deliberately shared between the awards and scores panels — an admin
+investigating one game moves between its prizes and its board. Parameters at
+their default value are never written, so an unfiltered panel stays a bare path.
+Both apps use the same hand-rolled split: pure `parse.ts` (calculations, fully
+unit-tested) and a thin `useRouter.ts` (the only module touching `window`).
+
 ## Related
 
 - `frontend/CLAUDE.md` — mandatory color palette + reusable-UI-component rules.
