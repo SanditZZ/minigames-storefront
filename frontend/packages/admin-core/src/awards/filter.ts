@@ -48,11 +48,25 @@ export function matchesStock(award: Award, stock: StockFilter): boolean {
   }
 }
 
-/** Case-insensitive name search. An empty query matches everything. */
+/**
+ * Case-insensitive name search, across BOTH names. An empty query matches
+ * everything.
+ *
+ * The Thai name is searched too, because otherwise a prize an operator named
+ * "กาแฟฟรี" is unfindable by the only name they think of it as — and a Thai
+ * venue's staff would have to know the English name of every prize to use the
+ * search box at all. `toLowerCase` is a no-op on Thai, which has no letter
+ * case; it is still applied to both so the English half behaves identically
+ * whichever field matched.
+ *
+ * Only the names, not the descriptions. That is the existing scope and worth
+ * keeping: a description search turns a prize lookup into a full-text search
+ * whose hits an operator then has to explain to themselves.
+ */
 export function matchesQuery(award: Award, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return award.name.toLowerCase().includes(q);
+  return award.name.toLowerCase().includes(q) || award.nameTh.toLowerCase().includes(q);
 }
 
 /** Applies every filter. Order of the surviving awards is preserved. */

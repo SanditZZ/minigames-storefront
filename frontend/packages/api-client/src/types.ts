@@ -47,6 +47,17 @@ export interface Award {
   id: string;
   name: string;
   description: string;
+  /**
+   * The operator's Thai text. "" means NOT TRANSLATED rather than "blank", and
+   * the server falls back PER FIELD — a prize with a Thai name and no Thai
+   * description is served with the Thai name and the English description.
+   *
+   * Only the ADMIN ever sees these. A player's endpoints resolve the pick
+   * server-side and serve `name`/`description` ready to render, so no client
+   * re-derives the rule. See internal/reward/text.go.
+   */
+  nameTh: string;
+  descriptionTh: string;
   imageUrl: string;
   gameSlug: string; // "" = applies to any game
   minScore: number;
@@ -60,7 +71,16 @@ export interface Award {
 /** The admin-editable fields of an Award (server manages id/timestamps). */
 export type AwardInput = Pick<
   Award,
-  "name" | "description" | "imageUrl" | "gameSlug" | "minScore" | "stock" | "active" | "sortOrder"
+  | "name"
+  | "description"
+  | "nameTh"
+  | "descriptionTh"
+  | "imageUrl"
+  | "gameSlug"
+  | "minScore"
+  | "stock"
+  | "active"
+  | "sortOrder"
 >;
 
 export interface Setting {
@@ -124,6 +144,15 @@ export interface Claim {
   code: string;
   scoreId: string;
   awardId: string;
+  /**
+   * The prize's name, SNAPSHOTTED when the claim was issued so a later rename
+   * or delete cannot rewrite what a permanent result URL says was won.
+   *
+   * The player's endpoints resolve it to the reader's language; the admin's
+   * serve it as stored, because the counter is operator-facing and deliberately
+   * untranslated. Both are `awardName` on the wire — which of the two arrived
+   * depends on which endpoint answered.
+   */
   awardName: string;
   issuedAt: string;
   expiresAt?: string;

@@ -17,6 +17,7 @@ import (
 	"github.com/sanditzz/minigames-storefront/backend/internal/claim"
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
+	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
 	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 	"github.com/sanditzz/minigames-storefront/backend/internal/reward"
 	"github.com/sanditzz/minigames-storefront/backend/internal/settings"
@@ -467,7 +468,11 @@ func (s *Service) HighScores(ctx context.Context, slug domain.GameSlug, limit in
 // It exists so the landing screen can advertise prizes without the player app
 // needing an admin token — the filtering and ordering are the reward package's
 // pure Showcase calculation, so this only fetches and delegates.
-func (s *Service) Prizes(ctx context.Context, slug domain.GameSlug) ([]reward.PublicAward, error) {
+//
+// The locale is a parameter rather than something read here because the service
+// does not know who is asking — the transport edge negotiates it and passes it
+// down, exactly as it does for every message this API words itself.
+func (s *Service) Prizes(ctx context.Context, slug domain.GameSlug, loc i18n.Locale) ([]reward.PublicAward, error) {
 	def, ok := s.registry.Get(slug)
 	if !ok {
 		return nil, ErrGameUnavailable
@@ -476,7 +481,7 @@ func (s *Service) Prizes(ctx context.Context, slug domain.GameSlug) ([]reward.Pu
 	if err != nil {
 		return nil, err
 	}
-	return reward.Showcase(awards, slug, def.Game.Direction), nil
+	return reward.Showcase(awards, slug, def.Game.Direction, loc), nil
 }
 
 // settingInt reads an int setting, falling back to def on any miss/parse error.

@@ -56,7 +56,11 @@ func Issue(claimID, code string, score domain.ScoreEntry, award domain.Award, tt
 		ScoreID:   score.ID,
 		AwardID:   award.ID,
 		AwardName: award.Name,
-		IssuedAt:  score.CreatedAt,
+		// Snapshotted alongside the English name, not resolved to one language
+		// here: Issue does not know who will read the claim, and a claim is read
+		// by both the player (in their locale) and the counter (in English).
+		AwardNameTH: award.NameTH,
+		IssuedAt:    score.CreatedAt,
 	}
 	if ttl > 0 {
 		c.ExpiresAt = score.CreatedAt.Add(ttl)

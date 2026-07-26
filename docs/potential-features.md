@@ -485,28 +485,63 @@ component each:
     looking at that leaderboard.
 
   What it did NOT cover, ordered by how soon each bites:
-  - **Award names and descriptions are still English-only** (or Thai-only —
-    whatever the operator typed). This was flagged in the original entry as a
-    schema change and it still is: `awards.name_th` / `description_th`, two more
-    fields on `AwardInput` and the admin form, and a locale-aware pick in
-    `reward.Showcase`. It bites the first time a Thai venue configures prizes,
-    which is the first time this feature is used for real — the chrome around
-    the prize list is Thai and the prize itself is not.
-    **The fallback rule is decided: PER FIELD.** An award with a Thai name and
-    no Thai description shows the Thai name and the English description, rather
-    than dropping the whole pair back to English. That is the rule
-    `storeIdentity` (`player-core/brand.ts`) already follows for name/tagline,
-    so the app has one answer to "what happens when half a translation exists"
-    instead of two — and it lets an operator translate a prize list
-    incrementally rather than in one sitting. The cost, stated so it is not a
-    surprise: a card can be visibly bilingual mid-migration. That is the honest
-    display of a half-finished translation, and it is what makes the missing
-    half obvious enough to finish.
-    Note this reaches `claims.award_name` too, which is a *snapshot* of the name
-    at issue time (see the deleted-award entry below). A claim issued before the
-    Thai name existed keeps the English one forever, which is correct — it says
-    what was won — but means the counter and the result screen can disagree with
-    the current award. Decide that deliberately rather than discovering it.
+  - ~~**Award names and descriptions are still English-only.**~~ — **built**,
+    and the entry's own scoping note turned out to be the important part.
+    `awards.name_th` / `description_th` (migrations 005/006) hold the operator's
+    text; `reward.Text` / `LocalizedAward` (`internal/reward/text.go`) pick per
+    field; `AwardForm.tsx` grew two optional inputs labelled in Thai. The player
+    receives prose ready to render, so no client re-derives the rule.
+    **The per-field fallback was the right call and is now testable both ways.**
+    An award with a Thai name and no Thai description shows the Thai name beside
+    the English description — the same rule `storeIdentity` uses for the store's
+    name and tagline, so the system has one answer to "what happens when half a
+    translation exists" instead of two.
+    Four things the build settled that the entry had not:
+    - **The claim needed its own column, and the entry only half-saw it.** It
+      noted that `claims.award_name` is a snapshot and left the consequence
+      open. The consequence was that the *flagship* moment — winning — would
+      have stayed English: the result screen reads the claim, not the award.
+      `claims.award_name_th` (migration 007) snapshots both, and both are kept
+      rather than one resolved at issue time, because the two readers want
+      different ones — the player follows their locale, the counter's panel is
+      operator-facing and deliberately untranslated.
+    - **Translation is a COLUMN, and that is a third case, not an exception.**
+      The rule in `internal/i18n` was a binary — server-worded strings in a
+      message table, chrome in the client's dictionary. Admin free text is
+      neither: nobody on either side of the wire wrote it. The distinction that
+      matters operationally is what "" means. A missing message-table entry
+      fails a test; a missing translation here is a supported configuration, so
+      `validateAward` deliberately does **not** require the Thai fields. An
+      English-only venue must not pay a tax for a feature it does not want.
+    - **The pick runs inside `Showcase`, not at the transport edge**, unlike
+      `game.Localize`. The text is on the row, and narrowing `domain.Award` to
+      `PublicAward` *is* the presentation step; splitting "which fields a player
+      may see" from "which language" would mean carrying both languages through
+      a type whose whole purpose is to carry less. The transport edge still owns
+      negotiation and hands the answer down. The score endpoints do localize at
+      the edge (`localizedResult` in `httpapi/games.go`) because they serve the
+      award and the claim from *different* sources on purpose — live row, and
+      snapshot.
+    - **The admin's search had to learn Thai too.** `matchesQuery` matched
+      `name` only, so a prize named "กาแฟฟรี" was findable only by staff who
+      knew its English name — precisely the people a Thai venue does not have.
+      One line, plus the guard that an empty `nameTh` is a substring of every
+      query and must not match everything.
+  - **A half-translated prize list shows the same prize twice.** The landing
+    showcase merges prizes by NAME across games (`mergePrizes`,
+    `packages/player-core/src/prizes/merge.ts`), and the seeded catalog gives
+    all three games a prize called "Free Coffee" — one row, not three. Translate
+    tap-fast's copy alone and that row splits: "กาแฟฟรี" from tap-fast, "Free
+    Coffee" still from the other two, both on screen, both the same coffee.
+    It is a consequence of merge-by-name meeting per-award translation, and it
+    is not new behaviour — renaming one game's copy in English has always split
+    the row the same way. What is new is that translating a prize list is now a
+    routine thing to do half of. The honest fixes, cheapest first: merge on a
+    stable key rather than the display name (awards have ids, but the showcase
+    deliberately does not carry them — see `PublicAward`); or warn in the admin
+    when two awards share an English name and disagree on the Thai one. It
+    bites a venue mid-translation, which is every venue that adopts this,
+    once.
   - **Score rejections keep an English diagnostic.** `writeAppError` in
     `internal/httpapi/respond.go` serves `err.Error()` for `ErrScoreRejected` in
     English and a plain sentence in Thai, because the validator messages in
@@ -522,8 +557,19 @@ component each:
     speakers.
   - **A store has one name, not one per language.** `store_name` and
     `store_tagline` are single settings, so an operator who wants an English and
-    a Thai wordmark has nowhere to put the second. Same shape as the award
-    problem and worth solving once for both.
+    a Thai wordmark has nowhere to put the second.
+    **This is now the LAST untranslated player-facing string, and the pattern it
+    should follow already exists.** The award work settled every open question —
+    per-field fallback, "" meaning "not supplied", optional in the form, the
+    resolver as a pure function — so this is that pattern applied to two
+    settings rather than a design problem. Concretely: `store_name_th` /
+    `store_tagline_th` added to the allowlist in `internal/settings`, two more
+    inputs on `StoreBranding.tsx`, and the pick in `storeIdentity`
+    (`player-core/brand.ts`), which is the one place it CANNOT reuse
+    `reward.Text` — that lives in Go, and this fallback happens client-side
+    because the settings endpoint serves a flat map rather than resolved prose.
+    Worth noting the asymmetry deliberately: awards are resolved server-side and
+    the store's identity would not be.
   - **`index.html` still ships `lang="en"`.** `LocaleProvider` corrects
     `document.documentElement.lang` on mount, so a Thai load is briefly declared
     English — one frame of wrong line-breaking, invisible on a kiosk that never
@@ -911,21 +957,33 @@ are the seams that give way as the catalog and the score table grow.
   - The prediction that this "would also cover the awards and settings panels"
     was half right: settings are now covered by `admin-branding.spec.ts`, and
     **`AwardsPanel` still has none** — see the new entry below.
-- **The awards panel is now reachable and still untested in a browser.** The
-  blocker is gone — the admin app is in the `webServer` list — so this is the
-  cheapest browser coverage left in the repo, and it is the panel an operator
-  actually uses most. `filterAwards` is unit-tested and the URL grammar is
-  unit-tested; what nobody has ever run is creating a prize, editing it, and
-  deleting it through the form (`AwardForm.tsx`, `AwardsPanel.tsx`). Two things
-  make it more than box-ticking:
-  - **Delete confirms and then destroys, with no audit trail** (see the entry
-    at the end of this section). A flow whose only safeguard is a confirm dialog
-    is worth exercising before that safeguard is the thing that regresses.
-  - **A created award should show up for the player**, which is the same
-    cross-app assertion `admin-branding.spec.ts` makes for the store name — the
-    prize showcase on the landing screen reads what the admin wrote. Note the
-    ordering discipline that entry documents applies here too: an award created
-    by a test and left behind changes what every later test's round can win.
+- **The awards panel is half-covered: EDIT is exercised, CREATE and DELETE are
+  not.** `admin-awards-i18n.spec.ts` drives the filter, opens one prize's form,
+  saves it, and checks the result reaches the player — so the panel is no longer
+  untouched, but it got there by editing a *seeded* award. Nothing has ever run
+  `+ New award` or the delete confirmation (`AwardsPanel.tsx`,
+  `AwardForm.tsx`). Two reasons that gap is worth closing rather than declaring
+  covered:
+  - **Delete confirms and then destroys, with no audit trail** (see the entry at
+    the end of this section). A flow whose only safeguard is a confirm dialog is
+    worth exercising before that safeguard is the thing that regresses.
+  - **Create is where validation lives.** `validateAward` rejects an empty name
+    and an out-of-range stock, and the form's `-1`-means-unlimited checkbox is
+    the only UI for a sentinel — none of which an edit of a valid seeded row
+    ever touches.
+  Note the hazard the i18n spec had to solve and a create/delete spec will face
+  worse: the suite shares one backend, so an award created by a test and left
+  behind changes what every later round can win. Existing specs restore what
+  they edit and assert the restore landed; a create test must delete its own
+  prize on the way out.
+- **Every award row's Edit and Delete buttons share one accessible name.**
+  `AwardsPanel.tsx` renders "Edit" and "Delete" per row with nothing
+  distinguishing them, so a screen reader hears a column of identical controls —
+  the same defect `ClaimRow` fixed with `aria-label={`Redeem claim ${code}`}`.
+  It is also why `admin-awards-i18n.spec.ts` has to narrow the list to a single
+  row with `?game=&q=` before it can click one: the locator ambiguity is the
+  accessibility bug, visible from the outside. One `aria-label` each, following
+  the pattern already in `ClaimRow`.
 - **The native admin still has no claims screen.** `mobile/admin` remains a
   one-screen skeleton (awards list). A phone at a counter is exactly the right
   device for redeeming a code, and the API is ready for it; it needs its own
@@ -1005,16 +1063,16 @@ are the seams that give way as the catalog and the score table grow.
   written here — **re-derive it**: `grep -c 'playRound(' e2e/tests/*.spec.ts`,
   plus the Precision Stop test, which reaches the same sequence by a different
   route (it ends the round on a tap instead of waiting out a clock). That
-  instruction has now paid for itself twice. The entry first said "six specs";
-  by the next reading it was ten call sites; **the admin claims coverage added
-  three more**, because every claim it redeems is won by playing a real round
-  rather than fabricated — deliberately, since the point is the wire between the
-  apps.
+  instruction has now paid for itself three times. The entry first said "six
+  specs"; by the next reading it was ten call sites; the admin claims coverage
+  added three more rounds, and the award-i18n coverage one more after that —
+  because every claim those specs use is *won by playing*, never fabricated,
+  which is the point when the thing under test is the wire between the apps.
   The cost grows with every game AND with every cross-app test, which is the
   part the original framing missed: rounds are no longer played only by specs
-  that are *about* playing. Still acceptable — the full suite is ~3 minutes —
-  but if it grows, the reveal needs a test-only way to shorten the beats that is
-  not the skip that was just removed. Emulating `prefers-reduced-motion` already
+  that are *about* playing. Still acceptable — 35 tests in ~3.4 minutes — but if
+  it grows, the reveal needs a test-only way to shorten the beats that is not
+  the skip that was just removed. Emulating `prefers-reduced-motion` already
   collapses both holds to zero (`holdMs`) and is the obvious lever.
 - ~~**The suite produced its first flake, and it was blamed on the wrong
   thing.**~~ — **fixed, and the first guess written here was wrong**, which is

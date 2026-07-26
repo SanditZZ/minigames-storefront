@@ -12,7 +12,11 @@ import (
 
 type awardRepo struct{ db *sql.DB }
 
-const awardCols = `id, name, description, image_url, game_slug, min_score, stock, active, sort_order, created_at, updated_at`
+// Column order is shared by every statement below AND by both scanners, so a
+// column added here must be added to the two Scan calls in the same edit — the
+// compiler cannot catch a mismatch between a SELECT list and a Scan argument
+// list, only the row will, at runtime.
+const awardCols = `id, name, description, name_th, description_th, image_url, game_slug, min_score, stock, active, sort_order, created_at, updated_at`
 
 func (r *awardRepo) List(ctx context.Context) ([]domain.Award, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT `+awardCols+` FROM awards ORDER BY sort_order, name`)
@@ -44,8 +48,8 @@ func (r *awardRepo) Get(ctx context.Context, id string) (domain.Award, error) {
 func (r *awardRepo) Create(ctx context.Context, a domain.Award) (domain.Award, error) {
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO awards (`+awardCols+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		a.ID, a.Name, a.Description, a.ImageURL, a.GameSlug, a.MinScore, a.Stock,
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		a.ID, a.Name, a.Description, a.NameTH, a.DescriptionTH, a.ImageURL, a.GameSlug, a.MinScore, a.Stock,
 		boolToInt(a.Active), a.SortOrder, fmtTime(a.CreatedAt), fmtTime(a.UpdatedAt))
 	if err != nil {
 		return domain.Award{}, fmt.Errorf("create award: %w", err)
@@ -55,10 +59,10 @@ func (r *awardRepo) Create(ctx context.Context, a domain.Award) (domain.Award, e
 
 func (r *awardRepo) Update(ctx context.Context, a domain.Award) (domain.Award, error) {
 	res, err := r.db.ExecContext(ctx, `
-		UPDATE awards SET name=?, description=?, image_url=?, game_slug=?, min_score=?,
-			stock=?, active=?, sort_order=?, updated_at=?
+		UPDATE awards SET name=?, description=?, name_th=?, description_th=?, image_url=?,
+			game_slug=?, min_score=?, stock=?, active=?, sort_order=?, updated_at=?
 		WHERE id=?`,
-		a.Name, a.Description, a.ImageURL, a.GameSlug, a.MinScore, a.Stock,
+		a.Name, a.Description, a.NameTH, a.DescriptionTH, a.ImageURL, a.GameSlug, a.MinScore, a.Stock,
 		boolToInt(a.Active), a.SortOrder, fmtTime(a.UpdatedAt), a.ID)
 	if err != nil {
 		return domain.Award{}, fmt.Errorf("update award: %w", err)
@@ -108,8 +112,8 @@ func scanAwardRow(row *sql.Row) (domain.Award, error) {
 	var a domain.Award
 	var active int
 	var created, updated string
-	err := row.Scan(&a.ID, &a.Name, &a.Description, &a.ImageURL, &a.GameSlug,
-		&a.MinScore, &a.Stock, &active, &a.SortOrder, &created, &updated)
+	err := row.Scan(&a.ID, &a.Name, &a.Description, &a.NameTH, &a.DescriptionTH,
+		&a.ImageURL, &a.GameSlug, &a.MinScore, &a.Stock, &active, &a.SortOrder, &created, &updated)
 	if err != nil {
 		return domain.Award{}, err
 	}
@@ -123,8 +127,8 @@ func scanAwardRows(rows *sql.Rows) (domain.Award, error) {
 	var a domain.Award
 	var active int
 	var created, updated string
-	err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.ImageURL, &a.GameSlug,
-		&a.MinScore, &a.Stock, &active, &a.SortOrder, &created, &updated)
+	err := rows.Scan(&a.ID, &a.Name, &a.Description, &a.NameTH, &a.DescriptionTH,
+		&a.ImageURL, &a.GameSlug, &a.MinScore, &a.Stock, &active, &a.SortOrder, &created, &updated)
 	if err != nil {
 		return domain.Award{}, fmt.Errorf("scan award: %w", err)
 	}

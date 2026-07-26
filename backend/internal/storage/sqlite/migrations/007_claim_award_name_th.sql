@@ -1,0 +1,23 @@
+-- The Thai name of the prize a claim is for, snapshotted beside award_name.
+--
+-- The claim already snapshots the English name rather than joining to the award
+-- (see 003_claims.sql: a deleted prize must not rewrite what a permanent result
+-- URL says was won). Translating award text without extending that snapshot
+-- would leave the ONE screen the whole feature exists for still in English: a
+-- Thai player sees the prize list in Thai, plays, wins, and is told they won a
+-- "Free Coffee". The showcase and the claim card would disagree about the name
+-- of the same object.
+--
+-- Both languages are stored, not one resolved at issue time, because the two
+-- readers want different ones. The player's result screen follows their locale;
+-- the admin's claims panel is operator-facing and deliberately untranslated, so
+-- it keeps showing award_name. Resolving at write time would have to pick a
+-- side and would then be wrong for the other one forever.
+--
+-- '' means the award had no Thai name when the claim was issued — including
+-- every claim written before this column existed. That reads as "untranslated"
+-- and falls back to award_name, which is exactly right: those prizes WERE
+-- untranslated at the moment they were won. Nothing to backfill, and
+-- backfilling from the award today would be a lie about history.
+
+ALTER TABLE claims ADD COLUMN award_name_th TEXT NOT NULL DEFAULT '';

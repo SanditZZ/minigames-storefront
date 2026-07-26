@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
+	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
 )
 
 // PublicAward is the player-facing view of a prize, shown on the landing screen
@@ -31,13 +32,20 @@ type PublicAward struct {
 // and flagged rather than hidden: an empty-looking board is worse than an
 // honest one, and a prize that ran out today is back tomorrow.
 //
+// The prizes arrive already worded for loc — see text.go for why the pick lives
+// here rather than at the transport edge, and why it falls back per field. Note
+// the sort's name tie-break therefore orders by the RESOLVED name, which is
+// what a reader of that language is actually looking at; ordering by the
+// English name would put a Thai list in an order with no visible logic.
+//
 // Pure: same inputs, same output, no I/O.
-func Showcase(awards []domain.Award, slug domain.GameSlug, dir domain.ScoreDirection) []PublicAward {
+func Showcase(awards []domain.Award, slug domain.GameSlug, dir domain.ScoreDirection, loc i18n.Locale) []PublicAward {
 	out := make([]PublicAward, 0, len(awards))
 	for _, a := range awards {
 		if !a.Active || !appliesToGame(a, slug) {
 			continue
 		}
+		a = LocalizedAward(a, loc)
 		out = append(out, PublicAward{
 			Name:        a.Name,
 			Description: a.Description,

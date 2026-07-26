@@ -84,3 +84,39 @@ export function rootVar(page: Page, prop: string): Promise<string> {
     prop,
   );
 }
+
+/**
+ * The awards panel. Editing is addressed by FILTERING to one prize rather than
+ * by picking one "Edit" button out of many identical ones: every row's button
+ * carries the same accessible name, so a bare `getByRole("button", {name:
+ * "Edit"})` is ambiguous by construction. Narrowing with the panel's own
+ * `?game=&q=` filters is what an operator does anyway, and it keeps the test
+ * honest about which prize it opened.
+ */
+export const awards = {
+  editOnly: (page: Page) => page.getByRole("button", { name: "Edit" }),
+  // getByROLE, not getByLabel, and the difference is not stylistic.
+  //
+  // `Field` associates its text by WRAPPING the control in a <label>, and
+  // Playwright's getByLabel matches such a label by its textContent. React
+  // renders a controlled <textarea value=…> by setting defaultValue, which the
+  // DOM reflects as the element's child TEXT NODE — so the moment a description
+  // has content, the label's textContent becomes "Description — ไทย
+  // (optional)แตะให้ได้ 40 ครั้ง" and an exact getByLabel silently stops
+  // matching. It works on an empty form and fails on a populated one, which is
+  // the worst possible failure schedule.
+  //
+  // The accessible NAME is correct throughout — verified with getByRole, which
+  // is why this is a locator fix and not an app fix: the accname algorithm skips
+  // the embedded control when computing its own name, so a screen reader hears
+  // "Description — ไทย (optional)" either way.
+  nameTh: (page: Page) => page.getByRole("textbox", { name: "Name — ไทย (optional)", exact: true }),
+  descriptionTh: (page: Page) =>
+    page.getByRole("textbox", { name: "Description — ไทย (optional)", exact: true }),
+  save: (page: Page) => page.getByRole("button", { name: /Save award/ }),
+};
+
+/** URL for the awards panel narrowed to a single prize. */
+export function oneAward(game: string, query: string): string {
+  return `/awards?game=${game}&q=${encodeURIComponent(query)}`;
+}

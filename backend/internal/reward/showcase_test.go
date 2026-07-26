@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
+	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
 )
 
 func showcaseAward(name string, slug domain.GameSlug, min, stock int, active bool) domain.Award {
@@ -30,7 +31,7 @@ func TestShowcase_OrdersEasiestFirstForHigherIsBetter(t *testing.T) {
 		showcaseAward("Coupon", "tap-fast", 20, domain.Unlimited, true),
 		showcaseAward("Coffee", "tap-fast", 40, domain.Unlimited, true),
 	}
-	got := names(Showcase(awards, "tap-fast", domain.HigherIsBetter))
+	got := names(Showcase(awards, "tap-fast", domain.HigherIsBetter, i18n.English))
 	want := []string{"Coupon", "Coffee", "Tote"}
 	for i := range want {
 		if got[i] != want[i] {
@@ -46,7 +47,7 @@ func TestShowcase_OrdersEasiestFirstForLowerIsBetter(t *testing.T) {
 		showcaseAward("Coupon", "reaction-timer", 400, domain.Unlimited, true),
 		showcaseAward("Coffee", "reaction-timer", 300, domain.Unlimited, true),
 	}
-	got := names(Showcase(awards, "reaction-timer", domain.LowerIsBetter))
+	got := names(Showcase(awards, "reaction-timer", domain.LowerIsBetter, i18n.English))
 	want := []string{"Coupon", "Coffee", "Tote"}
 	for i := range want {
 		if got[i] != want[i] {
@@ -62,7 +63,7 @@ func TestShowcase_FiltersInactiveAndOtherGames(t *testing.T) {
 		showcaseAward("OtherGame", "reaction-timer", 300, domain.Unlimited, true),
 		showcaseAward("Wildcard", "", 10, domain.Unlimited, true),
 	}
-	got := names(Showcase(awards, "tap-fast", domain.HigherIsBetter))
+	got := names(Showcase(awards, "tap-fast", domain.HigherIsBetter, i18n.English))
 	want := []string{"Wildcard", "Mine"}
 	if len(got) != len(want) {
 		t.Fatalf("showcase = %v, want %v", got, want)
@@ -81,7 +82,7 @@ func TestShowcase_FlagsSoldOutWithoutLeakingStock(t *testing.T) {
 		showcaseAward("Limited", "tap-fast", 40, 7, true),
 		showcaseAward("Endless", "tap-fast", 60, domain.Unlimited, true),
 	}
-	got := Showcase(awards, "tap-fast", domain.HigherIsBetter)
+	got := Showcase(awards, "tap-fast", domain.HigherIsBetter, i18n.English)
 	if !got[0].SoldOut {
 		t.Fatal("an award with zero stock should be flagged sold out")
 	}

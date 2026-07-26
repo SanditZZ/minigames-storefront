@@ -11,14 +11,21 @@ import (
 // awardRequest is the admin-editable shape of an award. IDs and timestamps are
 // server-managed and therefore not accepted from the client on create.
 type awardRequest struct {
-	Name        string          `json:"name"`
-	Description string          `json:"description"`
-	ImageURL    string          `json:"imageUrl"`
-	GameSlug    domain.GameSlug `json:"gameSlug"`
-	MinScore    int             `json:"minScore"`
-	Stock       int             `json:"stock"`
-	Active      bool            `json:"active"`
-	SortOrder   int             `json:"sortOrder"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// Optional Thai text. Omitted or "" means "not translated", and the player
+	// then reads the English — validateAward deliberately does NOT require them.
+	// A venue with an English-only prize list is a supported configuration, and
+	// refusing to save a prize without a translation would make this feature a
+	// tax on the stores that do not need it.
+	NameTH        string          `json:"nameTh"`
+	DescriptionTH string          `json:"descriptionTh"`
+	ImageURL      string          `json:"imageUrl"`
+	GameSlug      domain.GameSlug `json:"gameSlug"`
+	MinScore      int             `json:"minScore"`
+	Stock         int             `json:"stock"`
+	Active        bool            `json:"active"`
+	SortOrder     int             `json:"sortOrder"`
 }
 
 func (s *Server) handleListAwards(w http.ResponseWriter, r *http.Request) {
@@ -54,17 +61,19 @@ func (s *Server) handleCreateAward(w http.ResponseWriter, r *http.Request) {
 	}
 	now := time.Now()
 	a := domain.Award{
-		ID:          id.New(),
-		Name:        req.Name,
-		Description: req.Description,
-		ImageURL:    req.ImageURL,
-		GameSlug:    req.GameSlug,
-		MinScore:    req.MinScore,
-		Stock:       req.Stock,
-		Active:      req.Active,
-		SortOrder:   req.SortOrder,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:            id.New(),
+		Name:          req.Name,
+		Description:   req.Description,
+		NameTH:        req.NameTH,
+		DescriptionTH: req.DescriptionTH,
+		ImageURL:      req.ImageURL,
+		GameSlug:      req.GameSlug,
+		MinScore:      req.MinScore,
+		Stock:         req.Stock,
+		Active:        req.Active,
+		SortOrder:     req.SortOrder,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	created, err := s.svc.Store().Awards().Create(r.Context(), a)
 	if err != nil {
@@ -93,6 +102,11 @@ func (s *Server) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 	// Preserve server-managed fields; apply editable ones.
 	existing.Name = req.Name
 	existing.Description = req.Description
+	// Assigned unconditionally, so clearing a translation in the form actually
+	// removes it. A "only overwrite when non-empty" shortcut here would pin the
+	// first Thai name an operator ever saved.
+	existing.NameTH = req.NameTH
+	existing.DescriptionTH = req.DescriptionTH
 	existing.ImageURL = req.ImageURL
 	existing.GameSlug = req.GameSlug
 	existing.MinScore = req.MinScore

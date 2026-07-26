@@ -14,7 +14,7 @@ import (
 
 type claimRepo struct{ db *sql.DB }
 
-const claimCols = `id, code, score_id, award_id, award_name, issued_at, expires_at, redeemed_at`
+const claimCols = `id, code, score_id, award_id, award_name, award_name_th, issued_at, expires_at, redeemed_at`
 
 // sqliteConstraint is SQLITE_CONSTRAINT. The driver reports the extended codes
 // (SQLITE_CONSTRAINT_UNIQUE = 2067, _PRIMARYKEY = 1555), and every extended
@@ -40,9 +40,9 @@ func isConstraintViolation(err error) bool {
 // ErrConflict so the caller can retry with a freshly minted one.
 func (r *claimRepo) Create(ctx context.Context, c domain.Claim) (domain.Claim, error) {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO claims (id, code, score_id, award_id, award_name, issued_at, expires_at, redeemed_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.Code, c.ScoreID, c.AwardID, c.AwardName,
+		INSERT INTO claims (id, code, score_id, award_id, award_name, award_name_th, issued_at, expires_at, redeemed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.Code, c.ScoreID, c.AwardID, c.AwardName, c.AwardNameTH,
 		fmtTime(c.IssuedAt), fmtOptionalTime(c.ExpiresAt), fmtNullTime(c.RedeemedAt))
 	if isConstraintViolation(err) {
 		return domain.Claim{}, storage.ErrConflict
@@ -138,7 +138,7 @@ func scanClaimRow(row rowScanner) (domain.Claim, error) {
 		issued            string
 		expires, redeemed sql.NullString
 	)
-	err := row.Scan(&c.ID, &c.Code, &c.ScoreID, &c.AwardID, &c.AwardName, &issued, &expires, &redeemed)
+	err := row.Scan(&c.ID, &c.Code, &c.ScoreID, &c.AwardID, &c.AwardName, &c.AwardNameTH, &issued, &expires, &redeemed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Claim{}, err // translated by scanClaim; List cannot hit this
 	}

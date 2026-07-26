@@ -75,17 +75,29 @@ type ScoreEntry struct {
 // the target game's ScoreUnit that a player must reach (respecting the game's
 // ScoreDirection) to qualify. GameSlug empty means the award applies to any game.
 type Award struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	ImageURL    string    `json:"imageUrl"`
-	GameSlug    GameSlug  `json:"gameSlug"` // "" = any game
-	MinScore    int       `json:"minScore"` // threshold to qualify
-	Stock       int       `json:"stock"`    // remaining units; -1 = unlimited
-	Active      bool      `json:"active"`
-	SortOrder   int       `json:"sortOrder"` // tie-break / display ordering
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	// NameTH and DescriptionTH are the operator's Thai text, and "" means NOT
+	// TRANSLATED rather than "blank". The resolver picks per field
+	// (reward.LocalizedAward), so an award with a Thai name and no Thai
+	// description shows the Thai name beside the English description — the same
+	// per-field fallback `storeIdentity` uses for the store's name and tagline.
+	//
+	// Only these two are translatable, and only into Thai. A `map[Locale]string`
+	// would be the general shape and the wrong one today: it trades a column an
+	// admin form can render for a blob nothing validates, to serve locales that
+	// do not exist. i18n.Supported is the list to grow first.
+	NameTH        string    `json:"nameTh"`
+	DescriptionTH string    `json:"descriptionTh"`
+	ImageURL      string    `json:"imageUrl"`
+	GameSlug      GameSlug  `json:"gameSlug"` // "" = any game
+	MinScore      int       `json:"minScore"` // threshold to qualify
+	Stock         int       `json:"stock"`    // remaining units; -1 = unlimited
+	Active        bool      `json:"active"`
+	SortOrder     int       `json:"sortOrder"` // tie-break / display ordering
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // Unlimited is the sentinel Stock value meaning "never runs out".
@@ -107,14 +119,19 @@ const Unlimited = -1
 // second source of truth that disagrees the moment a claim expires without
 // anyone writing a row. See internal/claim.StatusAt.
 type Claim struct {
-	ID         string     `json:"id"`
-	Code       string     `json:"code"`    // human-transcribed; see id.NewClaimCode
-	ScoreID    string     `json:"scoreId"` // the round that earned it
-	AwardID    string     `json:"awardId"`
-	AwardName  string     `json:"awardName"` // snapshot, see above
-	IssuedAt   time.Time  `json:"issuedAt"`
-	ExpiresAt  time.Time  `json:"expiresAt,omitempty"` // zero = never expires
-	RedeemedAt *time.Time `json:"redeemedAt,omitempty"`
+	ID        string `json:"id"`
+	Code      string `json:"code"`    // human-transcribed; see id.NewClaimCode
+	ScoreID   string `json:"scoreId"` // the round that earned it
+	AwardID   string `json:"awardId"`
+	AwardName string `json:"awardName"` // snapshot, see above
+	// AwardNameTH is the same snapshot in Thai, and "" means the prize had no
+	// Thai name when this claim was issued. Both are stored because the two
+	// readers want different ones: the player's result screen follows their
+	// locale, while the admin's claims panel is operator-facing and untranslated.
+	AwardNameTH string     `json:"awardNameTh"`
+	IssuedAt    time.Time  `json:"issuedAt"`
+	ExpiresAt   time.Time  `json:"expiresAt,omitempty"` // zero = never expires
+	RedeemedAt  *time.Time `json:"redeemedAt,omitempty"`
 }
 
 // ClaimStatus is the derived state of a Claim at a point in time. It is never

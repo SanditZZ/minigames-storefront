@@ -1,0 +1,26 @@
+-- The Thai name of a prize, as the operator typed it.
+--
+-- Award text is the one player-facing string the i18n work deliberately did not
+-- translate: game names and error messages are ours to write, so they live in
+-- message tables (internal/i18n, internal/game/i18n.go), but a prize is admin-
+-- entered free text and no table can hold it. The result was a player app that
+-- is Thai from the headline to the tier ladder, wrapped around "Free Coffee".
+--
+-- DEFAULT '' means "not translated", NOT "empty name". The distinction is the
+-- whole design: the resolver falls back PER FIELD (reward.Showcase), so an
+-- award with a Thai name and no Thai description shows the Thai name and the
+-- English description rather than dropping the pair back to English. An
+-- operator can translate a prize list incrementally, and a half-finished
+-- translation is visibly half-finished rather than silently invisible.
+--
+-- That also makes '' the correct value for every row written before this
+-- column: an existing prize list is untranslated, which is exactly what the
+-- English fallback describes, so there is nothing to backfill.
+--
+-- Paired with 006_award_description_th.sql. They are two files rather than one
+-- because Store.Migrate guards each ALTER on a PRAGMA table_info check and
+-- SQLite has no "ADD COLUMN IF NOT EXISTS": a single file holding both
+-- statements would be guarded on one of them, and a crash between the two would
+-- leave the second column missing forever with the guard reporting success.
+
+ALTER TABLE awards ADD COLUMN name_th TEXT NOT NULL DEFAULT '';

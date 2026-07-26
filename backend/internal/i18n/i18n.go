@@ -18,9 +18,13 @@
 //     (packages/player-core/src/i18n). Round-tripping a button label through
 //     HTTP would make every screen wait on the network for its own furniture.
 //
-// Award names and descriptions are the deliberate gap: they are admin-entered
-// free text, so translating them is a schema change (awards.name_th) rather
-// than a message table. That decision is filed, not forgotten.
+// Award names and descriptions are the third case, and they are why this is a
+// split rather than a binary: they are admin-entered free text, so no table on
+// either side of the wire can hold them. They are translated by COLUMN —
+// awards.name_th, claims.award_name_th — and resolved by internal/reward/text.go,
+// where "" means "the operator supplied none" rather than "someone forgot to
+// translate this". A missing entry here fails a test; a missing translation
+// there is a supported configuration.
 package i18n
 
 // Locale is a language this API can answer in. It is a closed set on purpose:

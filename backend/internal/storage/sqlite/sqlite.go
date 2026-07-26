@@ -25,6 +25,15 @@ var claimsSQL string
 //go:embed migrations/004_game_target_score.sql
 var gameTargetScoreSQL string
 
+//go:embed migrations/005_award_name_th.sql
+var awardNameThSQL string
+
+//go:embed migrations/006_award_description_th.sql
+var awardDescriptionThSQL string
+
+//go:embed migrations/007_claim_award_name_th.sql
+var claimAwardNameThSQL string
+
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
 	db       *sql.DB
@@ -77,6 +86,17 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return fmt.Errorf("apply claims schema: %w", err)
 	}
 	if err := s.addColumnIfMissing(ctx, "games", "target_score", gameTargetScoreSQL); err != nil {
+		return err
+	}
+	// Two calls, not one, because each ALTER is guarded independently. See the
+	// header of 005_award_name_th.sql.
+	if err := s.addColumnIfMissing(ctx, "awards", "name_th", awardNameThSQL); err != nil {
+		return err
+	}
+	if err := s.addColumnIfMissing(ctx, "awards", "description_th", awardDescriptionThSQL); err != nil {
+		return err
+	}
+	if err := s.addColumnIfMissing(ctx, "claims", "award_name_th", claimAwardNameThSQL); err != nil {
 		return err
 	}
 	return nil

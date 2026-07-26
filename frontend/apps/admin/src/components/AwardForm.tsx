@@ -21,6 +21,8 @@ interface Props {
 export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [nameTh, setNameTh] = useState(initial?.nameTh ?? "");
+  const [descriptionTh, setDescriptionTh] = useState(initial?.descriptionTh ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
   const [gameSlug, setGameSlug] = useState(initial?.gameSlug ?? "");
   const [minScore, setMinScore] = useState(initial?.minScore ?? 0);
@@ -34,6 +36,8 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
     onSubmit({
       name: name.trim(),
       description: description.trim(),
+      nameTh: nameTh.trim(),
+      descriptionTh: descriptionTh.trim(),
       imageUrl: imageUrl.trim(),
       gameSlug,
       minScore,
@@ -51,6 +55,38 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
 
       <Field label="Description" className="sm:col-span-2">
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+      </Field>
+
+      {/* Thai is OPTIONAL and says so, because a blank field here has to read as
+          "this store does not need one" rather than as an unfinished form. The
+          server falls back per field, so a prize with a Thai name and an English
+          description is a supported half-way state and not a mistake — see
+          internal/reward/text.go.
+
+          Not required, deliberately: an English-only venue is a real
+          configuration, and refusing to save a prize without a translation
+          would make bilingual support a tax on the stores that do not want it.
+
+          Labelled with the language's own name — someone looking for the Thai
+          field scans for "ไทย", the same rule the player's language switcher
+          follows. */}
+      <Field label="Name — ไทย (optional)" className="sm:col-span-2">
+        <Input
+          value={nameTh}
+          onChange={(e) => setNameTh(e.target.value)}
+          maxLength={80}
+          lang="th"
+          placeholder="Leave empty to show the English name to Thai players"
+        />
+      </Field>
+
+      <Field label="Description — ไทย (optional)" className="sm:col-span-2">
+        <Textarea
+          value={descriptionTh}
+          onChange={(e) => setDescriptionTh(e.target.value)}
+          rows={2}
+          lang="th"
+        />
       </Field>
 
       <div className="sm:col-span-2">

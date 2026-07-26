@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/sanditzz/minigames-storefront/backend/internal/app"
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
 	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
+	"github.com/sanditzz/minigames-storefront/backend/internal/reward"
 )
 
 func (s *Server) handleListGames(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +79,7 @@ func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, loc, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, result)
+	writeJSON(w, http.StatusCreated, localizedResult(result, loc))
 }
 
 // handleGetScore serves a single finished round, so the player app's result URL
@@ -85,12 +87,40 @@ func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {
 // the side effects.
 func (s *Server) handleGetScore(w http.ResponseWriter, r *http.Request) {
 	slug := domain.GameSlug(r.PathValue("slug"))
+	loc := localeOf(r)
 	result, err := s.svc.ScoreResult(r.Context(), slug, r.PathValue("id"))
 	if err != nil {
-		writeAppError(w, localeOf(r), err)
+		writeAppError(w, loc, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, localizedResult(result, loc))
+}
+
+// localizedResult words a finished round's prize for the reader.
+//
+// Both player-facing score endpoints return this shape, so it is done once here
+// rather than twice inline — and it is done at the transport edge for the same
+// reason game.Localize is: the service decides what was won, and the language it
+// is described in depends only on who is asking.
+//
+// The award and the claim are worded from DIFFERENT sources on purpose. The
+// award is the live row, so it follows an operator's later edits; the claim
+// carries its own snapshot, so it keeps saying what was won even after the award
+// is renamed or deleted. Wording both from the award would quietly undo that.
+//
+// Copies throughout: SubmitResult holds pointers, and rewriting through them
+// would mutate values the service still owns.
+func localizedResult(result app.SubmitResult, loc i18n.Locale) app.SubmitResult {
+	if result.Award != nil {
+		localized := reward.LocalizedAward(*result.Award, loc)
+		result.Award = &localized
+	}
+	if result.Claim != nil {
+		view := *result.Claim
+		view.Claim = reward.LocalizedClaim(view.Claim, loc)
+		result.Claim = &view
+	}
+	return result
 }
 
 // handlePrizes serves the prizes a game is offering, for the landing screen's
@@ -98,13 +128,15 @@ func (s *Server) handleGetScore(w http.ResponseWriter, r *http.Request) {
 // reward.PublicAward shape, never raw awards with their stock levels.
 func (s *Server) handlePrizes(w http.ResponseWriter, r *http.Request) {
 	slug := domain.GameSlug(r.PathValue("slug"))
-	// The prizes themselves are NOT localized: an award's name and description
-	// are admin-entered free text, so translating them is a schema change
-	// (awards.name_th) rather than a lookup — see the note in internal/i18n and
-	// the entry in docs/potential-features.md.
-	prizes, err := s.svc.Prizes(r.Context(), slug)
+	// The prizes ARE localized, from awards.name_th / description_th rather than
+	// from a message table: a prize name is admin-entered free text, so no table
+	// on this side of the wire could hold it. The pick falls back per field and
+	// happens inside Showcase — see internal/reward/text.go for why there and
+	// not here.
+	loc := localeOf(r)
+	prizes, err := s.svc.Prizes(r.Context(), slug, loc)
 	if err != nil {
-		writeAppError(w, localeOf(r), err)
+		writeAppError(w, loc, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, prizes)

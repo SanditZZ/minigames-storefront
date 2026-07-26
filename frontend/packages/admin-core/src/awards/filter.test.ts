@@ -17,6 +17,8 @@ function award(name: string, over: Partial<Award> = {}): Award {
     id: name,
     name,
     description: "",
+    nameTh: "",
+    descriptionTh: "",
     imageUrl: "",
     gameSlug: "tap-fast",
     minScore: 0,
@@ -88,6 +90,24 @@ describe("matchesQuery", () => {
     const a = award("Free Coffee");
     expect(matchesQuery(a, "coffee")).toBe(true);
     expect(matchesQuery(a, "COFF")).toBe(true);
+    expect(matchesQuery(a, "tote")).toBe(false);
+  });
+
+  // Otherwise a prize named in Thai is unfindable by the only name the staff
+  // who named it think of it as.
+  it("also matches the Thai name", () => {
+    const a = award("Free Coffee", { nameTh: "กาแฟฟรี" });
+    expect(matchesQuery(a, "กาแฟ")).toBe(true);
+    // Both names stay searchable — translating a prize must not cost the
+    // English lookup an operator was already using.
+    expect(matchesQuery(a, "coffee")).toBe(true);
+    expect(matchesQuery(a, "ถุงผ้า")).toBe(false);
+  });
+
+  it("does not match an untranslated award on an empty Thai name", () => {
+    // "" is a substring of every string, so a naive includes() on nameTh would
+    // make every untranslated prize match every query.
+    const a = award("Free Coffee");
     expect(matchesQuery(a, "tote")).toBe(false);
   });
 
