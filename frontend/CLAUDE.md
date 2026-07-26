@@ -151,3 +151,15 @@ It is a dev tool only — no app build and no CI job runs it.
 Always build with reusable UI components. Shared primitives live in `src/ui/`
 (player) — Button, Card, Stat, ProgressBar, Spinner, Screen, GameStage. Don't
 duplicate styled markup; extend the kit.
+
+### A kit control that wraps two inputs needs two names
+
+**A `<label>` in the markup reads as coverage; only the accessibility tree
+settles it.** A wrapping `<label>` associates with the FIRST labelable
+descendant only, so any primitive that composes *two* controls behind one label
+— `ColorInput` (swatch + hex box) and `DurationInput` (amount + unit) are the
+two that exist — leaves the second one nameless however carefully the markup
+reads. Give each inner control its own name derived from the caller's `label`,
+and make `label` **required** rather than optional: a name a compiler can demand
+is a name that cannot go missing again. Searching for controls with no label
+nearby will not find this class of bug, because the label *is* nearby.

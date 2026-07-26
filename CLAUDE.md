@@ -224,9 +224,22 @@ new work so a suggestion is either already on it or genuinely new.
 
 Keeping it true is part of shipping a feature, not a follow-up to it:
 
-- **Strike through what shipped** — `~~**Name**~~ — **built.**` plus one line on
-  what it actually proved out. Deleting the entry throws away the reason it was
-  wanted in the first place.
+- **DELETE what shipped — do not strike it through.** The doc is the list of
+  what is *not* built; an entry that describes finished work is noise in the one
+  place a session looks to decide what to do next, and a file that is half
+  history reads as twice as much roadmap as it has. No `~~struck~~` entries, no
+  "— **built.**" survivors.
+  **Deleting is not discarding: relocate first, then delete.** Before an entry
+  goes, ask what it says that the *code* does not. If it states a live rule —
+  "the client's filename is discarded, not sanitised", "the coarsest unit that
+  divides evenly", "this beat is a readout, not motion, so it skips `holdMs`" —
+  that rule belongs in a comment beside the symbol it governs, or in the
+  `CLAUDE.md` / `docs/architecture.md` that owns that area, and it has to be
+  there *before* the entry is removed. If the rationale is already in the code,
+  delete the entry outright; duplicating it in a roadmap is how the two versions
+  start disagreeing. What must never survive the delete is the *shape* the entry
+  had: prose about what the build proved, what the entry got wrong, and what it
+  cost is a changelog, and `git log` already keeps it.
 - **Correct what the feature invalidated.** A shipped change usually falsifies
   some *other* entry rather than its own: the prize showcase started rendering
   `Award.imageUrl`, which quietly made "award image URLs are unused" wrong while
@@ -239,6 +252,11 @@ Keeping it true is part of shipping a feature, not a follow-up to it:
   it. This is the rule that keeps the other three honest: a doc that is 90%
   accurate is read as if it were 100%, so the 10% is not a small defect — it is
   the entry that sends the next session to a file that no longer works that way.
+  **A shipped entry is stale by definition**, so the sweep covers those too: if
+  the feature exists, the entry describing it goes, under the relocate-then-
+  delete rule above. What stays behind is only the part that is still *unbuilt*
+  — the follow-ups the work surfaced, promoted to entries of their own rather
+  than left as sub-bullets of something finished.
 
 **Every claim in that doc is a claim about the code, so cite the file.** "Errors
 are not announced" is only actionable because it names `StatusMessage`; an entry

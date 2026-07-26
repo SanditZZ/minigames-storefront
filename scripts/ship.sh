@@ -26,11 +26,11 @@
 # NOT for stepping past a failing test — a red E2E means the player flow is
 # broken, which is exactly what the gate is for.
 #
-# KNOWN GAP: step 4 typechecks the native client but does not RUN it. There is
-# no Maestro/Detox suite yet, so nothing here catches a mobile screen that
-# compiles and then crashes on a device — unlike the web player, which step 3
-# actually drives in a browser. Until that suite exists, a green ship.sh says
-# nothing about whether the Expo app works. See mobile/CLAUDE.md.
+# KNOWN GAP: step 4 typechecks the native client always, and runs its Maestro
+# flows only when an emulator or phone is attached (see the checks below). On a
+# machine with no device the skip is announced, but a green ship.sh still means
+# the Expo app was COMPILED and not RUN — unlike the web player, which step 3
+# always drives in a browser. See mobile/CLAUDE.md.
 #
 # set -e ensures any failing step aborts before the commit/push — main stays green.
 
