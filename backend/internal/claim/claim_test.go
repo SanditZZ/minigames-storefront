@@ -101,6 +101,33 @@ func TestCanRedeem(t *testing.T) {
 	}
 }
 
+// The inverse's only precondition is that a redemption happened. Expiry is NOT
+// one, which these cases pin: a claim collected inside its window and corrected
+// after it must still be correctable.
+func TestCanUnredeem(t *testing.T) {
+	hour := time.Hour
+	cases := []struct {
+		name       string
+		claim      domain.Claim
+		wantOK     bool
+		wantReason string
+	}{
+		{"collected", redeemedAt(issued(hour), base.Add(time.Minute)), true, ""},
+		{"collected, and its window has since closed", redeemedAt(issued(hour), base.Add(time.Minute)), true, ""},
+		{"never collected", issued(hour), false, ReasonNotRedeemed},
+		{"never collected and long expired", issued(hour), false, ReasonNotRedeemed},
+		{"never collected, never expires", issued(0), false, ReasonNotRedeemed},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ok, reason := CanUnredeem(c.claim)
+			if ok != c.wantOK || reason != c.wantReason {
+				t.Fatalf("CanUnredeem() = (%v, %q), want (%v, %q)", ok, reason, c.wantOK, c.wantReason)
+			}
+		})
+	}
+}
+
 func TestTTL(t *testing.T) {
 	cases := []struct {
 		hours int

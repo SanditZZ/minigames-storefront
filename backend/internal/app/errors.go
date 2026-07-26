@@ -20,4 +20,12 @@ var (
 	// already redeemed, or expired. Wrapped with the reason from
 	// claim.CanRedeem, so the admin at the counter is told which.
 	ErrClaimNotRedeemable = errors.New("claim not redeemable")
+	// ErrClaimNotUnredeemable is a real claim whose redemption cannot be taken
+	// back, which today means only one thing: it was never redeemed. It is a
+	// separate error from ErrClaimNotRedeemable rather than a reuse of it because
+	// the two mean opposite things about the same claim — "not redeemable"
+	// usually means it is ALREADY redeemed, which is precisely the state in which
+	// un-redeeming is legal. One error covering both would make the message an
+	// admin reads at the counter a puzzle.
+	ErrClaimNotUnredeemable = errors.New("claim not unredeemable")
 )

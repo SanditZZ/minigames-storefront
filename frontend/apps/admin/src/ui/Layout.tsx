@@ -89,10 +89,13 @@ export function ClaimRow({
   view,
   busy = false,
   onRedeem,
+  onUnredeem,
 }: {
   view: ClaimView;
   busy?: boolean;
   onRedeem: () => void;
+  /** Undo a collection. Rendered only on a redeemed row. */
+  onUnredeem: () => void;
 }) {
   const { claim, status } = view;
   return (
@@ -116,6 +119,21 @@ export function ClaimRow({
           className="shrink-0 whitespace-nowrap"
         >
           Redeem
+        </Button>
+      )}
+      {status === "redeemed" && (
+        // The repair for a mis-scan, on the only rows where it means anything.
+        // `ghost` rather than `danger`: undoing a collection is a correction, not
+        // a destruction — nothing is lost, and styling it as a hazard would make
+        // staff hesitate over the button that fixes their mistake.
+        <Button
+          variant="ghost"
+          onClick={onUnredeem}
+          disabled={busy}
+          aria-label={`Undo collection of claim ${claim.code}`}
+          className="shrink-0 whitespace-nowrap"
+        >
+          Undo
         </Button>
       )}
     </li>

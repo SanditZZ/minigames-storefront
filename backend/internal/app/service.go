@@ -356,6 +356,80 @@ func (s *Service) ListClaims(ctx context.Context, status domain.ClaimStatus) ([]
 	return out, nil
 }
 
+// GetClaim resolves a code WITHOUT acting on it.
+//
+// This is what makes a confirmation step possible: "Redeem Free Coffee for
+// ABCD-2345?" needs the prize's name, and the code alone does not carry it. A
+// UI that skipped this would have to either name nothing (confirming a bare
+// string tells an operator nothing about what they are about to hand over) or
+// redeem first and describe afterwards, which is the mis-scan this whole path
+// exists to prevent.
+//
+// It reports every failure the way RedeemClaim does — one ErrClaimNotFound for
+// both an impossible shape and an unknown code — so adding a lookup does not
+// hand a code-guesser a cheaper oracle than the redeem endpoint already was.
+func (s *Service) GetClaim(ctx context.Context, code string) (ClaimView, error) {
+	found, err := s.claimByCode(ctx, code)
+	if err != nil {
+		return ClaimView{}, err
+	}
+	return ClaimView{Claim: found, Status: claim.StatusAt(found, s.now())}, nil
+}
+
+// claimByCode normalizes, shape-checks and loads a claim. Shared by every
+// code-addressed operation so they cannot drift on what a code is or on how
+// much a failure reveals.
+func (s *Service) claimByCode(ctx context.Context, code string) (domain.Claim, error) {
+	normalized := id.NormalizeClaimCode(code)
+	if !id.LooksLikeClaimCode(normalized) {
+		return domain.Claim{}, ErrClaimNotFound
+	}
+
+	found, err := s.store.Claims().GetByCode(ctx, normalized)
+	if errors.Is(err, storage.ErrNotFound) {
+		return domain.Claim{}, ErrClaimNotFound
+	}
+	if err != nil {
+		return domain.Claim{}, err
+	}
+	return found, nil
+}
+
+// UnredeemClaim takes a redemption back: the inverse of RedeemClaim.
+//
+// It exists because redeeming had no inverse and scanning makes the trigger far
+// easier to pull — a camera pointed at the wrong screen redeems a stranger's
+// prize, and until now the only repair was editing SQLite by hand.
+//
+// Note what it deliberately does NOT do: it does not extend the claim's window.
+// An un-redeemed claim whose expiry has passed comes back as expired, not
+// issued, because the deadline is a fact about when the round was won rather
+// than about this correction. claim.StatusAfterUnredeem is what lets a UI warn
+// about that before the operator commits.
+func (s *Service) UnredeemClaim(ctx context.Context, code string) (ClaimView, error) {
+	found, err := s.claimByCode(ctx, code)
+	if err != nil {
+		return ClaimView{}, err
+	}
+
+	if ok, reason := claim.CanUnredeem(found); !ok {
+		// The claim rides along with the refusal, same as RedeemClaim: the admin
+		// still needs to see what they were looking at.
+		return ClaimView{Claim: found, Status: claim.StatusAt(found, s.now())},
+			fmt.Errorf("%w: %s", ErrClaimNotUnredeemable, reason)
+	}
+
+	restored, err := s.store.Claims().Unredeem(ctx, found.Code)
+	if errors.Is(err, storage.ErrConflict) {
+		// Another counter un-redeemed it between the check and the write.
+		return ClaimView{}, fmt.Errorf("%w: %s", ErrClaimNotUnredeemable, claim.ReasonNotRedeemed)
+	}
+	if err != nil {
+		return ClaimView{}, err
+	}
+	return ClaimView{Claim: restored, Status: claim.StatusAt(restored, s.now())}, nil
+}
+
 // RedeemClaim hands a prize over: it marks the code used, once.
 //
 // The code arrives as a human typed it — lowercase, grouped with a dash,
@@ -366,15 +440,7 @@ func (s *Service) ListClaims(ctx context.Context, status domain.ClaimStatus) ([]
 // and the store's conditional UPDATE is what makes "redeem exactly once" true
 // when two admins scan the same code at the same moment.
 func (s *Service) RedeemClaim(ctx context.Context, code string) (ClaimView, error) {
-	normalized := id.NormalizeClaimCode(code)
-	if !id.LooksLikeClaimCode(normalized) {
-		return ClaimView{}, ErrClaimNotFound
-	}
-
-	found, err := s.store.Claims().GetByCode(ctx, normalized)
-	if errors.Is(err, storage.ErrNotFound) {
-		return ClaimView{}, ErrClaimNotFound
-	}
+	found, err := s.claimByCode(ctx, code)
 	if err != nil {
 		return ClaimView{}, err
 	}
@@ -387,7 +453,7 @@ func (s *Service) RedeemClaim(ctx context.Context, code string) (ClaimView, erro
 			fmt.Errorf("%w: %s", ErrClaimNotRedeemable, reason)
 	}
 
-	redeemed, err := s.store.Claims().Redeem(ctx, normalized, now)
+	redeemed, err := s.store.Claims().Redeem(ctx, found.Code, now)
 	if errors.Is(err, storage.ErrConflict) {
 		// Lost the race with another counter between the check and the write.
 		return ClaimView{}, fmt.Errorf("%w: %s", ErrClaimNotRedeemable, claim.ReasonAlreadyRedeemed)

@@ -96,7 +96,9 @@ func (s *Server) routes() http.Handler {
 	// Claims are admin-only: the list is every outstanding prize in the venue,
 	// and redeeming is the act of giving one away.
 	mux.HandleFunc("GET /api/v1/admin/claims", s.requireAdmin(s.handleListClaims))
+	mux.HandleFunc("GET /api/v1/admin/claims/{code}", s.requireAdmin(s.handleGetClaim))
 	mux.HandleFunc("POST /api/v1/admin/claims/{code}/redeem", s.requireAdmin(s.handleRedeemClaim))
+	mux.HandleFunc("POST /api/v1/admin/claims/{code}/unredeem", s.requireAdmin(s.handleUnredeemClaim))
 
 	// Uploads are admin-only to WRITE and public to READ — an image nobody can
 	// fetch is not an image. Serving is mounted only when the configured store

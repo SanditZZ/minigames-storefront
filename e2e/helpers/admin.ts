@@ -19,8 +19,25 @@ export const admin = {
   // accessible name (`Redeem claim ABCD-2345`) precisely so the two are
   // distinguishable, which is what `exact` leans on here.
   codeField: (page: Page) => page.getByLabel("Redeem a code"),
-  redeem: (page: Page) => page.getByRole("button", { name: "Redeem", exact: true }),
+  /**
+   * The box's button LOOKS a code up — it no longer redeems.
+   *
+   * That is the confirmation step, and the rename is the point of it: nothing in
+   * this panel writes on a single press, because a camera can fire one at
+   * whatever is in frame. The two-step shape is asserted by its own test below.
+   */
+  lookUp: (page: Page) => page.getByRole("button", { name: "Look up" }),
   redeemRow: (page: Page, code: string) => page.getByRole("button", { name: `Redeem claim ${code}` }),
+  undoRow: (page: Page, code: string) => page.getByRole("button", { name: `Undo collection of claim ${code}` }),
+
+  /** The confirmation step, and its two buttons. */
+  confirm: (page: Page) => page.getByRole("group", { name: "Confirm" }),
+  // `exact` separates the confirming button ("Undo collection") from a row's
+  // accessible name ("Undo collection of claim ABCD2345"), which is a substring
+  // match away from being the same locator.
+  confirmRedeem: (page: Page) => page.getByRole("button", { name: "Hand it over", exact: true }),
+  confirmUndo: (page: Page) => page.getByRole("button", { name: "Undo collection", exact: true }),
+  cancel: (page: Page) => page.getByRole("button", { name: "Cancel", exact: true }),
   /**
    * One claim's row in the list, by its stored (undashed) code.
    *
@@ -31,6 +48,7 @@ export const admin = {
    */
   claimRow: (page: Page, code: string) => page.getByRole("listitem").filter({ hasText: code }),
   handedOver: (page: Page) => page.getByText(/^Handed over:/),
+  undone: (page: Page) => page.getByText(/^Collection undone:/),
   statusFilter: (page: Page) => page.getByLabel("Filter claims by status"),
 
   // `exact` matters here: getByLabel matches substrings, and the logo field's

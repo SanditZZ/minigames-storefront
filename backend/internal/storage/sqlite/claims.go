@@ -118,6 +118,39 @@ func (r *claimRepo) Redeem(ctx context.Context, code string, at time.Time) (doma
 	return r.GetByCode(ctx, code)
 }
 
+// Unredeem atomically flips redeemed_at from `at` back to NULL.
+//
+// It is Redeem's mirror image, including the guard: `WHERE redeemed_at IS NOT
+// NULL` means two admins both pressing "undo" produce one un-redemption and one
+// ErrConflict, rather than the second silently erasing a redemption that the
+// first had already erased and a third had since re-made.
+//
+// The old timestamp is not kept anywhere. That is a deliberate consequence of
+// having no actor column to keep it beside: half an audit trail — "this was
+// un-redeemed at some point, by nobody, from an unknown value" — invites more
+// trust than it earns. See the audit-trail entry in docs/potential-features.md.
+func (r *claimRepo) Unredeem(ctx context.Context, code string) (domain.Claim, error) {
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE claims SET redeemed_at = NULL
+		WHERE code = ? AND redeemed_at IS NOT NULL`, code)
+	if err != nil {
+		return domain.Claim{}, fmt.Errorf("unredeem claim: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return domain.Claim{}, fmt.Errorf("unredeem claim rows: %w", err)
+	}
+	if n == 0 {
+		// Same fork as Redeem, for the same reason: a code that does not exist is
+		// a different thing to tell the operator than a prize nobody collected.
+		if _, gerr := r.GetByCode(ctx, code); errors.Is(gerr, storage.ErrNotFound) {
+			return domain.Claim{}, storage.ErrNotFound
+		}
+		return domain.Claim{}, storage.ErrConflict
+	}
+	return r.GetByCode(ctx, code)
+}
+
 // rowScanner is satisfied by both *sql.Row and *sql.Rows, so the single-row and
 // list paths share one column ordering.
 type rowScanner interface {

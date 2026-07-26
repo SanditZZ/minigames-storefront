@@ -72,10 +72,12 @@ func writeAppError(w http.ResponseWriter, loc i18n.Locale, err error) {
 		writeMessage(w, loc, http.StatusUnprocessableEntity, i18n.MsgScoreRejected)
 	case errors.Is(err, app.ErrClaimNotFound):
 		writeMessage(w, loc, http.StatusNotFound, i18n.MsgClaimNotFound)
-	case errors.Is(err, app.ErrClaimNotRedeemable):
-		// The wrapped reason (already redeemed / expired) is the message: it is
-		// what the admin at the counter has to tell the person in front of them.
-		// Admin-facing, and so untranslated with the rest of that app.
+	case errors.Is(err, app.ErrClaimNotRedeemable), errors.Is(err, app.ErrClaimNotUnredeemable):
+		// The wrapped reason (already redeemed / expired / never redeemed) is the
+		// message: it is what the admin at the counter has to tell the person in
+		// front of them. Admin-facing, and so untranslated with the rest of that
+		// app. Both directions are 409 for the same reason — the request was
+		// well-formed and the claim's state is what refused it.
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, storage.ErrConflict):
 		writeMessage(w, loc, http.StatusConflict, i18n.MsgConflict)

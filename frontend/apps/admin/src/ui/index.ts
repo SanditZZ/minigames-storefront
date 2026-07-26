@@ -2,4 +2,4 @@
 
 export { Button, Checkbox, ColorInput, DurationInput, Field, Input, Select, Textarea } from "./Controls";
 export { AppShell, CenteredCard, ClaimRow, PanelHeader, RankRow, Stack, Tabs, TopBar } from "./Layout";
-export { Alert, Badge, Card, EmptyState, Loading } from "./Surface";
+export { Alert, Badge, Card, ConfirmPrompt, EmptyState, Loading } from "./Surface";

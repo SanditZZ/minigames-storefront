@@ -150,6 +150,47 @@ func TestRedeemIsAtomicAndHappensOnce(t *testing.T) {
 	}
 }
 
+// Unredeem is Redeem's mirror, guard included: it clears a stamp that is set and
+// refuses one that is not, so two admins undoing the same mis-scan produce one
+// correction rather than one correction and one silent no-op.
+func TestUnredeemIsAtomicAndHappensOnce(t *testing.T) {
+	ctx := context.Background()
+	claims := newTestStore(t).Claims()
+	if _, err := claims.Create(ctx, sampleClaim()); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	at := issuedAt.Add(time.Hour)
+	if _, err := claims.Redeem(ctx, "ABCD2345", at); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+
+	got, err := claims.Unredeem(ctx, "ABCD2345")
+	if err != nil {
+		t.Fatalf("unredeem: %v", err)
+	}
+	if got.RedeemedAt != nil {
+		t.Fatalf("redeemed_at = %v, want NULL", got.RedeemedAt)
+	}
+	// Cleared in the DATABASE, not just in the returned struct — the row is
+	// re-read rather than trusted.
+	after, err := claims.GetByCode(ctx, "ABCD2345")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if after.RedeemedAt != nil {
+		t.Fatalf("row still carries redeemed_at = %v", after.RedeemedAt)
+	}
+
+	if _, err := claims.Unredeem(ctx, "ABCD2345"); !errors.Is(err, storage.ErrConflict) {
+		t.Fatalf("second unredeem err = %v, want storage.ErrConflict", err)
+	}
+
+	// And the claim is genuinely collectable again, not merely NULL-stamped.
+	if _, err := claims.Redeem(ctx, "ABCD2345", at.Add(time.Hour)); err != nil {
+		t.Fatalf("redeem after unredeem: %v", err)
+	}
+}
+
 func TestMissingClaimsAreNotFound(t *testing.T) {
 	ctx := context.Background()
 	claims := newTestStore(t).Claims()
@@ -164,6 +205,10 @@ func TestMissingClaimsAreNotFound(t *testing.T) {
 	// the admin needs to be told those apart.
 	if _, err := claims.Redeem(ctx, "ZZZZ9999", issuedAt); !errors.Is(err, storage.ErrNotFound) {
 		t.Fatalf("redeem err = %v, want ErrNotFound", err)
+	}
+	// Same fork in the inverse: an unknown code is not "a prize nobody collected".
+	if _, err := claims.Unredeem(ctx, "ZZZZ9999"); !errors.Is(err, storage.ErrNotFound) {
+		t.Fatalf("unredeem err = %v, want ErrNotFound", err)
 	}
 }
 

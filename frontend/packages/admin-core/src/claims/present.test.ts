@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { claimStatusLabel, claimStatusTone, reasonFrom, redeemErrorMessage } from "./present";
+import type { ClaimView } from "@minigames/api-client";
+import {
+  claimConfirmation,
+  claimStatusLabel,
+  claimStatusTone,
+  reasonFrom,
+  redeemErrorMessage,
+  unredeemErrorMessage,
+} from "./present";
 
 describe("claim status presentation", () => {
   it("labels each state distinctly", () => {
@@ -57,5 +65,64 @@ describe("redeemErrorMessage", () => {
     for (const status of [400, 404, 409, 401, 500]) {
       expect(redeemErrorMessage(status, "")).not.toBe("");
     }
+  });
+});
+
+describe("unredeemErrorMessage", () => {
+  // The same status means the opposite thing in each direction, which is the
+  // whole reason this is a second function and not a reuse of the first.
+  it("answers a 409 with 'nothing to undo', not 'already used'", () => {
+    const undo = unredeemErrorMessage(409, "claim not unredeemable: this claim has not been redeemed");
+    expect(undo).toMatch(/has not been redeemed/i);
+    expect(undo).not.toMatch(/already/i);
+    expect(undo).not.toBe(redeemErrorMessage(409, "claim not redeemable: this claim has already been redeemed"));
+  });
+
+  it("never returns an empty string, whatever the server said", () => {
+    for (const status of [400, 404, 409, 401, 500]) {
+      expect(unredeemErrorMessage(status, "")).not.toBe("");
+    }
+  });
+});
+
+describe("claimConfirmation", () => {
+  const view: ClaimView = {
+    claim: {
+      id: "c1",
+      code: "ABCD2345",
+      scoreId: "s1",
+      awardId: "a1",
+      awardName: "Free Coffee",
+      issuedAt: "2026-07-26T10:00:00Z",
+    },
+    status: "issued",
+  };
+
+  // The point of confirming a scan is being able to tell "the claim I meant"
+  // from "the claim that was in frame", which takes both facts.
+  it("names the prize AND the code in both directions", () => {
+    for (const action of ["redeem", "unredeem"] as const) {
+      const { question } = claimConfirmation(action, view);
+      expect(question).toContain("Free Coffee");
+      expect(question).toContain("ABCD2345");
+    }
+  });
+
+  it("asks opposite questions with distinct buttons", () => {
+    const redeem = claimConfirmation("redeem", view);
+    const undo = claimConfirmation("unredeem", { ...view, status: "redeemed" });
+    expect(redeem.question).not.toBe(undo.question);
+    expect(redeem.verb).not.toBe(undo.verb);
+  });
+
+  // It must not promise the prize becomes collectable again — a claim whose
+  // window closed while it was marked collected comes back expired.
+  it("admits the undo may land on expired", () => {
+    const undo = claimConfirmation("unredeem", { ...view, status: "redeemed" });
+    expect(undo.note).toMatch(/expired/i);
+  });
+
+  it("says a redemption happens only once", () => {
+    expect(claimConfirmation("redeem", view).note).toMatch(/once/i);
   });
 });

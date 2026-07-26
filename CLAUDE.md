@@ -100,6 +100,7 @@ packages/api-client    typed HTTP client + wire types
 packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
                        plus the runtime-override precedence rule (override.ts)
 packages/image-core    crop-and-zoom geometry: cover scale, pan clamp, export map
+packages/qr-core       QR encoding for short codes: text → module matrix + SVG path
 packages/player-core   route grammar, reveal maths, prize merge, game scoring,
                        the en/th dictionaries + locale precedence (i18n/)
 packages/admin-core    route grammar, award filter/sort, branding + benchmark forms

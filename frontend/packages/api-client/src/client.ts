@@ -146,6 +146,27 @@ export function createClient(opts: ClientOptions) {
       }),
 
     /**
+     * Looks a code up WITHOUT redeeming it, so a confirmation can name the prize
+     * it is about to hand over. Same normalisation and the same 404 as
+     * `redeemClaim` — a lookup is not a cheaper way to probe which codes exist.
+     */
+    getClaim: (code: string) =>
+      request<ClaimView>(`/api/v1/admin/claims/${encodeURIComponent(code)}`),
+
+    /**
+     * Takes a redemption back — the repair for a prize marked collected by
+     * mistake, which a camera makes far easier to do than a keyboard did.
+     *
+     * Throws ApiError(409) when the claim was never redeemed. Note it does NOT
+     * reopen an expired window: an un-redeemed claim past its deadline comes
+     * back `expired`, so read the returned status rather than assuming `issued`.
+     */
+    unredeemClaim: (code: string) =>
+      request<ClaimView>(`/api/v1/admin/claims/${encodeURIComponent(code)}/unredeem`, {
+        method: "POST",
+      }),
+
+    /**
      * Uploads one image and returns where it can be fetched.
      *
      * The returned URL is ABSOLUTE — it has to be, because the apps are built

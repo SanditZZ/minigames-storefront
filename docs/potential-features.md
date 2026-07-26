@@ -41,62 +41,47 @@ Games worth building:
 - **Daily / per-customer win caps** — limit prizes per person per day to control
   cost (needs customer identity, below).
 - **Time-boxed campaigns** — awards with start/end windows and schedules.
-- **Scan-to-redeem: a QR on the result screen, a camera in the admin.** The
-  counter flow today is a player reading eight characters aloud and an admin
-  typing them into the redeem box (`ClaimsPanel.tsx`) — fine one at a time, slow
-  at a queue, and every transcription is a chance to redeem the wrong claim,
-  which is terminal (see "A redemption cannot be undone" below). Three parts,
-  and they are worth separating because only two of them are hard:
-
-  - **Render the claim code as a QR** on the result screen, beside the existing
-    grouped code and copy button in `ClaimCard.tsx`. Pure rendering from data
-    already on screen — no new API, no permissions, no secure context. This half
-    works on the current plain-HTTP local stack as-is.
-  - **Scan it in the admin**, filling the redeem box from the camera instead of
-    the keyboard. Web: `getUserMedia` plus a decoder. Native: `expo-camera` in
-    `mobile/admin`, which is the device that actually belongs at a counter and
-    which currently has no claims screen at all (see the follow-up below).
-  - **Confirm before redeeming, always.** A scan is a trigger a stray camera
-    angle can pull, so it must land on "Redeem *Free Coffee* for `ABCD-2345`?"
-    rather than on the POST. This is not UI polish: `POST
-    /api/v1/admin/claims/{code}/redeem` has no inverse, so a mis-scan is
-    unrepairable outside SQLite.
-
-  **Deciding what the QR encodes is the security question, not a detail.** The
-  bare code keeps the blast radius where it is. A deep link into the admin
-  (`/claims?code=…`) is faster for staff and turns the prize credential into a
-  URL, which spreads the way the "score id is a bearer capability" entry below
-  describes. Prefer the bare code until claims have owners.
-
-  **Testing it on the local stack is the part that will bite**, so plan for it
-  before building:
-
-  - `navigator.mediaDevices` is **undefined on an insecure origin**, for exactly
-    the reason `apps/player/src/clipboard/copy.ts` documents at length for
-    `navigator.clipboard`. `scripts/serve-prod.sh` serves plain HTTP on the
-    Tailscale IP, so the web scanner is not merely awkward to test across the
-    tailnet — the API it needs is absent. `localhost` *is* a secure context, but
-    this box is headless and has no camera, so that exemption buys nothing.
-  - The clean fix is real HTTPS on the tailnet (`tailscale cert` / `tailscale
-    serve` issue a genuine cert for the `*.ts.net` name), which would also let
-    the clipboard's modern path start winning by itself. Chrome's
-    `--unsafely-treat-insecure-origin-as-secure` works per-device for a dev
-    phone and is not a deployment.
-  - **The native admin sidesteps all of it.** `expo-camera` asks the OS for
-    permission and is not bound by web secure-context rules — only by the
-    cleartext/ATS exceptions `mobile/CLAUDE.md` already documents for the API
-    call. If scan-to-redeem is built once, the phone is the honest place.
-  - For the browser suite, Playwright can feed a fake camera
+- **The web scanner exists and cannot run anywhere this project is served.**
+  `useCodeScanner` (`apps/admin/src/scan/`) opens the rear camera and decodes with
+  `BarcodeDetector`; `scanAvailability` (`admin-core/src/claims/scan.ts`) decides
+  whether to offer the control and, when not, which of three reasons to show. On
+  every origin this repo actually uses, at least one reason applies:
+  - **Plain HTTP has no camera API at all.** `scripts/serve-prod.sh` serves the
+    Tailscale IP over HTTP, so `navigator.mediaDevices` is `undefined` — the same
+    rule that removes `navigator.clipboard` there, documented at length in
+    `apps/player/src/clipboard/copy.ts`. The fix is real HTTPS on the tailnet
+    (`tailscale cert` / `tailscale serve` issue a genuine cert for the `*.ts.net`
+    name), which would also let the clipboard's modern path start winning by
+    itself. Chrome's `--unsafely-treat-insecure-origin-as-secure` is a per-device
+    dev switch, not a deployment.
+  - **`BarcodeDetector` is not implemented on Linux Chromium**, so even
+    `localhost` — which *is* a secure context — cannot decode. This was measured,
+    not assumed: `BarcodeDetector` is absent from the Playwright browser this
+    repo's suite runs in. Portable decoding means shipping a wasm/JS decoder into
+    an app whose only runtime dependency is React, which is a dependency decision
+    rather than a fix.
+  - Consequently **the web scan path has no browser coverage** — the pure ranking
+    is unit-tested (`scan.test.ts`) and the camera code is exercised nowhere. If
+    HTTPS lands, Playwright can feed a fake camera
     (`--use-fake-device-for-media-stream --use-file-for-fake-video-capture`) with
-    a pre-rendered QR video, so the scan path is testable without hardware. The
-    admin app is already a `webServer` in `e2e/stack.ts` (port 5298) and
-    `tests/admin-claims.spec.ts` already drives the redeem box, so a scanner
-    filling that box has somewhere to be tested. What remains unmet is the
-    secure-context problem two bullets up — a fake camera does not conjure
-    `navigator.mediaDevices` onto an insecure origin.
-  - Decoding in the browser needs a dependency decision: `BarcodeDetector` is
-    Chromium-only, so portable decoding means shipping a wasm/JS decoder into an
-    app whose only runtime dependency today is React.
+    a pre-rendered QR video, and `tests/admin-claims.spec.ts` is where it goes.
+  - **The native admin is the honest home for scanning**: `expo-camera` asks the
+    OS and is bound by none of the above.
+- **A QR could carry more than a bare code, and that is a security decision.**
+  `ClaimCard` encodes the raw claim code, which keeps the blast radius where it
+  is. A deep link into the admin (`/claims?code=…`) would be faster for staff and
+  would turn a prize credential into a URL, which spreads the way the "score id is
+  a bearer capability" entry below describes. Prefer the bare code until claims
+  have owners — and note `@minigames/qr-core` would need extending first: it
+  encodes version 1 only (ten alphanumeric characters), and its header comment
+  names the three extension points a longer payload needs.
+- **The QR is not scannable during the result card's entrance.** The card fades in
+  over roughly 600ms (`animate-rise-in`), and a symbol at partial opacity over
+  cream has too little contrast to decode — measured while writing
+  `e2e/tests/claim-qr.spec.ts`, which polls for exactly this reason. A customer
+  who holds their phone out the instant the score lands gets one failed scan and
+  then a working one. The fix, if it is ever worth making, is to exempt the QR
+  from the fade rather than to shorten it.
 - **A claim has no owner.** Anyone holding the code can redeem it, which is the
   same trust model as a paper voucher and was the deliberate scope (this is a
   portfolio piece — no real prizes). If prizes ever have value, the gap to close
@@ -527,25 +512,17 @@ and the score table grow.
   setting the same generic way, so an admin shortening the window sees a knob
   that looks retroactive and is not. The fix is copy on that setting, not a
   change to the data.
-- **A redemption cannot be undone.** The only write is
-  `POST /api/v1/admin/claims/{code}/redeem`; there is no inverse. A code
-  redeemed by mistake — a mistyped lookup that happened to hit a real claim, a
-  customer who walked off before collecting — is terminal, and the only repair
-  is editing SQLite by hand. An un-redeem action (admin-only, and itself
-  audited) is the obvious pair to the audit-trail item below.
-  **Scan-to-redeem makes this a prerequisite rather than a nicety.** Typing a
-  wrong code that happens to collide with a real claim is unlikely; a camera
-  pointed at the wrong screen is not, which is why that entry insists on a
-  confirmation step — and why the inverse should exist before the trigger gets
-  that much easier to pull.
-  Note what an un-redeem must not break: `admin-claims.spec.ts` › "refuses the
-  same code a second time" asserts single-use, and it would rightly fail the day
-  someone wires an un-redeem into the same path.
-- **`redeemed_at` records when, never who.** The claims table has no actor
-  column (`003_claims.sql`), and the admin API is one shared secret with no
-  identities behind it, so "who handed this prize over?" is unanswerable by
-  construction. Same root cause as the award-delete audit gap below, and the
-  same fix buys both: admin identities, then an audit log.
+- **`redeemed_at` records when, never who — and an undo records nothing at all.**
+  The claims table has no actor column (`003_claims.sql`), and the admin API is
+  one shared secret with no identities behind it, so "who handed this prize
+  over?" is unanswerable by construction. Un-redeeming makes it worse in a
+  specific way: `claimRepo.Unredeem` sets `redeemed_at` back to NULL, so the row
+  afterwards is indistinguishable from one that was never collected — the
+  correction erases its own evidence. That is deliberate (half an audit trail
+  invites more trust than it earns) and it is why the undo is the strongest
+  argument on this list for **Real auth** plus an audit log: one change buys the
+  actor, the history, and a reason string. Same root cause as the award-delete
+  audit gap below.
 - **The awards panel is half-covered: EDIT is exercised, CREATE and DELETE are
   not.** `admin-awards-i18n.spec.ts` drives the filter, opens one prize's form,
   saves it, and checks the result reaches the player — but it got there by

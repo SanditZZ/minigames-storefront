@@ -86,6 +86,16 @@ type ClaimRepository interface {
 	// claim is already redeemed, so two admins scanning the same code at the
 	// same counter cannot both hand out the prize.
 	Redeem(ctx context.Context, code string, at time.Time) (domain.Claim, error)
+	// Unredeem clears redeemed_at, undoing a mis-scan. It must return
+	// ErrConflict when the claim is NOT redeemed, mirroring Redeem: both are
+	// conditional writes, and the condition is what makes "exactly once" true in
+	// each direction rather than a read the caller hopes is still current.
+	//
+	// It takes no timestamp because it erases one. Nothing records that an
+	// un-redeem happened — see the audit-trail entry in docs/potential-features.md;
+	// the claim simply reads as never collected, which is the honest state and
+	// also a real gap.
+	Unredeem(ctx context.Context, code string) (domain.Claim, error)
 }
 
 // SettingRepository is the admin-CRUD store for configuration knobs.

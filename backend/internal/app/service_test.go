@@ -228,6 +228,22 @@ func (c *memClaims) Redeem(_ context.Context, code string, at time.Time) (domain
 	return v, nil
 }
 
+// Unredeem mirrors the SQL guard in the other direction: it only clears a stamp
+// that is actually set, so undoing twice conflicts rather than looking like it
+// worked.
+func (c *memClaims) Unredeem(_ context.Context, code string) (domain.Claim, error) {
+	v, ok := c.byCode[code]
+	if !ok {
+		return domain.Claim{}, storage.ErrNotFound
+	}
+	if v.RedeemedAt == nil {
+		return domain.Claim{}, storage.ErrConflict
+	}
+	v.RedeemedAt = nil
+	c.byCode[code] = v
+	return v, nil
+}
+
 // memSettings always misses, so the service falls back to its defaults.
 type memSettings struct{}
 
@@ -650,6 +666,140 @@ func TestRedeemClaimRefusesAnExpiredClaimButStillReportsIt(t *testing.T) {
 	}
 	if store.claims.byCode["ABCD2345"].RedeemedAt != nil {
 		t.Fatal("an expired claim was marked redeemed anyway")
+	}
+}
+
+// A confirmation dialog is only worth having if it can name the prize, so the
+// lookup has to answer with the award and WITHOUT spending the claim.
+func TestGetClaimNamesThePrizeWithoutSpendingIt(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+
+	peek, err := svc.GetClaim(ctx, code)
+	if err != nil {
+		t.Fatalf("GetClaim: %v", err)
+	}
+	if peek.Claim.AwardName != "Free Coffee" {
+		t.Fatalf("award name = %q, want %q", peek.Claim.AwardName, "Free Coffee")
+	}
+	if peek.Status != domain.ClaimIssued {
+		t.Fatalf("status = %q, want %q", peek.Status, domain.ClaimIssued)
+	}
+
+	// The whole point: looking is not taking.
+	if _, err := svc.RedeemClaim(ctx, code); err != nil {
+		t.Fatalf("redeem after a peek: %v", err)
+	}
+}
+
+// The lookup must not be a cheaper oracle than the redeem endpoint it precedes:
+// both answer ErrClaimNotFound for a code that does not exist AND for one that
+// could not, so guessing tells you nothing about which shapes are real.
+func TestGetClaimHidesWhetherACodeCouldExist(t *testing.T) {
+	svc := newTestService(winningStore())
+	ctx := context.Background()
+
+	for _, code := range []string{"ABCD2345", "ABCD234", "ABCO2345", "V1StGXR8_Z5", ""} {
+		if _, err := svc.GetClaim(ctx, code); !errors.Is(err, ErrClaimNotFound) {
+			t.Fatalf("GetClaim(%q) err = %v, want ErrClaimNotFound", code, err)
+		}
+	}
+}
+
+// The repair a scanner makes necessary: a prize handed over by mistake goes back
+// to outstanding, and can then be collected by the person who actually won it.
+func TestUnredeemClaimReturnsAPrizeToOutstanding(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+	if _, err := svc.RedeemClaim(ctx, code); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+
+	back, err := svc.UnredeemClaim(ctx, code)
+	if err != nil {
+		t.Fatalf("UnredeemClaim: %v", err)
+	}
+	if back.Status != domain.ClaimIssued {
+		t.Fatalf("status = %q, want %q", back.Status, domain.ClaimIssued)
+	}
+	if back.Claim.RedeemedAt != nil {
+		t.Fatalf("redeemedAt = %v, want it cleared", back.Claim.RedeemedAt)
+	}
+
+	// Un-redeeming is only a repair if the prize is collectable again afterwards.
+	if _, err := svc.RedeemClaim(ctx, code); err != nil {
+		t.Fatalf("redeem after unredeem: %v", err)
+	}
+}
+
+func TestUnredeemClaimRefusesAPrizeNobodyCollected(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+
+	view, err := svc.UnredeemClaim(context.Background(), code)
+	if !errors.Is(err, ErrClaimNotUnredeemable) {
+		t.Fatalf("err = %v, want ErrClaimNotUnredeemable", err)
+	}
+	// Refused, but still described — same contract as a refused redemption.
+	if view.Claim.AwardName != "Free Coffee" || view.Status != domain.ClaimIssued {
+		t.Fatalf("view = %+v, want the issued claim returned with the refusal", view)
+	}
+}
+
+// Undoing twice is the same shape of race as redeeming twice, and gets the same
+// answer: the conditional write refuses the second one.
+func TestUnredeemClaimWorksExactlyOnce(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	code := playRound(t, svc, "Po", 40).Claim.Claim.Code
+	if _, err := svc.RedeemClaim(ctx, code); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+	if _, err := svc.UnredeemClaim(ctx, code); err != nil {
+		t.Fatalf("first unredeem: %v", err)
+	}
+	if _, err := svc.UnredeemClaim(ctx, code); !errors.Is(err, ErrClaimNotUnredeemable) {
+		t.Fatalf("second unredeem err = %v, want ErrClaimNotUnredeemable", err)
+	}
+}
+
+// The surprising case, pinned so nobody "fixes" it: un-redeeming does not extend
+// the window. A claim collected before its deadline and un-redeemed after it
+// comes back EXPIRED, because the deadline is a fact about the round rather than
+// about this correction.
+func TestUnredeemClaimDoesNotExtendAnExpiredWindow(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	collected := time.Date(2025, 1, 5, 0, 0, 0, 0, time.UTC)
+	store.claims.byCode["ABCD2345"] = domain.Claim{
+		ID: "c1", Code: "ABCD2345", ScoreID: "s1", AwardID: "a1", AwardName: "Free Coffee",
+		IssuedAt:   time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		ExpiresAt:  time.Date(2025, 1, 8, 0, 0, 0, 0, time.UTC),
+		RedeemedAt: &collected,
+	}
+	store.claims.order = append(store.claims.order, "ABCD2345")
+
+	back, err := svc.UnredeemClaim(ctx, "ABCD2345")
+	if err != nil {
+		t.Fatalf("UnredeemClaim: %v", err)
+	}
+	if back.Status != domain.ClaimExpired {
+		t.Fatalf("status = %q, want %q — the window must not reopen", back.Status, domain.ClaimExpired)
+	}
+	if _, err := svc.RedeemClaim(ctx, "ABCD2345"); !errors.Is(err, ErrClaimNotRedeemable) {
+		t.Fatalf("redeem err = %v, want it still refused as expired", err)
 	}
 }
 

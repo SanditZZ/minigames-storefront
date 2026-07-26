@@ -48,12 +48,17 @@ test.describe("the counter", () => {
     // lookup that only accepted the stored form would make every redemption a
     // transcription exercise.
     await admin.codeField(page).fill(grouped);
-    await admin.redeem(page).click();
+    await admin.lookUp(page).click();
 
     // The confirmation has to name the PRIZE as well as the code — an operator
-    // is about to hand over an object, and "done" is not enough to catch having
-    // redeemed the wrong claim. Which prize it is depends on how many taps the
-    // round landed, so this asserts the shape rather than the words.
+    // is about to hand over an object, and a bare code is not enough to catch
+    // having looked up the wrong claim. Which prize it is depends on how many
+    // taps the round landed, so this asserts the shape rather than the words.
+    await expect(admin.confirm(page)).toContainText(
+      new RegExp(`^Hand over .+ for ${raw(grouped)}\\?`),
+    );
+    await admin.confirmRedeem(page).click();
+
     await expect(admin.handedOver(page)).toHaveText(
       new RegExp(`^Handed over: .+ \\(${raw(grouped)}\\)$`),
     );
@@ -68,7 +73,8 @@ test.describe("the counter", () => {
 
     await openAdmin(page, "/claims");
     await admin.codeField(page).fill(grouped);
-    await admin.redeem(page).click();
+    await admin.lookUp(page).click();
+    await admin.confirmRedeem(page).click();
     await expect(admin.handedOver(page)).toBeVisible();
 
     // Single-use is the entire reason the credential is a server-issued code
@@ -76,7 +82,10 @@ test.describe("the counter", () => {
     // buys them nothing once the original has been collected — that cap is what
     // this asserts, and it is only observable end to end.
     await admin.codeField(page).fill(grouped);
-    await admin.redeem(page).click();
+    await admin.lookUp(page).click();
+    // The lookup still SUCCEEDS on a spent code — it is a read, and the counter
+    // needs to see what happened to it. The refusal comes from confirming.
+    await admin.confirmRedeem(page).click();
 
     await expect(page.getByText(/already been redeemed/i)).toBeVisible();
     // And the success line from the first redemption is gone rather than left
@@ -91,9 +100,11 @@ test.describe("the counter", () => {
     // transcription, not a malformed string, so the panel has to distinguish
     // "check the characters" from "already used".
     await admin.codeField(page).fill("ZZZZ-9999");
-    await admin.redeem(page).click();
+    await admin.lookUp(page).click();
 
     await expect(page.getByText(/No claim with that code/i)).toBeVisible();
+    // And it must not offer to hand over a claim it could not find.
+    await expect(admin.confirm(page)).toBeHidden();
   });
 
   test("a redeemed claim leaves the outstanding list", async ({ page }) => {
@@ -108,8 +119,10 @@ test.describe("the counter", () => {
 
     // Redeemed from the row rather than the box: it is the other of the two
     // ways a claim can be collected, and it is the one an operator uses when
-    // the customer cannot find their code.
+    // the customer cannot find their code. A row already holds the claim, so it
+    // confirms without a second lookup — but it still confirms.
     await admin.redeemRow(page, code).click();
+    await admin.confirmRedeem(page).click();
     await expect(admin.handedOver(page)).toBeVisible();
 
     // The list is RELOADED after a redemption rather than patched, because the
@@ -127,5 +140,81 @@ test.describe("the counter", () => {
     // No Redeem button on a collected claim: the row offers the action only
     // while it is still owed.
     await expect(admin.redeemRow(page, code)).toBeHidden();
+  });
+
+  /**
+   * The confirmation is a GATE, not a notification.
+   *
+   * This is the assertion the scan-to-redeem work exists for: a camera fires the
+   * trigger, so the press that opens the question must not also answer it. The
+   * test proves the prize is still owed after the prompt appears — i.e. that no
+   * POST happened — and that cancelling leaves it that way.
+   */
+  test("asks before handing anything over, and cancelling changes nothing", async ({ page }) => {
+    const grouped = await winACode(page, "Careful");
+    const code = raw(grouped);
+
+    await openAdmin(page, "/claims?status=issued");
+    await admin.redeemRow(page, code).click();
+
+    await expect(admin.confirm(page)).toContainText(code);
+    // Nothing was written: the claim is still in the OUTSTANDING filter, which
+    // it would have left the instant a redemption landed.
+    await expect(admin.claimRow(page, code)).toBeVisible();
+    await expect(admin.handedOver(page)).toBeHidden();
+
+    await admin.cancel(page).click();
+    await expect(admin.confirm(page)).toBeHidden();
+
+    // Reloaded from the server rather than trusted from the DOM: the question is
+    // whether the BACKEND still has it outstanding, and only a fresh fetch of
+    // ?status=issued can answer that.
+    await page.reload();
+    await expect(admin.claimRow(page, code)).toBeVisible();
+    await expect(admin.redeemRow(page, code)).toBeVisible();
+  });
+
+  /**
+   * The repair for a mis-scan, which had no inverse before this work: a
+   * redemption can be taken back, and the prize becomes collectable again.
+   *
+   * Note what this does NOT weaken — "refuses the same code a second time"
+   * above still passes, because undoing is a separate endpoint reached by a
+   * separate control. If a future change wires an undo into the redeem path,
+   * that test is the one that should go red.
+   */
+  test("undoes a collection, and the prize can then be collected again", async ({ page }) => {
+    const grouped = await winACode(page, "Mistake");
+    const code = raw(grouped);
+
+    await openAdmin(page, "/claims?status=issued");
+    await admin.redeemRow(page, code).click();
+    await admin.confirmRedeem(page).click();
+    await expect(admin.handedOver(page)).toBeVisible();
+
+    // The undo lives on the collected row — the only place it means anything.
+    await admin.statusFilter(page).selectOption("redeemed");
+    await expect(admin.claimRow(page, code)).toBeVisible();
+    await admin.undoRow(page, code).click();
+
+    // The prompt admits the undo may land on "expired" rather than promising it
+    // comes back collectable, because the collection window is the server's fact.
+    await expect(admin.confirm(page)).toContainText(/expired/i);
+    await admin.confirmUndo(page).click();
+
+    // And the banner reports what the SERVER said the claim became, not a guess.
+    await expect(admin.undone(page)).toHaveText(
+      new RegExp(`^Collection undone: .+ \\(${code}\\) is now outstanding\\.$`),
+    );
+    // It left the collected list the same way a redemption leaves the outstanding
+    // one — the list is reloaded, not patched.
+    await expect(admin.claimRow(page, code)).toHaveCount(0);
+
+    // The real proof that the undo worked: the code redeems again. A status flip
+    // that left the claim uncollectable would be a worse bug than no undo at all.
+    await admin.codeField(page).fill(grouped);
+    await admin.lookUp(page).click();
+    await admin.confirmRedeem(page).click();
+    await expect(admin.handedOver(page)).toBeVisible();
   });
 });

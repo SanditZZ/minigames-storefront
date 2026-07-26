@@ -21,6 +21,10 @@ import (
 const (
 	ReasonAlreadyRedeemed = "this claim has already been redeemed"
 	ReasonExpired         = "this claim has expired"
+	// ReasonNotRedeemed refuses the INVERSE operation: you cannot un-hand-over a
+	// prize that was never handed over. Phrased for the same reader as the other
+	// two — an admin holding a code, being told why the button did nothing.
+	ReasonNotRedeemed = "this claim has not been redeemed"
 )
 
 // TTL converts the admin-configured claim window (in hours) to a duration.
@@ -103,6 +107,31 @@ func CanRedeem(c domain.Claim, now time.Time) (bool, string) {
 	default:
 		return true, ""
 	}
+}
+
+// CanUnredeem reports whether a redemption may be taken back, and if not, why.
+//
+// The only precondition is that the prize WAS handed over: an un-redeem repairs
+// a mis-scan, and a claim nobody redeemed has nothing to repair. Expiry is
+// deliberately not a precondition — a claim redeemed on Monday and un-redeemed
+// the following month is a correction to Monday's record, and refusing it
+// because the window has since closed would leave the wrong record standing.
+//
+// It reads RedeemedAt rather than StatusAt because StatusAt collapses exactly
+// the distinction this needs: a redeemed claim past its expiry still reports
+// "redeemed", which is right for a reader and would be an accident to rely on
+// here.
+//
+// What the claim becomes afterwards is deliberately NOT computed: clearing the
+// stamp re-exposes whatever the expiry already said, and StatusAt is the one
+// place that reads it. An admin is warned in words that an undo may land on
+// "expired" (see claimConfirmation in @minigames/admin-core) and then told what
+// actually happened by the status on the response.
+func CanUnredeem(c domain.Claim) (bool, string) {
+	if c.RedeemedAt == nil {
+		return false, ReasonNotRedeemed
+	}
+	return true, ""
 }
 
 // Filter returns the claims in `status` at `now`, preserving order.

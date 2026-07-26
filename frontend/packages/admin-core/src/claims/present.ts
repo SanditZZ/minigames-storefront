@@ -5,7 +5,7 @@
 // the server's clock and arrives on `ClaimView.status`; this module only picks
 // words for it. See the note on ClaimView in @minigames/api-client.
 
-import type { ClaimStatus } from "@minigames/api-client";
+import type { ClaimStatus, ClaimView } from "@minigames/api-client";
 
 /** How prominent a claim's state should look in a list. */
 export type ClaimTone = "on" | "off";
@@ -70,4 +70,71 @@ export function redeemErrorMessage(status: number, message: string): string {
     default:
       return message || "Could not redeem that claim.";
   }
+}
+
+/**
+ * What to show when UNDOING a redemption fails.
+ *
+ * Separate from `redeemErrorMessage` because the same status codes mean opposite
+ * things here: a 409 on the way in is "already collected", and a 409 on the way
+ * back is "nobody collected it". Reusing one function would have produced the
+ * most confusing possible sentence for a counter — "already been used" in answer
+ * to "give it back".
+ */
+export function unredeemErrorMessage(status: number, message: string): string {
+  switch (status) {
+    case 404:
+      return "No claim with that code. Check the characters and try again.";
+    case 409:
+      return reasonFrom(message) || "That claim was not collected, so there is nothing to undo.";
+    case 401:
+      return "Your admin session is no longer valid — sign in again.";
+    default:
+      return message || "Could not undo that redemption.";
+  }
+}
+
+/** The two things an admin can do to a claim from the counter. */
+export type ClaimAction = "redeem" | "unredeem";
+
+/** The wording of a confirmation step: what is being asked, and the button. */
+export interface ClaimConfirmation {
+  /** The question, naming the prize and the code — never a bare "Are you sure?". */
+  question: string;
+  /** The consequence, in one sentence. */
+  note: string;
+  /** The confirming button's label. */
+  verb: string;
+}
+
+/**
+ * The copy for confirming a redemption or its undo.
+ *
+ * A confirmation exists because of the camera: a scan is a trigger that a stray
+ * angle can pull, and `POST /claims/{code}/redeem` hands a real prize to whoever
+ * is standing there. So the prompt has to name **the prize and the code**, which
+ * is the only way an operator can tell "the claim I meant" from "the claim that
+ * happened to be in frame". `ClaimView` is the argument rather than a code
+ * string precisely so this cannot be built without the prize name.
+ *
+ * The un-redeem note does NOT promise the prize becomes collectable again: a
+ * claim whose window closed while it was marked collected comes back *expired*.
+ * That is deliberately stated as a possibility rather than computed from the
+ * device's clock — status is the server's answer everywhere else in this app and
+ * a second definition here would be the one that disagrees.
+ */
+export function claimConfirmation(action: ClaimAction, view: ClaimView): ClaimConfirmation {
+  const { claim } = view;
+  if (action === "unredeem") {
+    return {
+      question: `Undo the collection of ${claim.awardName} for ${claim.code}?`,
+      note: "The claim goes back to being outstanding, so it can be collected again. If its collection window has already closed it will come back as expired.",
+      verb: "Undo collection",
+    };
+  }
+  return {
+    question: `Hand over ${claim.awardName} for ${claim.code}?`,
+    note: "This marks the prize collected, and it can only be collected once.",
+    verb: "Hand it over",
+  };
 }

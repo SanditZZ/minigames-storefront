@@ -118,6 +118,8 @@ export const th: Messages = {
   "claim.note.collected": "รางวัลนี้รับไปเรียบร้อยแล้ว",
   "claim.note.expired": "รหัสนี้หมดอายุแล้ว หากคิดว่าไม่ถูกต้องกรุณาสอบถามพนักงาน",
   "claim.codeLabel": "รหัสรับรางวัล",
+  "claim.scanHint": "หรือให้พนักงานสแกนรหัสนี้",
+  "claim.qrAlt": "คิวอาร์โค้ดสำหรับรหัส {code}",
   "claim.collectBy": "รับได้ถึง {date}",
   "claim.collectedOn": "รับแล้วเมื่อ {date}",
   "claim.expiredOn": "หมดอายุเมื่อ {date}",

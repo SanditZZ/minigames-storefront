@@ -1,7 +1,7 @@
 import type { ClaimView } from "@minigames/api-client";
 import { claimCopy, groupClaimCode } from "@minigames/player-core";
 import { useLocale, useT, type Locale } from "../i18n";
-import { Badge, Card, CopyButton, Eyebrow, PrizeImage } from "../ui";
+import { Badge, Card, CopyButton, Eyebrow, PrizeImage, QrGlyph } from "../ui";
 
 /** Renders an ISO timestamp as a plain date in the app's language. Formatting a
  *  date is presentation; judging whether it has passed is not, and never
@@ -80,6 +80,26 @@ export function ClaimCard({ view, imageUrl }: { view: ClaimView; imageUrl?: stri
               is looking at, and the backend normalises the dash away — so what
               they paste and what they read are the same string. */}
           <CopyButton value={code} label={t("claim.codeLabel")} />
+        </div>
+      )}
+
+      {/* The scannable form of the same credential, on the redeemable state only:
+          a QR for a prize already collected invites someone to point a camera at
+          a code that will be refused.
+
+          It encodes the RAW code, not the grouped display form and not a URL. The
+          dash would be normalised away by the endpoint anyway, and a deep link
+          would turn the credential into something that spreads — see the
+          scan-to-redeem entry in docs/potential-features.md, where what the QR
+          carries is the security decision rather than a detail. */}
+      {copy.redeemable && (
+        <div className="mt-4 flex flex-col items-center gap-1.5">
+          {/* Square corners, deliberately. `rounded-*` here would clip the white
+              quiet zone diagonally, and the quiet zone is the edge a scanner
+              locks onto — this is the one graphic in the app that must not be
+              softened to match the cards around it. */}
+          <QrGlyph value={claim.code} label={t("claim.qrAlt", { code })} className="h-40 w-40" />
+          <p className="text-xs font-medium text-ink/50">{t("claim.scanHint")}</p>
         </div>
       )}
 

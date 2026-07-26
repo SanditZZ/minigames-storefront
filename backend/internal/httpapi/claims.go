@@ -31,6 +31,37 @@ func (s *Server) handleListClaims(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, claims)
 }
 
+// handleGetClaim looks a code up without acting on it, so the admin can be shown
+// what it is about to redeem.
+//
+// It is a GET on the same address the redeem POST uses, which is the whole point:
+// "look at this claim" and "act on this claim" are the same resource, and a
+// separate `?code=` search endpoint would have invited the client to search when
+// it already knows the address.
+func (s *Server) handleGetClaim(w http.ResponseWriter, r *http.Request) {
+	view, err := s.svc.GetClaim(r.Context(), r.PathValue("code"))
+	if err != nil {
+		writeAppError(w, localeOf(r), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// handleUnredeemClaim takes a redemption back.
+//
+// A POST rather than a DELETE: nothing is removed — the claim survives and goes
+// back to being collectable (or expired). DELETE on this address would suggest
+// the claim itself was being destroyed, which is the one thing an operator
+// repairing a mis-scan must not fear they are doing.
+func (s *Server) handleUnredeemClaim(w http.ResponseWriter, r *http.Request) {
+	view, err := s.svc.UnredeemClaim(r.Context(), r.PathValue("code"))
+	if err != nil {
+		writeAppError(w, localeOf(r), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
 // handleRedeemClaim marks a prize handed over.
 //
 // The code is a path parameter rather than a body field because this is the

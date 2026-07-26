@@ -124,6 +124,10 @@ export const en = {
   "claim.note.collected": "You've already picked this one up. Nice.",
   "claim.note.expired": "This claim ran out of time. Ask staff if that looks wrong.",
   "claim.codeLabel": "claim code",
+  // The QR is an alternative to reading eight characters aloud, so the copy says
+  // what to DO with it rather than naming the technology.
+  "claim.scanHint": "Or let staff scan this",
+  "claim.qrAlt": "QR code for claim {code}",
   "claim.collectBy": "Collect by {date}",
   "claim.collectedOn": "Collected {date}",
   "claim.expiredOn": "Expired {date}",

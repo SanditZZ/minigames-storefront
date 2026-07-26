@@ -1,10 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ApiClient, ClaimView } from "@minigames/api-client";
 import { ApiError } from "@minigames/api-client";
-import { redeemErrorMessage } from "@minigames/admin-core";
+import {
+  claimConfirmation,
+  redeemErrorMessage,
+  unredeemErrorMessage,
+  type ClaimAction,
+} from "@minigames/admin-core";
 import type { ClaimStatusFilter } from "../router";
 import { CLAIM_STATUS_VALUES } from "../router";
-import { Alert, Button, Card, ClaimRow, EmptyState, Input, Loading, PanelHeader, Select, Stack } from "../ui";
+import { useCodeScanner } from "../scan/useCodeScanner";
+import {
+  Alert,
+  Button,
+  Card,
+  ClaimRow,
+  ConfirmPrompt,
+  EmptyState,
+  Input,
+  Loading,
+  PanelHeader,
+  Select,
+  Stack,
+} from "../ui";
 
 interface Props {
   api: ApiClient;
@@ -19,6 +37,12 @@ const FILTER_LABELS: Record<ClaimStatusFilter, string> = {
   redeemed: "Collected",
   expired: "Expired",
 };
+
+/** A claim the admin has asked to act on, and has not yet confirmed. */
+interface Pending {
+  action: ClaimAction;
+  view: ClaimView;
+}
 
 /**
  * The counter's panel: redeem a code someone is holding, and see what is
@@ -35,13 +59,20 @@ const FILTER_LABELS: Record<ClaimStatusFilter, string> = {
  * rule covers which VIEW is on screen — panel, filters, the award being edited
  * — and a half-typed code is form content, the same as the text inside the
  * award form's name field. The filter, which is a view, does live in the URL.
+ *
+ * **Nothing here writes without a confirmation.** Redeeming has no inverse worth
+ * relying on (there is an undo, but it cannot un-tell a customer their prize is
+ * gone), and a camera can fire it at whatever happens to be in frame. So the
+ * typed box, the row buttons and the scanner all converge on one `Pending` state
+ * and one `ConfirmPrompt` that names the prize and the code.
  */
 export function ClaimsPanel({ api, status, onStatusChange }: Props) {
   const [claims, setClaims] = useState<ClaimView[] | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [redeemed, setRedeemed] = useState<ClaimView | null>(null);
+  const [done, setDone] = useState<{ action: ClaimAction; view: ClaimView } | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
 
   const load = useCallback(() => {
     setClaims(null);
@@ -54,34 +85,77 @@ export function ClaimsPanel({ api, status, onStatusChange }: Props) {
   useEffect(load, [load]);
 
   /**
-   * Redeems a code, from the box or from a row's button.
+   * Turns a bare code into a confirmable claim by looking it up.
    *
-   * The list is reloaded rather than patched in place: redeeming changes which
-   * claims match the current filter (an outstanding one leaves the "Outstanding"
-   * view entirely), and editing one row in an array that should no longer
-   * contain it is how a list starts lying.
+   * This is the only reason `GET /admin/claims/{code}` exists: a code alone
+   * cannot say what prize it is, and "Hand over ABCD2345?" tells an operator
+   * nothing they can check. A failure here is reported with the redeem wording
+   * because a lookup is only ever the first half of one.
    */
-  async function redeem(raw: string) {
-    const value = raw.trim();
-    if (!value || busy) return;
+  const propose = useCallback(
+    async (raw: string, action: ClaimAction = "redeem") => {
+      const value = raw.trim();
+      if (!value || busy) return;
 
+      setBusy(true);
+      setError("");
+      setDone(null);
+      try {
+        setPending({ action, view: await api.getClaim(value) });
+      } catch (e) {
+        setPending(null);
+        setError(
+          e instanceof ApiError
+            ? redeemErrorMessage(e.status, e.message)
+            : "Could not reach the server. Check the connection and try again.",
+        );
+      } finally {
+        setBusy(false);
+      }
+    },
+    [api, busy],
+  );
+
+  const scanner = useCodeScanner((value) => void propose(value));
+
+  /**
+   * Performs the confirmed action.
+   *
+   * The list is reloaded rather than patched in place: acting on a claim changes
+   * which claims match the current filter (a collected one leaves "Outstanding"
+   * entirely, and an undone one comes back into it), and editing one row in an
+   * array that should no longer contain it is how a list starts lying.
+   */
+  async function commit({ action, view }: Pending) {
+    if (busy) return;
     setBusy(true);
     setError("");
-    setRedeemed(null);
     try {
-      const view = await api.redeemClaim(value);
-      setRedeemed(view);
+      const result =
+        action === "redeem"
+          ? await api.redeemClaim(view.claim.code)
+          : await api.unredeemClaim(view.claim.code);
+      setDone({ action, view: result });
+      setPending(null);
       setCode("");
       load();
     } catch (e) {
+      // The claim stays on screen: a refusal ("someone else already collected
+      // this") is exactly when the operator needs to keep looking at it.
+      const message = action === "redeem" ? redeemErrorMessage : unredeemErrorMessage;
       setError(
         e instanceof ApiError
-          ? redeemErrorMessage(e.status, e.message)
+          ? message(e.status, e.message)
           : "Could not reach the server. Check the connection and try again.",
       );
     } finally {
       setBusy(false);
     }
+  }
+
+  function cancel() {
+    setPending(null);
+    setError("");
   }
 
   return (
@@ -92,7 +166,7 @@ export function ClaimsPanel({ api, status, onStatusChange }: Props) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            void redeem(code);
+            void propose(code);
           }}
         >
           <label htmlFor="claim-code" className="text-sm font-semibold text-ink">
@@ -118,15 +192,73 @@ export function ClaimsPanel({ api, status, onStatusChange }: Props) {
               />
             </div>
             <Button type="submit" disabled={busy || !code.trim()} className="shrink-0 whitespace-nowrap">
-              {busy ? "Redeeming…" : "Redeem"}
+              {busy ? "Looking…" : "Look up"}
             </Button>
           </div>
 
+          {/* The scan control is offered ONLY where the browser can actually do
+              it. On this project's own stack it never is — plain HTTP means no
+              camera API at all — so the panel says which of the three reasons
+              applies rather than showing a button that fails on tap. See
+              scanAvailability in @minigames/admin-core, and the native admin,
+              which is not bound by any of it. */}
+          {scanner.availability.kind === "ready" ? (
+            <div className="mt-3">
+              {scanner.scanning ? (
+                <div className="flex flex-col gap-3">
+                  {/* muted + playsInline: an unmuted autoplaying video is blocked
+                      by every browser, and without playsInline iOS takes the
+                      video fullscreen and hides the panel behind it. */}
+                  <video
+                    ref={scanner.videoRef}
+                    muted
+                    playsInline
+                    aria-label="Camera preview"
+                    className="aspect-video w-full max-w-sm rounded-xl bg-ink/5 object-cover"
+                  />
+                  <div>
+                    <Button variant="ghost" onClick={scanner.stop} className="shrink-0 whitespace-nowrap">
+                      Stop camera
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="ghost" onClick={scanner.start} className="shrink-0 whitespace-nowrap">
+                  Scan a QR code
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs text-ink/50">{scanner.availability.reason}</p>
+          )}
+
+          <Alert message={scanner.error} />
           <Alert message={error} />
 
-          {redeemed && (
+          {pending && (
+            <ConfirmPrompt
+              {...claimConfirmation(pending.action, pending.view)}
+              busy={busy}
+              onConfirm={() => void commit(pending)}
+              onCancel={cancel}
+            />
+          )}
+
+          {done && (
             <p role="status" className="mt-3 rounded-lg bg-brand-3 px-3 py-2 text-sm font-medium text-ink">
-              Handed over: <strong>{redeemed.claim.awardName}</strong> ({redeemed.claim.code})
+              {done.action === "redeem" ? (
+                <>
+                  Handed over: <strong>{done.view.claim.awardName}</strong> ({done.view.claim.code})
+                </>
+              ) : (
+                <>
+                  {/* The resulting status comes from the response, not from a
+                      guess: undoing a collection after the window closed lands on
+                      "expired" rather than back on "outstanding". */}
+                  Collection undone: <strong>{done.view.claim.awardName}</strong> ({done.view.claim.code}) is now{" "}
+                  {done.view.status === "issued" ? "outstanding" : done.view.status}.
+                </>
+              )}
             </p>
           )}
         </form>
@@ -169,7 +301,10 @@ export function ClaimsPanel({ api, status, onStatusChange }: Props) {
                 key={view.claim.id}
                 view={view}
                 busy={busy}
-                onRedeem={() => void redeem(view.claim.code)}
+                // A row already HAS the claim, so it goes straight to the
+                // confirmation without a second request for what is on screen.
+                onRedeem={() => setPending({ action: "redeem", view })}
+                onUnredeem={() => setPending({ action: "unredeem", view })}
               />
             ))}
           </ul>
