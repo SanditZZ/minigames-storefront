@@ -248,6 +248,17 @@ component each:
     mode"** below: a timer returning to the picker should refetch on the way.
   - Note the cost side: this adds another per-load public fetch, joining the
     three prize requests the **Caching** entry already flags.
+  - **Only the landing screen knows the store's name.** `usePublicSettings` is
+    called once, in `App.tsx`, and the identity is passed down to `HomeScreen`
+    alone; `ResultScreen` and `PlayScreen` never receive it. That is correct
+    today — they display no branding — but it is exactly the wrong shape for the
+    next three things that want it: the shareable score card (**Share score
+    photo**, below) renders the store name onto an image, the store logo will
+    want to sit on more than one screen, and a runtime palette has to apply to
+    the whole document rather than one route. Lifting it into a context, or
+    resolving it once in `App` and passing it everywhere, is a small change now
+    and a tangled one after the logo lands. It bites the moment a second screen
+    needs identity — which the very next feature on this list does.
 - **Config change history** and one-click rollback for settings/awards.
 - **A/B testing** thresholds and reward mixes to optimise retention.
 
@@ -341,6 +352,15 @@ component each:
   this was written, and that is the point: the cost is per game, so every new
   game makes the landing page slower for everyone. The obvious first thing to
   batch or cache.
+  **Store identity added a fourth, and it is a different shape.**
+  `state/usePublicSettings.ts` fetches `GET /api/v1/settings/public` on mount and
+  again on every refresh-button press, and unlike the prize calls it does not
+  grow with the catalog — it is one request whose response is the same handful of
+  bytes for every player in the venue, changing perhaps twice a year. That makes
+  it the cheapest possible thing to serve from an `ETag` or a short
+  `Cache-Control: max-age`, and the one where the refresh button gives the
+  argument its edge case: a cache the operator cannot bust from the player's own
+  reload control would make the button lie.
 - **Observability** — structured logging, request tracing, metrics (play latency,
   error rates), health/readiness probes.
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode
@@ -544,6 +564,15 @@ are the seams that give way as the catalog and the score table grow.
 
 ### Testing
 
+- **The rename never happens in a browser.** Store identity is covered by
+  `settings/public_test.go` (the allowlist), `player-core/src/brand.test.ts` (the
+  fallbacks) and a `curl` — every part of it except the one that matters to an
+  operator: that editing `store_name` in the admin changes what the player's
+  header says. `play-flow.spec.ts` reads the landing screen already and asserts
+  nothing about the header, so the gap is one assertion wide *if* the admin app
+  is driven too — and it is not, which is the same prerequisite the admin claims
+  panel entry above is blocked on. Until then the whole feature is verified by
+  unit tests either side of a wire nobody crosses in anger.
 - **Visual regression.** Every layout bug found during this work was purely
   visual (collapsed tier labels, a bell overlapping text, halo rings crossing a
   caption) — none of which a DOM assertion would catch. Playwright's

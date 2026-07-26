@@ -197,6 +197,20 @@ Keeping it true is part of shipping a feature, not a follow-up to it:
 are not announced" is only actionable because it names `StatusMessage`; an entry
 that cannot be checked against a file is the kind that rots unnoticed.
 
+### Suggested next steps go in the doc, not just in the chat
+
+**Every follow-up or "worth considering next" raised at a checkpoint is written
+into `docs/potential-features.md` in the same change that raised it — without
+being asked.** A suggestion that exists only in a conversation is gone when the
+session ends, and the next session proposes it again from scratch as if it were
+new. This is the expected habit rather than a gate step: nothing fails a build
+over it, but a checkpoint that lists three ideas and commits none of them has
+left the doc less true than it found it.
+
+The bar is the same as for any other entry — cite the file, and say when it will
+bite. Small mechanical fixes are the exception that proves it: if the follow-up
+is one line and the fix is obvious, do it instead of filing it.
+
 ## Related
 
 - `frontend/CLAUDE.md` — mandatory color palette + reusable-UI-component rules.
