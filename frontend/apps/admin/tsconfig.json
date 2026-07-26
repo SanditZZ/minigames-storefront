@@ -3,6 +3,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@minigames/image-core": ["../../packages/image-core/src"],
       "@minigames/tokens": ["../../packages/tokens/src"],
       "@minigames/api-client": ["../../packages/api-client/src"],
       "@minigames/admin-core": ["../../packages/admin-core/src"]

@@ -59,6 +59,10 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
           label="Image"
           value={imageUrl}
           onChange={setImageUrl}
+          // Square, because PrizeImage renders into a square box with
+          // `object-cover` — cropping here is the operator choosing what the
+          // browser would otherwise trim on their behalf.
+          output={{ width: 600, height: 600 }}
           hint="Shown in the prize showcase before a round and on the winner's result screen."
         />
       </div>

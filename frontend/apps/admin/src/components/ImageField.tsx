@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import type { ApiClient } from "@minigames/api-client";
+import type { Size } from "@minigames/image-core";
+import { PhotoEditor } from "./PhotoEditor";
 import { Alert, Button, Field, Input } from "../ui";
 
 /**
@@ -20,16 +22,27 @@ export function ImageField({
   value,
   onChange,
   hint,
+  output = { width: 800, height: 600 },
+  format = "image/jpeg",
 }: {
   api: ApiClient;
   label: string;
   value: string;
   onChange: (url: string) => void;
   hint?: string;
+  /** Exported dimensions. Every upload is cropped and re-encoded to this. */
+  output?: Size;
+  /** PNG where transparency matters (a logo), JPEG for photographs. */
+  format?: "image/jpeg" | "image/png";
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Every picked file goes through the cropper before it is uploaded, rather
+  // than only oversized ones. Bounded output is what keeps the 2 MiB cap out of
+  // the operator's way, and an image landing in a fixed-size box is one they
+  // should have framed themselves rather than have `object-cover` guess at.
+  const [pending, setPending] = useState<File | null>(null);
 
   async function upload(file: File) {
     setBusy(true);
@@ -94,9 +107,25 @@ export function ImageField({
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void upload(file);
+          if (file) setPending(file);
+          // Clear the picker here as well as after an upload: cancelling the
+          // cropper and re-choosing the same file must still fire a change.
+          e.target.value = "";
         }}
       />
+
+      {pending && (
+        <PhotoEditor
+          file={pending}
+          output={output}
+          format={format}
+          onCancel={() => setPending(null)}
+          onConfirm={(cropped) => {
+            setPending(null);
+            void upload(cropped);
+          }}
+        />
+      )}
 
       <Alert message={error} />
     </Field>

@@ -109,6 +109,11 @@ export function StoreBranding({
           label="Logo"
           value={draft.logoUrl}
           onChange={set("logoUrl")}
+          // Wide and PNG: the player renders the logo height-capped at any
+          // width, and a logo is the one image here that usually needs a
+          // transparent background — JPEG would give it a white box.
+          output={{ width: 600, height: 200 }}
+          format="image/png"
           hint="Replaces the store name above the headline. Wide marks work best; leave empty to show the name as text."
         />
 

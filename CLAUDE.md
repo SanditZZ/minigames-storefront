@@ -88,8 +88,10 @@ reuse verbatim and what has to be written a second time.
 ```
 packages/api-client    typed HTTP client + wire types
 packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
+                       plus the runtime-override precedence rule (override.ts)
+packages/image-core    crop-and-zoom geometry: cover scale, pan clamp, export map
 packages/player-core   route grammar, reveal maths, prize merge, game scoring
-packages/admin-core    route grammar, award filter/sort
+packages/admin-core    route grammar, award filter/sort, branding + benchmark forms
 apps/player            React DOM: screens, UI kit, useRouter, the games
 apps/admin             React DOM: panels, UI kit, useRouter
 ```

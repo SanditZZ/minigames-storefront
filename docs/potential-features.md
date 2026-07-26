@@ -225,6 +225,31 @@ component each:
     Go process, which had served nothing but JSON until now. Fine for one venue;
     the fix when it stops being fine is the S3 implementation the interface was
     shaped for, not a cache bolted in front of `localfs`.
+- ~~**Crop-and-zoom before upload.**~~ — **built**, ported from
+  `src/components/ui/photo-editor.tsx` in `~/git-repos/sportsmatcherthailand-frontend`
+  (the HR Enterprise repo has an earlier square-only version of the same
+  component). It is a port rather than a paste: the geometry — cover scaling,
+  pan clamping, and the map from preview frame to output canvas — came out into
+  a new `packages/image-core`, leaving only canvas and pointer handling in
+  `apps/admin/src/components/PhotoEditor.tsx`.
+  - **Its own package, not `admin-core`**, because cropping is a *client*
+    concern the admin merely needed first; a player-side upload or a native
+    cropper wants the same functions under a different gesture layer.
+  - **Every picked file goes through it**, not just oversized ones. Bounded
+    output is what stops `blob.MaxUploadBytes` (2 MiB) rejecting a photo taken
+    on a modern phone, so the cap became something the operator never meets.
+    Awards export 600×600 (square, matching `PrizeImage`'s `object-cover` box —
+    the crop is now the operator's choice rather than the browser's guess);
+    the logo exports 600×200 as **PNG**, because it is the one image here that
+    usually needs transparency and JPEG would give it a white box.
+  - **What the port fixed that the original had**: the source computed the same
+    cover-scale geometry inline in five handlers and *twice* for the export
+    path, which is the shape of bug where what you export is not what you saw.
+    It is one tested function now. The circular crop mode was dropped — nothing
+    in this app is round, and an unused mode is a prop everyone reads past.
+  - Still uncovered: the component itself has no browser test, for the same
+    reason `useBrandPalette` does not — the admin app is not in the Playwright
+    `webServer` list. The maths under it is unit-tested; the canvas is not.
 - ~~**Store identity editable from the admin: name, tagline, colours.**~~ —
   **built, all three.** Renaming or recolouring the shop used to be a code edit
   and a `ship.sh` run, which is fine for one store and absurd for two; it is now
@@ -324,6 +349,61 @@ component each:
     resolving it once in `App` and passing it everywhere, is a small change now
     and a tangled one after the logo lands. It bites the moment a second screen
     needs identity — which the very next feature on this list does.
+- **Thai + English, with the backend as the source of truth for the strings.**
+  Nothing in this repo is translated today: both `index.html` files declare
+  `lang="en"`, every player-facing string is a literal in a component
+  (`"Play & Win 🎁"`, `"Your name (optional)"`, `"Record breaker"`), and the
+  store's own name and tagline are the *only* text an operator can change. A
+  storefront in a Thai venue is the obvious next market and the one this is
+  worth doing for.
+  - **Backend-owned wherever the string is data.** Anything the server already
+    decides should carry its own translation rather than have the client
+    re-derive it: game names and descriptions (`internal/game/catalog.go`),
+    award names and descriptions (admin-entered, so they need a *second field*
+    per locale rather than a lookup table), setting descriptions, and every
+    error message `writeError` produces — several of which are shown to a player
+    verbatim. The claim status vocabulary (`issued`/`redeemed`/`expired`) is
+    already derived server-side for exactly this kind of reason.
+  - **Client-owned only where the string is chrome.** Button labels, screen
+    headings and the reveal's tier names are presentation, and round-tripping
+    them through HTTP to render a button would make every screen wait on the
+    network for its own furniture. A small dictionary in `packages/player-core`
+    (and one in `admin-core`) keeps them pure, testable and reusable by a native
+    client — the same boundary the palette follows.
+  - **The locale has to be addressable**, like everything else here: `?lang=th`
+    parsed in `router/parse.ts` and defaulting from `navigator.language`, so a
+    kiosk can be pinned to Thai by URL and a link keeps its language.
+  - **Two things that will bite and are worth knowing first.** Award names are
+    admin-entered free text, so translating them is a schema change
+    (`awards.name_th`) rather than a message catalogue — decide that before
+    writing either. And Thai has no spaces between words: `truncate` and
+    `line-clamp` behave differently, and the anti-overlap rules in
+    `HeaderRow`/`ui/Layout.tsx` need re-checking at 320px with real Thai copy,
+    not with English text in a Thai font.
+- **An admin panel for editing every string, filtered and searchable.**
+  Separate from the i18n work above and dependent on it: once strings are data
+  rather than literals, an operator wants to *edit* them — fix a typo, soften a
+  message, reword a prize — without a deploy. That is a CRUD panel over the
+  string catalogue, and this repo already has the grammar for one.
+  - **Model it on `AwardsPanel`, because the shape is already solved.** The
+    awards panel has a filter (`?game=`, `?status=`), a search (`?q=`) and a
+    sort (`?sort=`), all parsed by pure functions in
+    `packages/admin-core/src/awards/filter.ts` and all addressable — see the
+    route grammar in `admin-core/src/router/routes.ts`. A strings panel wants
+    exactly that: filter by **page/screen**, search across key and value, and
+    both reflected in the URL so a colleague can be sent a link to the one
+    string under discussion.
+  - **Page filter needs the strings to know where they appear**, which is a
+    property nobody has to record while the strings are literals. Whatever
+    holds them (a `strings` table, or settings rows under a prefix) needs a
+    `screen` or `namespace` column from the first migration — retrofitting it
+    means re-classifying every row by hand.
+  - **It needs a new tab**, and `TABS` in `admin-core/src/router/routes.ts` is
+    the single place that decides both the tab strip and the set of paths the
+    router accepts, so adding one is a single-line change plus a panel.
+  - Note this collides with **Real auth** above in a way award edits do not: a
+    shared secret that lets anyone reword every player-facing message is a
+    bigger blast radius than one that lets them change a prize threshold.
 - **Config change history** and one-click rollback for settings/awards.
 - **A/B testing** thresholds and reward mixes to optimise retention.
 
