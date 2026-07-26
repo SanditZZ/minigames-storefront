@@ -28,6 +28,11 @@ npm run theme         # regenerate both apps' theme.css
 npm run theme:check   # fail if the committed CSS drifted from the tokens
 ```
 
+`theme:check` is a **gate step**, not a courtesy: `scripts/ship.sh` and
+`.github/workflows/ci.yml` both run it before the typecheck. Editing a
+`theme.css` by hand now fails the build rather than surviving until someone
+regenerates.
+
 React Native has no stylesheet — styles are plain JS objects — so a palette that
 only exists as CSS cannot follow these apps onto a phone. Holding the values in
 TypeScript and generating the CSS keeps "edit one place" true across web and

@@ -6,6 +6,7 @@ import type {
   Game,
   HighScores,
   Prize,
+  PublicSettings,
   Setting,
   SettingInput,
   StartSessionResponse,
@@ -72,6 +73,17 @@ export function createClient(opts: ClientOptions) {
       request<SubmitResult>(`/api/v1/games/${slug}/scores/${scoreId}`),
     /** Prizes on offer for a game, for the landing screen's showcase. Public. */
     gamePrizes: (slug: string) => request<Prize[]>(`/api/v1/games/${slug}/awards`),
+    /**
+     * The allowlisted settings an unauthenticated client may read — today the
+     * store's name and tagline. Deliberately a flat key→value map rather than
+     * the admin `Setting[]`: descriptions and edit timestamps are operator
+     * data, and the narrower shape is what keeps the allowlist meaningful.
+     *
+     * Read it through `storeIdentity` in @minigames/player-core rather than
+     * indexing the map at a call site, so the fallbacks stay in one place.
+     */
+    publicSettings: () => request<PublicSettings>("/api/v1/settings/public"),
+
     highScores: (slug: string, limit?: number) =>
       request<HighScores>(`/api/v1/games/${slug}/scores${limit ? `?limit=${limit}` : ""}`),
 

@@ -161,6 +161,23 @@ const (
 	// Admin-tunable because the right window is a venue policy, not a code
 	// decision. Zero or negative means claims never expire (see claim.TTL).
 	SettingClaimTTLHours = "claim_ttl_hours"
+
+	// SettingStoreName and SettingStoreTagline are the storefront's identity as
+	// players see it. They are the first settings a client may read WITHOUT the
+	// admin token — see settings.IsPublic, which is the allowlist that decides
+	// so, and which exists precisely so that adding a knob here does not
+	// accidentally publish it.
+	SettingStoreName    = "store_name"
+	SettingStoreTagline = "store_tagline"
+)
+
+// Default storefront identity, used when the settings rows are absent and as
+// the seed values. The player client carries the same two strings so a store
+// whose API is unreachable still renders a name rather than a blank header;
+// keep the two in step (frontend/packages/player-core/src/brand.ts).
+const (
+	DefaultStoreName    = "Fun Store"
+	DefaultStoreTagline = "Thanks for shopping with us — try your luck!"
 )
 
 // DefaultClaimTTLHours is the fallback claim window: seven days, long enough

@@ -65,6 +65,18 @@ export interface Setting {
 
 export type SettingInput = Pick<Setting, "value" | "type" | "description">;
 
+/**
+ * The settings an unauthenticated client may read, as served by
+ * GET /api/v1/settings/public.
+ *
+ * A bare string map by design — the backend's allowlist (internal/settings)
+ * decides which keys appear, and typing it as a closed shape here would only
+ * duplicate that decision at the wrong end of the wire. A key being absent is
+ * normal, not an error: it means the operator never set it, and the client
+ * falls back (see storeIdentity in @minigames/player-core).
+ */
+export type PublicSettings = Record<string, string>;
+
 export interface StartSessionResponse {
   token: string;
   gameSlug: string;

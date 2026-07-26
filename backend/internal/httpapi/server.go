@@ -75,6 +75,11 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/games/{slug}/scores/{id}", s.handleGetScore)
 	mux.HandleFunc("GET /api/v1/games/{slug}/awards", s.handlePrizes)
 
+	// The storefront's identity (name, tagline) is player-facing, so it is the
+	// one settings read that is NOT behind requireAdmin. settings.Public is the
+	// allowlist that keeps it to that — never widen this route to the full list.
+	mux.HandleFunc("GET /api/v1/settings/public", s.handlePublicSettings)
+
 	// --- Admin CRUD (guarded by the shared-secret header) ---
 	mux.HandleFunc("GET /api/v1/admin/awards", s.requireAdmin(s.handleListAwards))
 	mux.HandleFunc("POST /api/v1/admin/awards", s.requireAdmin(s.handleCreateAward))

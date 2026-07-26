@@ -68,6 +68,12 @@ func defaultSettings() []domain.Setting {
 		{Key: domain.SettingHighScoreLimit, Value: "10", Type: domain.SettingInt, Description: "How many entries a leaderboard returns by default."},
 		{Key: domain.SettingAllowReplays, Value: "true", Type: domain.SettingBool, Description: "Whether a player may start another session immediately after playing."},
 		{Key: domain.SettingClaimTTLHours, Value: "168", Type: domain.SettingInt, Description: "Hours a won prize stays claimable. 0 means claims never expire."},
+		// The two player-facing knobs. Seeded with the same strings the client
+		// falls back to, so an operator editing them sees what players see
+		// rather than an empty box, and so the public endpoint has something to
+		// serve on first boot.
+		{Key: domain.SettingStoreName, Value: domain.DefaultStoreName, Type: domain.SettingString, Description: "Store name shown to players above the headline. Public."},
+		{Key: domain.SettingStoreTagline, Value: domain.DefaultStoreTagline, Type: domain.SettingString, Description: "Short line under the headline on the landing screen. Public."},
 	}
 }
 

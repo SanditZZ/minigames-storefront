@@ -44,11 +44,17 @@ MSG="${1:-chore: auto-ship $(date '+%Y-%m-%d %H:%M:%S')}"
 echo "▸ [1/6] Backend tests…"
 (cd "$ROOT/backend" && go test ./...)
 
-echo "▸ [2/6] Frontend typecheck + unit tests…"
+echo "▸ [2/6] Frontend theme check + typecheck + unit tests…"
 # Runs the SAME npm scripts CI runs, not equivalent-looking ad-hoc commands.
 # A broken `typecheck` script once sat unnoticed precisely because the gate and
 # CI invoked different things.
-(cd "$ROOT/frontend" && npm run typecheck --silent && npm test --silent)
+#
+# theme:check fails when a committed apps/*/src/theme.css no longer matches
+# packages/tokens. It existed for a long time without either the gate or CI
+# calling it — the same "check nobody runs" failure as that typecheck script.
+# It runs FIRST because it is the cheapest step here and because a drifted
+# palette makes everything downstream build a store in the wrong colours.
+(cd "$ROOT/frontend" && npm run theme:check --silent && npm run typecheck --silent && npm test --silent)
 
 if [[ "${SKIP_E2E:-}" == "1" ]]; then
   echo "▸ [3/6] E2E browser tests… SKIPPED (SKIP_E2E=1)"

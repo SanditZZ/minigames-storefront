@@ -6,7 +6,24 @@ import (
 	"time"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
+	"github.com/sanditzz/minigames-storefront/backend/internal/settings"
 )
+
+// handlePublicSettings serves the allowlisted subset of settings to
+// unauthenticated clients — today the storefront's name and tagline, so
+// renaming the shop is an admin edit rather than a rebuild and redeploy.
+//
+// The allowlist is enforced in internal/settings, not here: what is safe to
+// publish is a rule about the data, and a handler is the wrong place to decide
+// it a second time.
+func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
+	all, err := s.svc.Store().Settings().List(r.Context())
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, settings.Public(all))
+}
 
 func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := s.svc.Store().Settings().List(r.Context())

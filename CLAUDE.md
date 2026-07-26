@@ -9,8 +9,10 @@ the same checks again on the pushed commit.
 The gate, in order — each step must pass before the next runs:
 
 1. `go test ./...` — backend unit tests.
-2. `npm run typecheck && npm test` (frontend) — project-wide TS build, then
-   vitest over the calculation layers (URL router, score-reveal maths).
+2. `npm run theme:check && npm run typecheck && npm test` (frontend) — the
+   committed `theme.css` still matches `packages/tokens`, then a project-wide TS
+   build, then vitest over the calculation layers (URL router, score-reveal
+   maths).
 3. `npx tsc --noEmit && npx playwright test` (e2e) — the real player flow in a
    browser, against an isolated throwaway stack (own ports, own temp SQLite file
    — never `.prod/`).

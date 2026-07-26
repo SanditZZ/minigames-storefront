@@ -40,3 +40,31 @@ export function Button({ variant = "primary", size = "md", fullWidth = false, cl
     />
   );
 }
+
+interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> {
+  variant?: Variant;
+  /**
+   * The accessible name. Required, not optional: an icon-only control whose
+   * only label is a glyph is unreadable to a screen reader, and making the
+   * prop mandatory is the only version of that rule a compiler can enforce.
+   */
+  label: string;
+}
+
+/**
+ * A square, icon-only button — 44px on a side, so it clears the tap target
+ * minimum without the horizontal padding a text button needs.
+ */
+export function IconButton({ variant = "ghost", label, className = "", children, ...rest }: IconButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`${base} ${variants[variant]} size-11 text-lg ${className}`}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}

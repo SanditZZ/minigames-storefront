@@ -1,7 +1,7 @@
 // The shared UI kit. Every player screen and mini-game composes these — no
 // screen defines its own styled markup or colours (see frontend/CLAUDE.md).
 
-export { Button } from "./Button";
+export { Button, IconButton } from "./Button";
 export { Card, Eyebrow, HighlightCard, Panel } from "./Card";
 export { CopyButton } from "./CopyButton";
 export { Countdown } from "./Countdown";

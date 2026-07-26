@@ -1,15 +1,19 @@
 import type { Game } from "@minigames/api-client";
-import { BRAND_NAME, BRAND_TAGLINE, MAX_NAME_LENGTH, type ShowcasePrize } from "@minigames/player-core";
+import { MAX_NAME_LENGTH, type ShowcasePrize, type StoreIdentity } from "@minigames/player-core";
 import { gameIcon, getMiniGame } from "../games/registry";
-import { PageHeader, SelectCard, Stack, TextField } from "../ui";
+import { IconButton, PageHeader, SelectCard, Stack, TextField } from "../ui";
 import { PrizeShowcase } from "./PrizeShowcase";
 
 interface Props {
   games: Game[];
+  /** Store name and tagline, already resolved against their fallbacks. */
+  identity: StoreIdentity;
   prizes: ShowcasePrize[];
   playerName: string;
   onNameChange: (name: string) => void;
   onPick: (game: Game) => void;
+  onRefresh: () => void;
+  refreshing: boolean;
 }
 
 /**
@@ -19,10 +23,38 @@ interface Props {
  *
  * Composed entirely from the UI kit — this file contains no styling of its own.
  */
-export function GamePicker({ games, prizes, playerName, onNameChange, onPick }: Props) {
+export function GamePicker({
+  games,
+  identity,
+  prizes,
+  playerName,
+  onNameChange,
+  onPick,
+  onRefresh,
+  refreshing,
+}: Props) {
   return (
     <Stack gap="lg" className="flex-1">
-      <PageHeader brand={BRAND_NAME} title="Play & Win 🎁" subtitle={BRAND_TAGLINE} />
+      <PageHeader
+        brand={identity.name}
+        title="Play & Win 🎁"
+        subtitle={identity.tagline}
+        // The store's identity, prizes and games are all admin-editable while
+        // this screen sits open on a till-side phone that nobody reloads. This
+        // is that phone's reload button.
+        action={
+          <IconButton
+            variant="quiet"
+            label={refreshing ? "Refreshing…" : "Refresh store details"}
+            disabled={refreshing}
+            onClick={onRefresh}
+          >
+            <span aria-hidden className={refreshing ? "inline-block animate-spin" : undefined}>
+              ↻
+            </span>
+          </IconButton>
+        }
+      />
 
       {/* Prizes sit above the games: a customer decides whether to play at all
           before they decide what to play, and the answer to "why bother?" is

@@ -203,19 +203,23 @@ component each:
 
   Do this once for both this and the award images above — they are the same
   problem, and `PrizeImage.tsx` is already the shared render primitive.
-- **Store identity editable from the admin: name, tagline, colours.** Today the
-  storefront's identity is compile-time data: `BRAND_NAME` and `BRAND_TAGLINE`
-  are constants in `packages/player-core/src/brand.ts`, read by `GamePicker.tsx`
-  and rendered through `PageHeader`. Renaming the shop is a code edit and a
-  `ship.sh` run, which is fine for one store and absurd for two. Split by
-  difficulty, because the three are not one feature:
-  - **Name and tagline are easy and blocked on one missing endpoint.** They are
-    strings, and `domain.Setting` already models admin-editable strings — but
-    every settings route is behind `requireAdmin` (`httpapi/server.go:90-92`),
-    so the player app has no way to read one. A public `GET
-    /api/v1/settings/public` exposing an allowlisted subset is the prerequisite,
-    and the allowlist is the security-relevant part: `claim_ttl_hours` and the
-    anti-cheat limits must not become public reads by accident.
+- **Store identity editable from the admin: name, tagline, colours.** —
+  **partly built: the strings ship, the colours do not.** Renaming the shop used
+  to be a code edit and a `ship.sh` run, which is fine for one store and absurd
+  for two; it is now a `SettingsPanel` edit. Colours remain compile-time, and the
+  split below is why the three were never one feature:
+  - ~~**Name and tagline are easy and blocked on one missing endpoint.**~~ —
+    **built.** `GET /api/v1/settings/public` serves a flat key→value map, and
+    the allowlist that decides what appears in it is its own calculation package
+    (`internal/settings`), pinned by a test to *exactly* `store_name` and
+    `store_tagline` so publishing a third knob cannot be a one-line slip. The
+    player resolves the pair through `storeIdentity` (`player-core/brand.ts`),
+    which falls back **per field** — a store with a name and no tagline keeps its
+    name — so `BRAND_NAME`/`BRAND_TAGLINE` survive as the offline fallback
+    rather than the source. What the entry underestimated: the response shape is
+    a decision, not a detail. Returning `Setting[]` would have handed players
+    the operator-facing `description` and `updatedAt` of every public key; the
+    narrower map is what keeps the allowlist meaning something.
   - **Colours fight the token pipeline.** The palette is TypeScript
     (`packages/tokens/src/palette.ts`) generated into a committed `theme.css`
     `@theme` block, and Tailwind resolves `bg-brand` against it **at build
@@ -225,20 +229,23 @@ component each:
     each app, next to `useRouter`, as the other thing allowed to touch `window`.
     Worth doing deliberately: it introduces a *second* source of colour, and
     "which one wins" needs an answer before the first bug.
-  - **Nothing currently guards the palette from drifting.** `npm run theme:check`
-    exists precisely to fail when `theme.css` no longer matches the tokens, and
-    **neither `ship.sh` nor `.github/workflows/ci.yml` runs it** — verified by
-    grep. That is the same failure the repo root's CLAUDE.md describes for the
-    broken `typecheck` script: a check nobody calls. Wire it into the gate before
-    adding a second way for colours to disagree, not after.
-  - **A refresh control on the player.** Settings would be fetched once on
-    mount, so a kiosk phone left running all day would never see a rename. A
-    small icon button top-right refetches them — `HeaderRow` (`ui/Layout.tsx`)
-    already has an `action` slot that encodes the anti-overlap rule
-    (`min-w-0 flex-1` on the text, `shrink-0` on the action), so it is the right
-    host rather than a bespoke absolute-positioned button. Pairs with **"Idle
-    reset for kiosk mode"** below: both exist because a kiosk screen is never
-    reloaded, and a timer that returns to the picker could refetch on the way.
+  - ~~**Nothing currently guards the palette from drifting.**~~ — **built**, and
+    deliberately ahead of the colours it protects. `npm run theme:check` is now
+    the first frontend step in both `scripts/ship.sh` and
+    `.github/workflows/ci.yml`, so a hand-edited `theme.css` fails the build
+    instead of surviving until someone regenerates.
+  - ~~**A refresh control on the player.**~~ — **built**, though not where this
+    entry expected. The landing hero is `PageHeader`, not `HeaderRow`, so the
+    anti-overlap rule had to be applied to a *centred* header: `PageHeader` grew
+    an `action` slot laid out as spacer / hero / action, the spacer mirroring the
+    button's width so the hero stays optically centred and the name still
+    truncates rather than shoving the button off a 320px screen. The button is a
+    new kit primitive, `IconButton`, whose `label` prop is **required** — an
+    icon-only control with no accessible name is the one accessibility bug a
+    compiler can prevent. One gesture reloads the catalog and the settings
+    together (`App.reload`), because "the games are stale but the name is not"
+    is not a state worth explaining. Still pairs with **"Idle reset for kiosk
+    mode"** below: a timer returning to the picker should refetch on the way.
   - Note the cost side: this adds another per-load public fetch, joining the
     three prize requests the **Caching** entry already flags.
 - **Config change history** and one-click rollback for settings/awards.
@@ -247,8 +254,12 @@ component each:
 ## Player experience
 
 - **Share score photo** — a "Share" button on the result screen that generates an
-  image of the player's score, decorated with the store theme and name (currently
-  **Fun Store**, from `player/src/brand.ts`). Render the card to a `<canvas>` from
+  image of the player's score, decorated with the store theme and name — which is
+  now an admin setting, so read it from `storeIdentity`
+  (`packages/player-core/src/brand.ts`) rather than the `BRAND_NAME` fallback, or
+  every shared card will say "Fun Store" whatever the shop is called. Note the
+  result screen does not fetch settings today: only the landing screen does, so
+  this needs the identity lifted or refetched there. Render the card to a `<canvas>` from
   the same palette tokens, then hand the blob to the Web Share API
   (`navigator.share({ files })`) with a download fallback on desktop. The result
   screen already has everything the card needs — score, unit, rank, prize, player

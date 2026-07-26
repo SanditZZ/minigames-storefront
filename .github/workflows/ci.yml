@@ -48,6 +48,12 @@ jobs:
       - name: Install
         working-directory: frontend
         run: npm ci
+      # Design tokens are the source; apps/*/src/theme.css is generated from
+      # them and committed. This fails when the two disagree — a hand-edited
+      # theme.css, or a palette change whose `npm run theme` never ran.
+      - name: Theme tokens match generated CSS
+        working-directory: frontend
+        run: npm run theme:check
       - name: Typecheck
         working-directory: frontend
         run: npm run typecheck
