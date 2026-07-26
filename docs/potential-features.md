@@ -376,26 +376,74 @@ component each:
     header ends up with two backgrounds fighting. And an unset banner must
     render as *nothing*, not as a grey placeholder box: an unconfigured
     storefront should look clean, the same rule the missing logo already follows.
-- **Show durations in the unit an operator thinks in.** `claim_ttl_hours` is
-  seeded as `168` with the description "Hours a won prize stays claimable"
-  (`internal/app/seed.go`), and `SettingsPanel.tsx` renders it as a raw integer —
-  so an operator who wants "one week" has to know that is 168, and one who reads
-  `168` has to divide. Nobody thinks about prize expiry in hours; they think in
-  days.
-  - **Fix it in the admin, not the wire.** The setting stays `claim_ttl_hours`
-    and keeps storing hours: the backend divides it into `claim.TTL`, the
-    migration cost of renaming a key is real, and an operator who typed a value
-    in a previous version should not silently get a different policy. What
-    changes is the input — a days field beside the raw value, or a unit
-    dropdown — with the conversion as a pure function in `admin-core` so the
-    rounding rule is tested rather than inlined into a form.
-  - **Non-whole days are the case to decide first.** `0` means "never expires"
-    and must keep meaning that; a value like `36` is a day and a half and either
-    displays as `1.5` or refuses to be shown in days at all. Pick one before
-    writing the input, because the answer decides whether the field is a number
-    or a pair.
-  - It bites every time someone configures a store, which is the only time this
-    panel is used.
+- ~~**Show durations in the unit an operator thinks in.**~~ — **built.**
+  `claim_ttl_hours` now opens as "7 · days" and `session_ttl_seconds` as
+  "2 · minutes", each with the stored value named underneath ("168 hours"), so
+  the panel is readable without anyone dividing and the number the backend reads
+  is still on screen. The conversions are pure and tested
+  (`packages/admin-core/src/settings/duration.ts`); the control is a kit
+  primitive (`DurationInput` in `apps/admin/src/ui/Controls.tsx`), keyed off the
+  setting's KEY rather than its type — a duration is an `int` like any other, and
+  inventing a `SettingType` for it would have meant a migration and a wire change
+  to fix a display problem.
+
+  Three things the build settled:
+  - **Coarsest unit that divides EVENLY.** 168 reads as 7 days; 36 stays 36
+    hours rather than becoming "1.5 days". That rule is what lets the control
+    round-trip — an operator who opens the panel, changes nothing and saves
+    writes back exactly the number that was there, which a fractional display
+    could not promise. Zero stays in the base unit, because for
+    `claim_ttl_hours` zero means "never expires" rather than a length someone
+    chose.
+  - **A malformed value falls back to the raw text box.** A hand-edited `"1.5"`
+    or `"abc"` in the settings table is shown as-is instead of being coerced —
+    repairing a broken row by silently changing store policy is worse than
+    showing the operator what it actually says.
+  - **The layout bug was only visible in a browser.** Two controls plus Save
+    plus Delete do not fit a 375px row: the number field collapsed to a sliver
+    and Save rendered on top of the unit dropdown. Two fixes came out of it —
+    the duration control takes `basis-full` so the buttons wrap to their own
+    line, and its sizing lives on wrapper divs, because `Input`/`Select` already
+    carry `w-full` from the shared control class and a competing `w-auto` is
+    resolved by Tailwind's rule order rather than by the order written in the
+    component. Worth remembering the next time a kit control is composed
+    sideways.
+- **One number input for the whole admin, with real controls on it.** Every
+  numeric field in the admin is a bare `<Input type="number">` — the settings
+  rows (`SettingsPanel.tsx`), the per-game benchmarks (`GameBenchmarks.tsx`),
+  and the award form's `minScore` / `stock` / `sortOrder` (`AwardForm.tsx`).
+  They inherit the browser's native spinner, which is roughly a 10px target
+  stacked two-high: it fails the project's own 44px tap-target rule outright, and
+  on a phone it is not there at all. A `NumberInput` in
+  `apps/admin/src/ui/Controls.tsx` with **optional `+` / `−` buttons** is the
+  fix, and it is the natural home for several other things currently missing:
+  - **Steppers only where a step means something.** `+`/`−` is right for
+    `sortOrder` and `stock`; it is silly for a value of 168, which is why the
+    `step` should come from the caller and the buttons should be opt-in rather
+    than automatic. Press-and-hold to repeat is what makes a stepper usable
+    beyond about five presses — worth building once, here, rather than never.
+  - **Clamping belongs in `admin-core`, not in an onChange.** `min`/`max`/`step`
+    rounding is a pure function and should sit beside `duration.ts` so it is
+    tested. `DurationInput` should then be rebuilt on top of `NumberInput`
+    instead of hand-rolling `Math.max(0, Math.floor(...))` as it does today.
+  - **`Award.stock` has a sentinel and a stepper must respect it.** `-1` means
+    unlimited (`UNLIMITED_STOCK` in `packages/api-client`), so decrementing from
+    0 must stop rather than walk into it, and the field wants an explicit
+    "unlimited" affordance rather than expecting an operator to type minus one.
+  - **A cleared field is not zero.** Today `Number(e.target.value) || 0` turns a
+    half-typed value into `0` mid-keystroke, so backspacing to retype silently
+    proposes a real change. The component should hold the empty string as a
+    distinct state and only coerce on blur.
+  - **Two small correctness fixes it can carry for free:** a `wheel` handler
+    that blurs instead of scrolling the value — a focused number input silently
+    changing while the page scrolls is a genuine data-loss bug — and
+    `inputMode="numeric"` everywhere so a phone offers a number pad
+    (`DurationInput` sets it; nothing else does).
+  - **A suffix slot** for the unit, so "taps/second" and "ms" sit inside the
+    field rather than only in the prose description above it, which is where the
+    duration work found them.
+  - It bites on every admin visit from a phone, which is the device an operator
+    at a counter actually has.
 - ~~**Thai + English, with the backend as the source of truth for the strings.**~~
   — **built, and the split this entry proposed is exactly the one that shipped.**
   The player app runs in Thai end to end: `backend/internal/i18n` owns the

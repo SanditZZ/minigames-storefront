@@ -1,8 +1,29 @@
 import { useState } from "react";
 import type { ApiClient, Game, Setting, SettingType } from "@minigames/api-client";
+import {
+  describeStored,
+  durationSpecFor,
+  formatDuration,
+  parseDuration,
+  type DurationSpec,
+  type DurationValue,
+} from "@minigames/admin-core";
 import { GameBenchmarks } from "./GameBenchmarks";
 import { StoreBranding } from "./StoreBranding";
-import { Alert, Badge, Button, Card, ColorInput, Field, Input, Loading, PanelHeader, Select, Stack } from "../ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  ColorInput,
+  DurationInput,
+  Field,
+  Input,
+  Loading,
+  PanelHeader,
+  Select,
+  Stack,
+} from "../ui";
 
 /**
  * Settings CRUD, with the store's identity lifted into a form at the top.
@@ -80,6 +101,10 @@ function SettingRow({
   const [value, setValue] = useState(setting.value);
   const [busy, setBusy] = useState(false);
   const dirty = value !== setting.value;
+  // A duration is two controls, not one, and two controls plus Save plus Delete
+  // do not fit on a 375px row — the number collapsed to a sliver and Save
+  // landed on top of the unit dropdown. It takes its own line instead.
+  const duration = setting.type === "int" ? durationSpecFor(setting.key) : null;
 
   async function save() {
     setBusy(true);
@@ -99,8 +124,8 @@ function SettingRow({
       </div>
       {setting.description && <p className="mt-1 text-sm text-ink/60">{setting.description}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <ValueInput type={setting.type} value={value} onChange={setValue} />
+        <div className={duration ? "basis-full" : "min-w-0 flex-1"}>
+          <ValueInput settingKey={setting.key} type={setting.type} value={value} onChange={setValue} />
         </div>
         <Button className="shrink-0" disabled={!dirty || busy} onClick={save}>
           {busy ? "Saving…" : "Save"}
@@ -113,8 +138,29 @@ function SettingRow({
   );
 }
 
-/** Renders the right control for a typed setting value. */
-function ValueInput({ type, value, onChange }: { type: SettingType; value: string; onChange: (v: string) => void }) {
+/**
+ * Renders the right control for a setting value.
+ *
+ * Mostly a function of `type`, with one exception: a duration is an `int` like
+ * any other, so what makes `claim_ttl_hours` readable is its KEY. Hence the key
+ * is passed alongside the type and checked first — the alternative would be a
+ * new SettingType, which would mean a migration and a wire change to fix a
+ * display problem.
+ */
+function ValueInput({
+  settingKey,
+  type,
+  value,
+  onChange,
+}: {
+  settingKey: string;
+  type: SettingType;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const duration = type === "int" ? durationSpecFor(settingKey) : null;
+  if (duration) return <DurationValueInput spec={duration} value={value} onChange={onChange} />;
+
   if (type === "color") {
     // No placeholder default here: a generic row edits an existing colour
     // setting, so there is always a value, and guessing which palette entry it
@@ -131,6 +177,52 @@ function ValueInput({ type, value, onChange }: { type: SettingType; value: strin
     );
   }
   return <Input type={type === "int" ? "number" : "text"} value={value} onChange={(e) => onChange(e.target.value)} />;
+}
+
+/**
+ * A duration setting, shown as an amount and a unit.
+ *
+ * The component holds the amount/unit pair while it is being edited and reports
+ * the STORED string upward, so the row's dirty check, its save and its delete
+ * all keep working on the value the backend actually sees. Every conversion is
+ * a pure function in `@minigames/admin-core` — nothing here does arithmetic.
+ *
+ * A value the parser refuses — a hand-edited `"1.5"` or `"abc"` in the settings
+ * table — falls back to the raw text box rather than being coerced. Coercing it
+ * would repair a broken row by silently changing store policy, and the operator
+ * would never see what it used to say.
+ */
+function DurationValueInput({
+  spec,
+  value,
+  onChange,
+}: {
+  spec: DurationSpec;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const parsed = parseDuration(value, spec);
+  // Held locally so "0" does not lose the unit the operator picked: every unit
+  // divides zero, so re-deriving from the stored string on each keystroke would
+  // snap the dropdown back to the base unit mid-edit.
+  const [draft, setDraft] = useState<DurationValue | null>(parsed);
+  const shown = draft ?? parsed;
+
+  if (!shown) {
+    return <Input type="text" value={value} onChange={(e) => onChange(e.target.value)} />;
+  }
+
+  return (
+    <DurationInput
+      value={shown}
+      units={spec.units}
+      note={describeStored(shown, spec)}
+      onChange={(next) => {
+        setDraft(next);
+        onChange(formatDuration(next, spec));
+      }}
+    />
+  );
 }
 
 function NewSettingForm({ api, onSaved }: { api: ApiClient; onSaved: () => void }) {
@@ -170,7 +262,9 @@ function NewSettingForm({ api, onSaved }: { api: ApiClient; onSaved: () => void 
           </Select>
         </Field>
         <Field label="Value">
-          <ValueInput type={type} value={value} onChange={setValue} />
+          {/* The key is live as it is typed, so re-creating a known duration
+              setting by hand gets the same control the row above it has. */}
+          <ValueInput settingKey={key.trim()} type={type} value={value} onChange={setValue} />
         </Field>
         <Field label="Description">
           <Input value={description} onChange={(e) => setDescription(e.target.value)} />

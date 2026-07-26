@@ -12,6 +12,7 @@ export * from "./awards/filter";
 export * from "./claims/present";
 export * from "./settings/benchmarks";
 export * from "./settings/branding";
+export * from "./settings/duration";
 export * from "./settings/map";
 export * from "./router/parse";
 export * from "./router/routes";

@@ -1,3 +1,4 @@
+import { unitLabel, type DurationUnit, type DurationValue } from "@minigames/admin-core";
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
@@ -106,6 +107,80 @@ export function ColorInput({
         onChange={(e) => onChange(e.target.value)}
         className="min-w-0 flex-1 font-mono"
       />
+    </div>
+  );
+}
+
+/**
+ * A length of time, entered as an amount and the unit it is counted in.
+ *
+ * It exists because the raw setting is unreadable: `claim_ttl_hours` stores
+ * `168`, and an operator who wants "one week" has to know that is 168 while one
+ * who reads 168 has to divide. The stored unit is part of the key's name and of
+ * what the backend reads, so it is the DISPLAY that changes here and never the
+ * value — every conversion is a pure function in `@minigames/admin-core`
+ * (`duration.ts`), and the line underneath always names the number actually
+ * being saved.
+ *
+ * The unit shown on load is the coarsest one that divides the stored value
+ * evenly, so 168 opens as "7 days" and 36 opens as "36 hours" rather than as a
+ * fraction nobody typed. Switching the unit dropdown REINTERPRETS the amount
+ * rather than converting it — picking "days" beside a 36 means thirty-six days,
+ * which is the only reading that matches what the operator is looking at.
+ *
+ * Layout follows the project's anti-overlap rule: the parent owns the gap, the
+ * number takes `min-w-0 flex-1` so it shrinks, and the unit select is
+ * `shrink-0` so it never collapses or wraps mid-word on a 320px screen.
+ */
+export function DurationInput({
+  value,
+  units,
+  note,
+  onChange,
+}: {
+  value: DurationValue;
+  units: readonly DurationUnit[];
+  /** The stored value in words, shown underneath ("168 hours"). */
+  note?: ReactNode;
+  onChange: (value: DurationValue) => void;
+}) {
+  return (
+    <div>
+      {/* The sizing lives on WRAPPERS, not on the controls. `Input` and
+          `Select` both carry `w-full` from the shared control class, and a
+          `w-auto`/`flex-1` added on top of that is decided by Tailwind's own
+          rule order rather than by the order written here — which is how the
+          number field ended up collapsed to a sliver while the unit select
+          took the whole row. Wrappers cannot lose that argument. */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            type="number"
+            min={0}
+            step={1}
+            inputMode="numeric"
+            aria-label="Amount"
+            value={String(value.amount)}
+            onChange={(e) => onChange({ ...value, amount: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+          />
+        </div>
+        {/* Wide enough for the longest unit word plus the native arrow, so the
+            control never wraps mid-word or clips its own label at 320px. */}
+        <div className="w-32 shrink-0">
+          <Select
+            aria-label="Unit"
+            value={value.unit}
+            onChange={(e) => onChange({ ...value, unit: e.target.value as DurationUnit })}
+          >
+            {units.map((unit) => (
+              <option key={unit} value={unit}>
+                {unitLabel(unit, value.amount)}
+              </option>
+            ))}
+          </Select>
+        </div>
+      </div>
+      {note != null && <p className="mt-1 text-xs text-ink/50">{note}</p>}
     </div>
   );
 }
