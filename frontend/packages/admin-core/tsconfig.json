@@ -3,7 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@minigames/api-client": ["../api-client/src"]
+      "@minigames/api-client": ["../api-client/src"],
+      "@minigames/tokens": ["../tokens/src"]
     }
   },
   "include": ["src"]

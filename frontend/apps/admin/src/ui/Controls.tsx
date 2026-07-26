@@ -67,6 +67,49 @@ export function Checkbox({
   );
 }
 
+/**
+ * A colour value: the OS picker and the hex it produced, side by side.
+ *
+ * Both are editable on purpose. The swatch is how anyone picks a colour; the
+ * text field is how a brand colour that already exists on a letterhead gets
+ * typed in exactly, which a picker makes needlessly hard. The text field is
+ * also the only one that can express "unset" — `<input type="color">` has no
+ * empty state and answers `#000000` when asked, so a store that has overridden
+ * nothing would silently acquire a black palette the moment the picker rendered.
+ * `placeholder` carries the token default for that reason.
+ */
+export function ColorInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  /** The token default shown when nothing is set — never submitted. */
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const swatch = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim()) ? value.trim() : placeholder;
+
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="color"
+        aria-label="Pick a colour"
+        value={swatch}
+        onChange={(e) => onChange(e.target.value)}
+        className="size-10 shrink-0 cursor-pointer rounded-lg border border-ink/15 bg-white p-1"
+      />
+      <Input
+        value={value}
+        placeholder={placeholder}
+        spellCheck={false}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-w-0 flex-1 font-mono"
+      />
+    </div>
+  );
+}
+
 export function Field({ label, className = "", children }: { label: string; className?: string; children: ReactNode }) {
   return (
     <label className={`block ${className}`}>

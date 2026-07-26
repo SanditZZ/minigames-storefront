@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Game } from "@minigames/api-client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { Game, Setting } from "@minigames/api-client";
 import { ApiError } from "@minigames/api-client";
+import { settingsToMap } from "@minigames/admin-core";
 import { clearToken, getToken, makeApi } from "./api";
+import { useBrandPalette } from "./theme/useBrandPalette";
 import { TokenGate } from "./components/TokenGate";
 import { AwardsPanel } from "./components/AwardsPanel";
 import { ClaimsPanel } from "./components/ClaimsPanel";
@@ -30,22 +32,46 @@ export function App() {
     api.listGames().then(setGames).catch(() => setGames([]));
   }, [api, token]);
 
-  // A stored token can stop being valid — the secret gets rotated, or a stale
-  // one is left over from an earlier default. Revalidate on mount and drop back
-  // to the sign-in gate, rather than rendering panels where every call 401s.
+  // Settings are owned here, not by the panel that edits them, because the
+  // store's palette applies to the whole document — see useBrandPalette. The
+  // one request doubles as the token check it always was: a stored secret can
+  // stop being valid (rotated, or a stale default), and rendering panels where
+  // every call 401s is worse than dropping back to the sign-in gate.
+  const [settings, setSettings] = useState<Setting[] | null>(null);
+  const [settingsError, setSettingsError] = useState("");
+  const [settingsToken, setSettingsToken] = useState(0);
+  const reloadSettings = useCallback(() => setSettingsToken((n) => n + 1), []);
+
   useEffect(() => {
     if (!token) return;
     let alive = true;
-    api.listSettings().catch((e) => {
-      if (alive && e instanceof ApiError && e.status === 401) {
-        clearToken();
-        setTokenState("");
-      }
-    });
+
+    api
+      .listSettings()
+      .then((s) => {
+        if (!alive) return;
+        setSettings(s);
+        setSettingsError("");
+      })
+      .catch((e) => {
+        if (!alive) return;
+        if (e instanceof ApiError && e.status === 401) {
+          clearToken();
+          setTokenState("");
+          return;
+        }
+        setSettingsError(e.message ?? "Failed to load settings");
+      });
+
     return () => {
       alive = false;
     };
-  }, [api, token]);
+  }, [api, token, settingsToken]);
+
+  // The admin wears the store's own colours, so choosing one is a preview
+  // rather than a guess. Applying it at the shell means a saved colour lands on
+  // every panel at once, which is also the honest test of a bad choice.
+  useBrandPalette(useMemo(() => settingsToMap(settings), [settings]));
 
   if (!token) {
     return <TokenGate onAuthenticated={setTokenState} />;
@@ -80,7 +106,15 @@ export function App() {
           onStatusChange={(claimStatus) => router.setFilters({ claimStatus })}
         />
       )}
-      {router.tab === "settings" && <SettingsPanel api={api} />}
+      {router.tab === "settings" && (
+        <SettingsPanel
+          api={api}
+          games={games}
+          settings={settings}
+          error={settingsError}
+          onChanged={reloadSettings}
+        />
+      )}
       {router.tab === "scores" && (
         <ScoresPanel
           api={api}

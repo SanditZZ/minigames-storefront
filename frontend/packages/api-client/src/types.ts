@@ -3,7 +3,15 @@
 // a TypeScript error rather than a runtime surprise.
 
 export type ScoreDirection = "higher" | "lower";
-export type SettingType = "string" | "int" | "bool";
+/**
+ * How a Setting.value should be interpreted. Mirrors domain.SettingType.
+ *
+ * "color" is a hex literal and its own type rather than a string because the
+ * value is written into a live CSS custom property: the backend validates it at
+ * write time (internal/settings.IsHexColor) so nothing downstream has to
+ * sanitise, and the admin renders a colour picker instead of a text box.
+ */
+export type SettingType = "string" | "int" | "bool" | "color";
 
 /** Sentinel Award.stock value meaning the prize never runs out. */
 export const UNLIMITED_STOCK = -1;

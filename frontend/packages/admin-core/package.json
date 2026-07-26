@@ -10,6 +10,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@minigames/api-client": "*"
+    "@minigames/api-client": "*",
+    "@minigames/tokens": "*"
   }
 }

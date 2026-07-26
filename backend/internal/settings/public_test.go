@@ -11,8 +11,19 @@ import (
 // checking a few members of it. That is the point: adding a key to publicKeys
 // must fail this test, so publishing a setting is always a deliberate edit in
 // two places and never a one-line slip in the map.
+//
+// Everything on this list is storefront IDENTITY — what the shop is called and
+// what colour it is. That is the rule a new entry has to argue against.
 func TestOnlyIdentityKeysArePublic(t *testing.T) {
-	want := []string{domain.SettingStoreName, domain.SettingStoreTagline}
+	want := []string{
+		domain.SettingStoreName,
+		domain.SettingStoreTagline,
+		domain.SettingColorBrand,
+		domain.SettingColorBrand2,
+		domain.SettingColorBrand3,
+		domain.SettingColorBrand4,
+		domain.SettingColorInk,
+	}
 	got := PublicKeys()
 	sort.Strings(want)
 	sort.Strings(got)

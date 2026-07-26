@@ -8,6 +8,7 @@ import { PlayScreen } from "./screens/PlayScreen";
 import { ResultScreen } from "./screens/ResultScreen";
 import { stashResult } from "./state/resultCache";
 import { usePublicSettings } from "./state/usePublicSettings";
+import { useBrandPalette } from "./theme/useBrandPalette";
 import { Screen, StatusMessage } from "./ui";
 
 /**
@@ -30,6 +31,12 @@ export function App() {
   // this refresh should be one gesture to the player.
   const { settings, refresh: refreshSettings, refreshing } = usePublicSettings();
   const identity = storeIdentity(settings);
+
+  // The palette applies to the whole document, not one screen, so it is applied
+  // here rather than passed down: a game's timer fill and the result screen's
+  // meter are both `bg-brand`, and neither should have to know the store has
+  // repainted itself.
+  useBrandPalette(settings);
 
   useEffect(() => {
     let alive = true;

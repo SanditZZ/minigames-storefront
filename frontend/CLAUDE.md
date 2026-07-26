@@ -33,6 +33,34 @@ npm run theme:check   # fail if the committed CSS drifted from the tokens
 `theme.css` by hand now fails the build rather than surviving until someone
 regenerates.
 
+### The runtime override — the second source of colour
+
+A store can set its own palette from the admin (`color_brand`, `color_ink`, …),
+which means there are now two sources of colour. **The precedence rule is one
+line and it lives in `packages/tokens/src/override.ts`:**
+
+> The tokens are the palette. A setting that is present AND a valid colour
+> overrides one of them. Anything else — absent, blank, malformed — is not an
+> override and the token stands.
+
+Consequences worth knowing before touching either side:
+
+- **Colour settings are never seeded.** Absent means "follow the tokens", so
+  editing `palette.ts` still re-themes every store that has not opted out. Seed
+  them and every database pins its palette on the day it was created.
+- **An operator who sets a colour has opted out of future token changes** for
+  that colour until they clear it. That is what the admin's reset is for.
+- **`--color-*` is the contract.** Tailwind v4 compiles `bg-brand` to
+  `var(--color-brand)`, so the override works by redefining that property on the
+  root element — in `useBrandPalette`, which is per-app because it touches
+  `document`. Renaming a token renames a public API.
+- **Opacity utilities lag on old browsers.** `text-ink/70` compiles to a
+  `color-mix()` over the variable behind an `@supports` guard, with a baked hex
+  fallback, so a browser without `color-mix` re-colours the solid shades only.
+- **Nothing checks contrast.** The rules in the table above are what the tokens
+  were chosen to satisfy; an operator can set five colours that violate all of
+  them. See `docs/potential-features.md`.
+
 React Native has no stylesheet — styles are plain JS objects — so a palette that
 only exists as CSS cannot follow these apps onto a phone. Holding the values in
 TypeScript and generating the CSS keeps "edit one place" true across web and

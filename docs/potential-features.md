@@ -203,11 +203,13 @@ component each:
 
   Do this once for both this and the award images above — they are the same
   problem, and `PrizeImage.tsx` is already the shared render primitive.
-- **Store identity editable from the admin: name, tagline, colours.** —
-  **partly built: the strings ship, the colours do not.** Renaming the shop used
-  to be a code edit and a `ship.sh` run, which is fine for one store and absurd
-  for two; it is now a `SettingsPanel` edit. Colours remain compile-time, and the
-  split below is why the three were never one feature:
+- ~~**Store identity editable from the admin: name, tagline, colours.**~~ —
+  **built, all three.** Renaming or recolouring the shop used to be a code edit
+  and a `ship.sh` run, which is fine for one store and absurd for two; it is now
+  a form — `StoreBranding.tsx` in the settings panel, with the admin app wearing
+  the store's own colours so choosing one is a preview rather than a guess. The
+  split below is kept because it is why the three were never one feature, and
+  because each part cost something different:
   - ~~**Name and tagline are easy and blocked on one missing endpoint.**~~ —
     **built.** `GET /api/v1/settings/public` serves a flat key→value map, and
     the allowlist that decides what appears in it is its own calculation package
@@ -220,15 +222,32 @@ component each:
     a decision, not a detail. Returning `Setting[]` would have handed players
     the operator-facing `description` and `updatedAt` of every public key; the
     narrower map is what keeps the allowlist meaning something.
-  - **Colours fight the token pipeline.** The palette is TypeScript
-    (`packages/tokens/src/palette.ts`) generated into a committed `theme.css`
-    `@theme` block, and Tailwind resolves `bg-brand` against it **at build
-    time**. A runtime palette cannot come from that pipeline at all; it has to be
-    CSS custom properties overridden on the document at runtime, which the
-    package-boundary rule forbids inside `packages/` — so the setter belongs in
-    each app, next to `useRouter`, as the other thing allowed to touch `window`.
-    Worth doing deliberately: it introduces a *second* source of colour, and
-    "which one wins" needs an answer before the first bug.
+  - ~~**Colours fight the token pipeline.**~~ — **built, and the premise was
+    wrong.** Tailwind v4 does not bake the palette in: `bg-brand` compiles to
+    `background-color: var(--color-brand)`, so redefining that property on the
+    root element re-colours every utility with no rebuild — verified against the
+    built bundle before any of this was written. The split landed as the entry
+    predicted even so: `paletteCssVars`/`resolvePalette`
+    (`packages/tokens/src/override.ts`) decide *which* colours apply and are
+    shared with native, while a ~15-line `useBrandPalette` in each app is the
+    only thing that touches `document`.
+    **"Which one wins" is answered in one line, at the top of `override.ts`:**
+    the tokens are the palette; a setting that is present AND a valid colour
+    overrides one; anything else is not an override. The colour settings are
+    deliberately **not seeded** — seeding them would pin every store's palette
+    at whatever it was the day its database was created, and a token change
+    would silently reach nobody. The cost of that choice, stated so it is not a
+    surprise: an operator who sets a colour has opted out of future token
+    changes for it until they clear it, which is why the admin offers a reset
+    and not only an edit box.
+    **Two things the entry did not anticipate.** A colour needed its own
+    `SettingType` (`domain.SettingColor`, validated by `settings.IsHexColor`) —
+    a string type would have accepted `url(https://…)`, valid CSS that would
+    have every player's browser fetch a third-party asset, since the value lands
+    in a live custom property. And opacity utilities (`text-ink/70`) compile to
+    a `color-mix()` over the same variable *behind an `@supports` guard*, with a
+    baked hex fallback: on a browser without `color-mix` the solid shades
+    re-colour and the translucent ones do not.
   - ~~**Nothing currently guards the palette from drifting.**~~ — **built**, and
     deliberately ahead of the colours it protects. `npm run theme:check` is now
     the first frontend step in both `scripts/ship.sh` and
@@ -248,6 +267,30 @@ component each:
     mode"** below: a timer returning to the picker should refetch on the way.
   - Note the cost side: this adds another per-load public fetch, joining the
     three prize requests the **Caching** entry already flags.
+  - **Nothing checks that a chosen palette is legible.** `frontend/CLAUDE.md`
+    states the contrast rules the tokens were picked to satisfy — ink on light
+    surfaces, *never* white text on the pastels — and an operator can now set
+    all five colours to anything that parses as hex. Cream text on a cream
+    background is two saves away, and the only feedback is the admin repainting
+    itself the same way. The fix is a pure contrast-ratio check next to
+    `isHexColor` (`packages/tokens/src/override.ts`): compute WCAG contrast for
+    the pairs the rules actually name — `ink` on each of `brand`…`brand-4`, and
+    `ink` on white — and warn in `StoreBranding.tsx` below 4.5:1. Worth doing as
+    a warning rather than a block: a venue's real brand colour is not negotiable
+    with a validator, and refusing to save it would just get the palette set by
+    hand in SQLite. This bites the first time a store picks its own colours,
+    which is the feature's entire purpose.
+  - **The palette arrives after the first paint.** `usePublicSettings` fetches on
+    mount, so a player sees the built-in tokens for one request and then the
+    store's colours — a visible flash on a cold load, worst on the landing screen
+    where the whole background is a `from-brand-4 to-brand-3` gradient. Options,
+    cheapest first: cache the last-known palette in `localStorage` and apply it
+    synchronously before the fetch resolves (an app-layer concern, next to
+    `useRouter`); or have `serve-prod.sh` bake the current palette into the
+    bundle's `theme.css` at deploy time, which reintroduces the drift the
+    read-time override was chosen to avoid. It bites on every cold load, but is
+    invisible on the kiosk phones that never reload — which is why it is filed
+    rather than fixed.
   - **Only the landing screen knows the store's name.** `usePublicSettings` is
     called once, in `App.tsx`, and the identity is passed down to `HomeScreen`
     alone; `ResultScreen` and `PlayScreen` never receive it. That is correct
@@ -383,25 +426,39 @@ rather than re-argued.
   leaderboard only when it is unset. The empty-board "Record breaker" is gone
   along with the permanent break.
   **What it cost that the entry did not anticipate:** a benchmark is a *catalog*
-  value, so it is only editable by changing Go and redeploying. An admin can
-  tune the claim TTL and the anti-cheat limits from `SettingsPanel`, but not the
-  number the reveal is measured against — see the follow-up below.
-- **A game's benchmark is not admin-tunable.** `TargetScore` lives in
-  `backend/internal/game/catalog.go` and is pushed to the `games` table by
-  `Service.Seed` on every boot, which is correct — it is catalog data, and Seed
-  overwriting it is what keeps code and database in step. The consequence is
-  that tuning the number the reveal measures against needs a code change and a
-  redeploy, while the claim TTL and the anti-cheat limits next to it are
-  editable from `SettingsPanel`. Fine while there are three games and one
-  operator; the moment a venue wants "our tote bag is 40 taps, not 60" it is a
-  gap. A settings-backed override read by `Seed`, or an admin games panel, are
-  the two shapes; neither is small, so this is a decision rather than a chore.
-- **The benchmark/top-prize convention has no test.** Every game's `TargetScore`
-  equals the `MinScore` of its hardest starter award (`app.starterAwards`), so
-  filling the reveal tower and winning the best prize are the same event. That
-  is asserted by a comment in `seed.go` and by nothing else — an admin editing
-  the award, or a future game seeded carelessly, breaks it silently and the only
-  symptom is a player being told they maxed the meter while winning nothing.
+  value, so it started out editable only by changing Go and redeploying — an
+  admin could tune the claim TTL and the anti-cheat limits from `SettingsPanel`
+  but not the number the reveal is measured against. That gap is now closed by
+  the read-time override below; the benchmark is still catalog data, with the
+  operator's value layered over it.
+- ~~**A game's benchmark is not admin-tunable.**~~ — **built**, and the entry's
+  two candidate shapes were both wrong in the same way. It said "a settings-backed
+  override read by `Seed`, or an admin games panel"; the override is
+  settings-backed but is applied **on read**, not by `Seed`, because `Seed` runs
+  once at boot and an override it wrote would need an API restart to take
+  effect — which defeats the point of not needing a deploy.
+  `settings.ApplyTargetScores` layers the override over the registry in
+  `app.ListGames`/`GetGame`/`HighScores`, so the catalog keeps saying what the
+  *code* thinks a benchmark is and clearing the setting restores it with nothing
+  to migrate. The panel is a card in settings (`GameBenchmarks.tsx`), not a
+  games panel. Zero is rejected rather than treated as a clear, because zero
+  already means "unset" to the client and would switch the leaderboard-leader
+  fallback back on by accident.
+  **What it cost that the entry did not anticipate:** the handlers were reading
+  `Registry()` directly, so `GET /api/v1/games` and the leaderboard's embedded
+  game had to be routed through the service or they would have served the
+  untuned number from one endpoint and the tuned one from another.
+- ~~**The benchmark/top-prize convention has no test.**~~ — **built.**
+  `TestBenchmarkMatchesHardestStarterAward` (`internal/app/seed_test.go`) walks
+  every registry game and asserts its `TargetScore` equals the `MinScore` of its
+  hardest starter award, reading each game's `ScoreDirection` rather than
+  assuming — tap-fast's hardest prize carries the largest threshold, the two
+  lower-is-better games the smallest. **It does not close the case the entry
+  actually named.** The test covers the *seeded* ladder; an admin editing an
+  award afterwards still breaks the convention silently, and now so does an
+  admin retuning a benchmark from the card above. Both are live edits, so
+  catching them needs a check at write time (or a warning in the admin when the
+  two disagree), not a unit test.
 - **Precision Stop's score cannot be verified server-side, and its validator
   says so.** `validatePrecisionStop` bounds-checks (`0 <= value <=
   PrecisionTrackHalf`) and stops there, because the marker's starting phase is
@@ -573,6 +630,15 @@ are the seams that give way as the catalog and the score table grow.
   is driven too — and it is not, which is the same prerequisite the admin claims
   panel entry above is blocked on. Until then the whole feature is verified by
   unit tests either side of a wire nobody crosses in anger.
+  **The palette made this worse, not equally bad.** A rename that fails to
+  apply is a wrong word on one line; a palette that fails to apply is the whole
+  app in the wrong colours, and the mechanism is a CSS custom property written
+  to `document.documentElement` — the one part of the feature that is *only*
+  exercisable in a real browser, and the one part no test touches.
+  `useBrandPalette` in each app has no coverage of any kind: the pure resolver
+  under it does, and the DOM write does not. One Playwright assertion that
+  `--color-brand` on the root element equals a value set through the API would
+  cover both apps' copies at once.
 - **Visual regression.** Every layout bug found during this work was purely
   visual (collapsed tier labels, a bell overlapping text, halo rings crossing a
   caption) — none of which a DOM assertion would catch. Playwright's

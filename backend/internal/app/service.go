@@ -19,6 +19,7 @@ import (
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
 	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 	"github.com/sanditzz/minigames-storefront/backend/internal/reward"
+	"github.com/sanditzz/minigames-storefront/backend/internal/settings"
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 )
 
@@ -46,6 +47,40 @@ func (s *Service) Registry() *game.Registry { return s.registry }
 
 // Store exposes the underlying store for admin CRUD handlers.
 func (s *Service) Store() storage.Store { return s.store }
+
+// --- Catalog ---------------------------------------------------------------
+
+// ListGames returns the playable catalog with any admin benchmark override
+// applied.
+//
+// Handlers go through here rather than reading Registry() directly: the
+// registry is what the CODE says a game is, and what a player is served is that
+// plus what the operator has retuned. Reading the registry straight would have
+// been the quiet way to serve a stale benchmark from one endpoint while another
+// served the tuned one.
+func (s *Service) ListGames(ctx context.Context) []domain.Game {
+	return settings.ApplyTargetScores(s.registry.Enabled(), s.allSettings(ctx))
+}
+
+// GetGame returns one game with its override applied, or ErrGameUnavailable.
+func (s *Service) GetGame(ctx context.Context, slug domain.GameSlug) (domain.Game, error) {
+	def, ok := s.registry.Get(slug)
+	if !ok {
+		return domain.Game{}, ErrGameUnavailable
+	}
+	return settings.ApplyTargetScore(def.Game, s.allSettings(ctx)), nil
+}
+
+// allSettings reads every setting, tolerating failure: an override is a tuning
+// knob, and a store whose settings table is briefly unreadable should serve the
+// catalog benchmark rather than no games at all.
+func (s *Service) allSettings(ctx context.Context) []domain.Setting {
+	all, err := s.store.Settings().List(ctx)
+	if err != nil {
+		return nil
+	}
+	return all
+}
 
 // --- Session ---------------------------------------------------------------
 
@@ -421,7 +456,11 @@ func (s *Service) HighScores(ctx context.Context, slug domain.GameSlug, limit in
 		limit = s.settingInt(ctx, domain.SettingHighScoreLimit, 10)
 	}
 	scores, err := s.store.Scores().Top(ctx, slug, def.Game.Direction, limit)
-	return scores, def.Game, err
+	// The leaderboard response carries the game, and the client reads the
+	// benchmark off it — so it has to be the tuned one here too, or the reveal
+	// would scale differently depending on which endpoint the page happened to
+	// read the game from.
+	return scores, settings.ApplyTargetScore(def.Game, s.allSettings(ctx)), err
 }
 
 // Prizes lists what a game is currently offering, in the trimmed public shape.

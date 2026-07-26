@@ -1,25 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
-import type { ApiClient, Setting, SettingType } from "@minigames/api-client";
-import { Alert, Badge, Button, Card, Field, Input, Loading, PanelHeader, Select, Stack } from "../ui";
+import { useState } from "react";
+import type { ApiClient, Game, Setting, SettingType } from "@minigames/api-client";
+import { GameBenchmarks } from "./GameBenchmarks";
+import { StoreBranding } from "./StoreBranding";
+import { Alert, Badge, Button, Card, ColorInput, Field, Input, Loading, PanelHeader, Select, Stack } from "../ui";
 
 /**
- * Settings CRUD. Each setting is a typed knob the backend reads at runtime
- * (session TTL, anti-cheat cap, etc.). The panel edits value/description and
- * can add new keys; the backend validates that a value parses as its type.
+ * Settings CRUD, with the store's identity lifted into a form at the top.
+ *
+ * The rows below it are the general case: every setting, as a typed knob the
+ * backend reads at runtime (session TTL, anti-cheat cap, claim window). The
+ * branding card is not a special kind of setting — the same keys appear in the
+ * rows — it is the handful an operator actually came here to change, presented
+ * as something other than a list of strings.
+ *
+ * `settings` is owned by App rather than fetched here, because the palette is
+ * applied to the whole document: the shell needs the same rows this panel edits,
+ * and one fetch feeding both is what makes a saved colour visible immediately.
  */
-export function SettingsPanel({ api }: { api: ApiClient }) {
-  const [settings, setSettings] = useState<Setting[] | null>(null);
-  const [error, setError] = useState("");
+export function SettingsPanel({
+  api,
+  games,
+  settings,
+  error,
+  onChanged,
+}: {
+  api: ApiClient;
+  games: Game[];
+  settings: Setting[] | null;
+  error: string;
+  onChanged: () => void;
+}) {
   const [adding, setAdding] = useState(false);
-
-  const load = useCallback(() => {
-    api
-      .listSettings()
-      .then(setSettings)
-      .catch((e) => setError(e.message ?? "Failed to load settings"));
-  }, [api]);
-
-  useEffect(load, [load]);
 
   return (
     <Stack>
@@ -35,7 +46,7 @@ export function SettingsPanel({ api }: { api: ApiClient }) {
           api={api}
           onSaved={() => {
             setAdding(false);
-            load();
+            onChanged();
           }}
         />
       )}
@@ -44,8 +55,10 @@ export function SettingsPanel({ api }: { api: ApiClient }) {
         <Loading />
       ) : (
         <Stack gap="sm">
+          <StoreBranding api={api} settings={settings} onSaved={onChanged} />
+          <GameBenchmarks api={api} games={games} settings={settings} onSaved={onChanged} />
           {settings.map((s) => (
-            <SettingRow key={s.key} api={api} setting={s} onSaved={load} onDeleted={load} />
+            <SettingRow key={s.key} api={api} setting={s} onSaved={onChanged} onDeleted={onChanged} />
           ))}
         </Stack>
       )}
@@ -102,6 +115,13 @@ function SettingRow({
 
 /** Renders the right control for a typed setting value. */
 function ValueInput({ type, value, onChange }: { type: SettingType; value: string; onChange: (v: string) => void }) {
+  if (type === "color") {
+    // No placeholder default here: a generic row edits an existing colour
+    // setting, so there is always a value, and guessing which palette entry it
+    // belongs to would be wrong as often as right. The branding card above is
+    // where a colour has a known default to fall back to.
+    return <ColorInput value={value} placeholder="#ff9a86" onChange={onChange} />;
+  }
   if (type === "bool") {
     return (
       <Select value={value} onChange={(e) => onChange(e.target.value)}>
@@ -146,6 +166,7 @@ function NewSettingForm({ api, onSaved }: { api: ApiClient; onSaved: () => void 
             <option value="string">string</option>
             <option value="int">int</option>
             <option value="bool">bool</option>
+            <option value="color">color</option>
           </Select>
         </Field>
         <Field label="Value">

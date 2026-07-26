@@ -7,19 +7,20 @@
 // below survive as the FALLBACK, not the source: a kiosk whose API is
 // unreachable still renders a name instead of an empty header.
 //
-// The keys are duplicated from the Go side (domain.SettingStoreName and
-// friends) because a wire contract has two ends; `settings.IsPublic` is what
-// decides these two may be read without a token.
+// The keys themselves live in @minigames/api-client, with the rest of the wire
+// contract — the admin edits the same two settings this reads, and a key
+// spelled two ways is a bug that typechecks. `settings.IsPublic` on the Go side
+// is what decides they may be read without a token.
+
+import { STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+
+export { STORE_NAME_KEY, STORE_TAGLINE_KEY };
 
 /** Store name shown to players when the backend has not been asked yet. */
 export const BRAND_NAME = "Fun Store";
 
 /** Short line under the brand on the landing screen. */
 export const BRAND_TAGLINE = "Thanks for shopping with us — try your luck!";
-
-/** Public setting keys the storefront identity is assembled from. */
-export const STORE_NAME_KEY = "store_name";
-export const STORE_TAGLINE_KEY = "store_tagline";
 
 /** The player-facing identity of the store, resolved and ready to render. */
 export interface StoreIdentity {

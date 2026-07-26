@@ -147,6 +147,13 @@ const (
 	SettingString SettingType = "string"
 	SettingInt    SettingType = "int"
 	SettingBool   SettingType = "bool"
+	// SettingColor is a hex colour literal (#abc or #aabbcc). It is its own
+	// type rather than a string because these values are written into a live
+	// CSS custom property on the player's document: a string type would accept
+	// `url(...)` or `var(...)`, which are valid CSS and would reach the style
+	// engine intact. Validating at write time is what keeps that impossible,
+	// and it also tells the admin UI to render a colour picker.
+	SettingColor SettingType = "color"
 )
 
 // Well-known setting keys. Centralized so calculations and actions never
@@ -169,6 +176,17 @@ const (
 	// accidentally publish it.
 	SettingStoreName    = "store_name"
 	SettingStoreTagline = "store_tagline"
+
+	// The five brand colours, overriding the compiled-in design tokens. They
+	// are public for the same reason the name is: the player's app renders
+	// them. They are deliberately NOT seeded — absent means "use the tokens",
+	// so a store that never opts out still follows a palette change in
+	// packages/tokens. See override.ts for the full precedence rule.
+	SettingColorBrand  = "color_brand"
+	SettingColorBrand2 = "color_brand_2"
+	SettingColorBrand3 = "color_brand_3"
+	SettingColorBrand4 = "color_brand_4"
+	SettingColorInk    = "color_ink"
 )
 
 // Default storefront identity, used when the settings rows are absent and as

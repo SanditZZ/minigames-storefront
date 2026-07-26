@@ -8,18 +8,18 @@ import (
 )
 
 func (s *Server) handleListGames(w http.ResponseWriter, r *http.Request) {
-	// Only enabled games are offered to players.
-	writeJSON(w, http.StatusOK, s.svc.Registry().Enabled())
+	// Only enabled games are offered to players, with any admin-tuned benchmark
+	// applied — see app.ListGames for why that layering happens on read.
+	writeJSON(w, http.StatusOK, s.svc.ListGames(r.Context()))
 }
 
 func (s *Server) handleGetGame(w http.ResponseWriter, r *http.Request) {
-	slug := domain.GameSlug(r.PathValue("slug"))
-	def, ok := s.svc.Registry().Get(slug)
-	if !ok {
+	g, err := s.svc.GetGame(r.Context(), domain.GameSlug(r.PathValue("slug")))
+	if err != nil {
 		writeError(w, http.StatusNotFound, "game not found")
 		return
 	}
-	writeJSON(w, http.StatusOK, def.Game)
+	writeJSON(w, http.StatusOK, g)
 }
 
 // startSessionResponse is what the player app needs to run and time a round.

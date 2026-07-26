@@ -92,6 +92,12 @@ func validateSetting(req settingRequest) (string, bool) {
 		if _, err := strconv.ParseBool(req.Value); err != nil {
 			return "value must be true/false for type bool", false
 		}
+	case domain.SettingColor:
+		// Rejected at write time so nothing downstream has to sanitise: this
+		// value ends up in a CSS custom property on the player's document.
+		if !settings.IsHexColor(req.Value) {
+			return "value must be a hex colour like #ff9a86 for type color", false
+		}
 	case domain.SettingString:
 		// any string is valid
 	default:
