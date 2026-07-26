@@ -285,9 +285,20 @@ The bar is the same as for any other entry — cite the file, and say when it wi
 bite. Small mechanical fixes are the exception that proves it: if the follow-up
 is one line and the fix is obvious, do it instead of filing it.
 
+## Icons come from icones.js.org — never emoji, never drawn here
+
+Every icon in either app is an SVG copied from <https://icones.js.org/>, from one
+chosen set. **Emoji are not icons** (the platform picks the artwork, the palette
+cannot reach them, and their screen-reader names are somebody else's), and
+**nothing in this repo authors icon path data** — inventing a shape that already
+exists in a set is wasted work twice over. The full rules, and the one exception
+(`scripts/icons/`, which packages the product's own mark into launcher/PWA/favicon
+assets), are in `frontend/CLAUDE.md`. The apps still carry emoji from before this
+rule; replacing them is an entry in `docs/potential-features.md`.
+
 ## Related
 
-- `frontend/CLAUDE.md` — mandatory color palette + reusable-UI-component rules.
+- `frontend/CLAUDE.md` — mandatory color palette, icon rules, reusable-UI rules.
 - `mobile/CLAUDE.md` — the Expo clients: sharing rules, ATS/cleartext, test gap.
 - `docs/architecture.md` — design.
 - `docs/potential-features.md` — the roadmap (see the section above).

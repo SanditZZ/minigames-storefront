@@ -19,6 +19,7 @@
     "@minigames/tokens": "file:../../frontend/packages/tokens",
     "expo": "~57.0.0",
     "expo-build-properties": "~57.0.7",
+    "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.7",
     "expo-linking": "~57.0.4",
     "expo-router": "~57.0.8",

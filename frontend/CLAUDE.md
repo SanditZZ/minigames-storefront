@@ -146,6 +146,43 @@ The generator borrows Chromium from `e2e/node_modules` because this box has no
 `rsvg-convert` and ImageMagick's fallback SVG renderer mangles the glyph's arcs.
 It is a dev tool only — no app build and no CI job runs it.
 
+## Icons: SVG from icones.js.org — emoji are not icons
+
+**No emoji in either app's UI, and no hand-authored icon SVGs.** Take every icon
+from <https://icones.js.org/> (Iconify's index — Lucide, Tabler, Phosphor,
+Material Symbols, …), paste the SVG in, and stay in ONE set across both apps so
+the player and the admin look like one product.
+
+Why this is a rule and not a preference — the current emoji are a live example of
+each failure:
+
+- **An emoji is a font glyph, so the platform picks the artwork.** 🎉 on the
+  result card is Noto on Android, Apple Color Emoji on iOS, and a box on a kiosk
+  browser with no emoji font. Nothing in `packages/tokens` can touch it.
+- **It cannot take the palette.** Every other mark in this app is `ink` or
+  `brand` and follows a store's runtime override; an emoji is permanently its own
+  colours, which is why the reveal's tier ladder is the one row on screen that
+  ignores a store's branding.
+- **Its accessible name is not ours.** A screen reader says "party popper" where
+  the design means "you won", and 🎟️ reads as "admission ticket" beside a claim
+  code.
+- **Sizing is typographic, not geometric.** An emoji scales with `font-size` and
+  its optical weight is whatever the font decided, so an icon next to a 14px
+  label and the same icon in a 40px hero are unrelated shapes.
+
+Use `currentColor` so an icon inherits text colour (and therefore the palette and
+any override), and give every icon-only control a real accessible name —
+`IconButton`'s required `label` already enforces this on the player side.
+
+**Never draw one.** No authored path data, no CSS-shape approximations, no
+model-invented SVG. If an icon seems to be missing from every set, the search
+term is wrong.
+
+**The one exception is `scripts/icons/`**, which renders the product's own mark
+into launcher/PWA/favicon assets. That is packaging a brand asset in the sizes
+platforms demand — not drawing an icon — and no icon set can supply it. See the
+app-icon section above; those files stay generated.
+
 ## Component rule
 
 Always build with reusable UI components. Shared primitives live in `src/ui/`

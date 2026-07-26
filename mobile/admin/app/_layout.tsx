@@ -25,6 +25,10 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ title: "Awards" }} />
+        {/* Pushed from the awards list rather than presented as a tab: the two
+            screens answer unrelated questions, and a back button is the gesture
+            staff already know. */}
+        <Stack.Screen name="claims" options={{ title: "Claims" }} />
       </Stack>
     </SafeAreaProvider>
   );

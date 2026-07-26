@@ -356,6 +356,34 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   rotation) and the render as a pure `draw(state) → canvas` function, so the same
   description can be re-rendered at export resolution without a second code path.
   Worth scoping the sticker set to store branding to keep moderation trivial.
+- **Replace every emoji with an SVG icon from <https://icones.js.org/>.** The
+  rule is now in `frontend/CLAUDE.md`; the apps predate it, so this is the
+  clean-up. Emoji are font glyphs: the platform picks the artwork, the palette
+  cannot reach them (they are the only marks on screen that ignore a store's
+  runtime colour override), they scale typographically rather than geometrically,
+  and a screen reader announces somebody else's name for them — "party popper"
+  where the design means "you won". Re-derive the list before starting rather
+  than trusting this one; today it is:
+  - **Player UI:** `App.tsx` (not-found), `RoundRunner.tsx` (loading, error),
+    `HomeScreen.tsx` (offline), `PlayScreen.tsx` / `ResultScreen.tsx` (lookup),
+    `PrizeShowcase.tsx`, `ClaimCard.tsx` (🎉/🎟️ prize fallback),
+    `ResultSummary.tsx`, `CopyButton.tsx` (three states), `games/registry.ts`
+    plus the per-game marks in `TapFast.tsx`, `ReactionTimer.tsx` and
+    `PrecisionStop.tsx`.
+  - **Admin UI:** `ImageField.tsx` (the image placeholder) — the admin is nearly
+    clean already.
+  - **Two harder cases, both in packages.** `player-core/src/reveal/tiers.ts`
+    carries an emoji per tier, and `i18n/{en,th}.ts` has emoji *inside* two
+    strings (`"Play & Win 🎁"`, `"🏆 Top score"`). A package may hold neither
+    prose nor markup, so a tier must name an ICON KEY the way it already names a
+    `labelKey`, and the two strings must lose their glyph to an icon rendered
+    beside them — which is a small API change to the tier ladder, not a find and
+    replace.
+  - **Native too.** `mobile/admin` is RN, where an inline `<svg>` does not exist:
+    icons arrive via `react-native-svg` components, so pick the icon set with an
+    RN export path in mind rather than discovering the constraint afterwards.
+  - Worth doing in one pass rather than opportunistically: a half-converted
+    interface has two icon languages in it, which looks worse than either alone.
 - **Sound and haptics** for the reveal — the animation beats are already there to
   hang them on (`navigator.vibrate` on the puck landing, a bell on a record).
 - **Accessibility** — larger tap targets and screen-reader labels. Reduced
@@ -547,15 +575,22 @@ and the score table grow.
   row with `?game=&q=` before it can click one: the locator ambiguity is the
   accessibility bug, visible from the outside. One `aria-label` each, following
   the pattern already in `ClaimRow`.
-- **The native admin still has no claims screen.** `mobile/admin` remains a
-  one-screen skeleton (awards list). A phone at a counter is exactly the right
-  device for redeeming a code, and the API is ready for it; it needs its own
-  Maestro flow, and the Maestro step only runs when a device is attached.
-  **It is also the only client that can scan one.** `expo-camera` is not subject
-  to the web's secure-context rule, so the phone is where scan-to-redeem works
-  without first putting HTTPS on the tailnet — see that entry under "Reward
-  system depth". The Maestro caveat cuts the other way, though: a camera flow is
-  precisely what a device-less CI run cannot verify.
+- **Nothing anywhere tests a QR being decoded from a camera.** `onBarcodeScanned`
+  in `mobile/admin/app/claims.tsx` is the one step of scan-to-redeem no suite
+  reaches: Maestro can tap the button that opens the camera but cannot hold a code
+  in front of an emulator's simulated lens, and the web scanner cannot run on any
+  origin this project serves (see the entry under "Reward system depth"). Every
+  step after the lookup is shared with the typed path, so the untested surface is
+  small — but it is the surface the feature is named after. Android's emulator can
+  be fed a virtual scene, and `expo-camera` has no injection hook; the realistic
+  options are a manual check on a real phone against a real player screen, or
+  accepting it and writing that down. It bites the first time someone changes the
+  scanner and believes a green gate.
+- **The native claims screen cannot see expired claims.** Its filter is two
+  buttons — outstanding and collected — because those are the two questions a
+  counter asks; the web panel's four-way `<select>` also covers expired, which is
+  a back-office question. Nothing is broken by the gap, but an operator asking
+  "did this lapse?" has to reach for the browser.
 - **The claims list is unpaginated and filtered in memory.**
   `ClaimRepository.List` returns every claim ever issued and `claim.Filter`
   narrows it afterwards. That is forced rather than lazy — status is derived, so

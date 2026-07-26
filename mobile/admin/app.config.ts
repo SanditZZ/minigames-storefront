@@ -52,6 +52,26 @@ const config: ExpoConfig = {
     "expo-router",
     "expo-status-bar",
     "expo-secure-store",
+    // The camera exists for exactly one job: reading a claim code off a
+    // customer's screen. The permission STRING says so, because "Store Admin
+    // would like to access the camera" is the prompt staff decline — and a
+    // declined camera permission is not re-askable from inside the app.
+    //
+    // Declaring it here rather than relying on the runtime request is not
+    // optional on either platform: iOS terminates an app that touches the camera
+    // without NSCameraUsageDescription, and Android needs the manifest entry
+    // before `requestCameraPermissionsAsync` can do anything but refuse.
+    [
+      "expo-camera",
+      {
+        cameraPermission: "Used to scan a customer's prize QR code at the counter.",
+        // Neither is wanted. Both default to true, and an app asking for the
+        // microphone to redeem a coffee is the kind of thing that gets a staff
+        // phone's permissions revoked wholesale.
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
     // Android's equivalent of the ATS exception above. It is a native build
     // property rather than an app.config key, so it only takes effect in a
     // development or EAS build — never in Expo Go, whose own manifest this

@@ -99,7 +99,31 @@ fi
 echo "▸ Installing APK…"
 adb install -r -d "$APK" >/dev/null
 
+# A claim to redeem, WON rather than fabricated.
+#
+# The claims flow needs a real code, and the only honest way to get one is the way
+# a customer does: start a session, submit a winning score, read the claim off the
+# result. Inserting a row into SQLite would test the panel against a credential no
+# player was ever issued — which is the exact seam these suites exist to cover
+# (see e2e/tests/admin-claims.spec.ts, which plays a round for the same reason).
+#
+# 60 taps clears tap-fast's hardest starter award (backend/internal/app/seed.go),
+# so the win is deterministic on a fresh database. The value is also inside the
+# validator's plausible ceiling; a bigger number would be REJECTED as fabricated,
+# which is the anti-cheat working and would look like a broken fixture.
+echo "▸ Winning a claim to redeem…"
+session_token=$(curl -fsS -X POST "${HOST_API_URL}/api/v1/games/tap-fast/sessions" |
+  sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+[[ -n "$session_token" ]] || { echo "✗ could not start a session"; exit 1; }
+
+CLAIM_CODE=$(curl -fsS -X POST "${HOST_API_URL}/api/v1/games/tap-fast/scores" \
+  -H 'Content-Type: application/json' \
+  -d "{\"token\":\"${session_token}\",\"playerName\":\"Maestro\",\"value\":60}" |
+  sed -n 's/.*"code":"\([^"]*\)".*/\1/p')
+[[ -n "$CLAIM_CODE" ]] || { echo "✗ the winning round issued no claim — did the starter awards change?"; exit 1; }
+echo "  won ${CLAIM_CODE}."
+
 echo "▸ Running Maestro flows…"
-maestro test -e ADMIN_TOKEN="$ADMIN_TOKEN" "$APP_DIR/.maestro"
+maestro test -e ADMIN_TOKEN="$ADMIN_TOKEN" -e CLAIM_CODE="$CLAIM_CODE" "$APP_DIR/.maestro"
 
 echo "✓ Mobile E2E passed."

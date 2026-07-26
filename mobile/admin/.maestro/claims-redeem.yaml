@@ -1,0 +1,124 @@
+appId: com.funstore.minigames.admin
+name: Redeems a won claim from the phone, behind a confirmation
+---
+# The counter's transaction on the device that actually belongs at a counter.
+#
+# The code under test was WON, not fabricated: scripts/run-e2e.sh plays a real
+# round through the API and passes the resulting code in as CLAIM_CODE. That is
+# the same discipline the browser suite follows — the seam worth covering is that
+# the credential a player is holding is the one this screen can find, and a row
+# inserted by a fixture would pass while that wire was cut.
+#
+# What this flow CANNOT cover is the camera. Maestro can drive the button that
+# opens it, but nothing here can hold a QR code in front of an emulator's
+# simulated lens, so `onBarcodeScanned` is exercised by no test on any platform.
+# The typed path below shares every step after the lookup — confirmation, POST,
+# banner, list reload — so what is untested is narrowly the decode itself. See
+# mobile/CLAUDE.md.
+
+- launchApp:
+    clearState: true
+
+- tapOn:
+    id: "admin-token-input"
+- inputText: "${ADMIN_TOKEN}"
+- hideKeyboard
+- tapOn:
+    id: "admin-signin-button"
+
+- assertVisible:
+    id: "awards-list"
+
+# Claims are one tap from the awards list — the phone's whole reason to exist.
+- tapOn:
+    id: "open-claims"
+
+- assertVisible:
+    id: "claims-list"
+# The won claim is outstanding, and the row is keyed on the CODE rather than on a
+# nanoid, so the fixture's code addresses it directly.
+- assertVisible:
+    id: "claim-${CLAIM_CODE}"
+
+# Type it as a customer reads it out. The backend normalises case and the dash,
+# so the lowercase form must resolve to the same claim.
+- tapOn:
+    id: "claim-code-input"
+- inputText: "${CLAIM_CODE}"
+- hideKeyboard
+- tapOn:
+    id: "claim-lookup"
+
+# NOTHING has been handed over yet. That is the safeguard the camera makes
+# necessary: the press that asks the question must not also answer it.
+- assertVisible:
+    id: "confirm-prompt"
+- assertVisible: "Hand it over"
+- assertNotVisible:
+    id: "claim-done"
+
+# Cancelling leaves the prize owed — the claim is still in the outstanding list.
+- tapOn:
+    id: "confirm-cancel"
+- assertNotVisible:
+    id: "confirm-prompt"
+- assertVisible:
+    id: "claim-${CLAIM_CODE}"
+
+# Now do it for real, from the row this time: the other of the two ways a claim
+# gets collected, and the one used when the customer cannot find their code.
+- tapOn:
+    id: "claim-redeem-${CLAIM_CODE}"
+- assertVisible:
+    id: "confirm-prompt"
+- tapOn:
+    id: "confirm-action"
+
+- assertVisible:
+    id: "claim-done"
+- assertVisible: "Handed over: Store Tote Bag (${CLAIM_CODE})"
+
+# The list is reloaded rather than patched, so a collected claim leaves the
+# outstanding view entirely.
+- assertNotVisible:
+    id: "claim-${CLAIM_CODE}"
+
+# Single-use, asserted from the phone: the same code cannot be handed over twice,
+# which is the entire reason the credential is a server-issued code rather than
+# the player's screen.
+- tapOn:
+    id: "claim-code-input"
+- inputText: "${CLAIM_CODE}"
+- hideKeyboard
+- tapOn:
+    id: "claim-lookup"
+- tapOn:
+    id: "confirm-action"
+- assertVisible: "this claim has already been redeemed"
+
+# The repair, on the device where the mis-scan happens. A collected claim is only
+# reachable through the "Collected" filter, which is why that filter exists at all
+# — without it this control could never appear.
+- tapOn:
+    id: "filter-redeemed"
+- assertVisible:
+    id: "claim-${CLAIM_CODE}"
+- tapOn:
+    id: "claim-undo-${CLAIM_CODE}"
+
+# The undo confirms too, and its wording admits it may land on "expired" rather
+# than promising the prize is collectable again.
+- assertVisible:
+    id: "confirm-prompt"
+- assertVisible: "Undo collection"
+- tapOn:
+    id: "confirm-action"
+
+# The status in the banner is the SERVER's answer, not a guess.
+- assertVisible: "is now outstanding"
+
+# And the proof the undo worked: it is owed again.
+- tapOn:
+    id: "filter-issued"
+- assertVisible:
+    id: "claim-${CLAIM_CODE}"

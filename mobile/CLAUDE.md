@@ -23,7 +23,7 @@ Shared code lives in `frontend/packages/*` and is consumed by name:
 | Package | Used natively for |
 |---|---|
 | `@minigames/api-client` | every request; it is dependency-free and browser-free |
-| `@minigames/admin-core` | the Location grammar and `visibleAwards` |
+| `@minigames/admin-core` | the Location grammar, `visibleAwards`, and every word the claims screen says (`claimConfirmation`, `claimStatusLabel`, the two error-message functions) |
 | `@minigames/tokens` | palette values, incl. `colors.json` for NativeWind |
 
 **Never import from `frontend/apps/*`.** Those are React DOM. If something there
@@ -72,6 +72,33 @@ error rather than a clear one. Build with the address `serve-prod.sh` prints:
 EXPO_PUBLIC_API_URL=http://100.64.124.94:8081 npx expo start
 ```
 
+## The camera — the one capability the web admin cannot have
+
+`app/claims.tsx` scans a claim QR with `expo-camera`. That screen exists on this
+platform first, and not out of enthusiasm for native: **the web scanner cannot run
+on any origin this project serves.** `navigator.mediaDevices` is absent on a
+plain-HTTP origin (the Tailscale address `serve-prod.sh` prints), and Chromium on
+Linux ships no `BarcodeDetector`, so even `localhost` cannot decode. `expo-camera`
+asks the OS and decodes natively, bound by neither rule.
+
+Three things to know before touching it:
+
+- **The permission is declared in `app.config.ts`, not just requested at runtime.**
+  iOS terminates an app that touches the camera without
+  `NSCameraUsageDescription`, and on Android the manifest entry has to exist before
+  a request can succeed. The permission STRING is part of the feature — staff
+  decline a vague prompt, and a declined camera permission is not re-askable from
+  inside the app, which is why the refusal path says "enable it in system
+  settings" rather than offering the button again.
+- **Microphone and audio recording are explicitly disabled.** Both default to
+  true in the plugin. An app that asks for the microphone to redeem a coffee is
+  how a staff phone's permissions get revoked wholesale.
+- **`onBarcodeScanned` fires per readable frame, not per code.** One code held up
+  produces a stream of identical events, so the screen closes a `useRef` gate
+  before the first lookup starts — `setState` is async and a second frame arrives
+  first. Then it stops the camera *before* proposing, because a confirmation must
+  be about one claim rather than about whatever drifts into frame next.
+
 ## Credentials
 
 The admin secret goes in `expo-secure-store` (the OS keychain), never
@@ -119,6 +146,14 @@ on *"Free Coffee"* and *"reach 60"* rather than on "some row exists". The runner
 fails fast if it does not find exactly six, because a silently-changed seed
 would otherwise turn into a confusing flow failure.
 
+**A claim under test is WON, never inserted.** `run-e2e.sh` starts a session and
+submits a 60-tap score through the API, then passes the resulting code to Maestro
+as `CLAIM_CODE`. Sixty taps clears tap-fast's hardest starter award, and sits
+inside the validator's plausible ceiling — a bigger number would be *rejected* as
+fabricated, which is the anti-cheat working and would read as a broken fixture.
+Writing a row into SQLite instead would test the panel against a credential no
+player was ever issued, which is the one seam a cross-app suite exists to cover.
+
 **`10.0.2.2` is not a placeholder.** It is the emulator's alias for the host's
 loopback; the app runs inside the emulator, so `127.0.0.1` there means the
 emulator itself. The APK is built with that address baked in. On a physical
@@ -143,6 +178,15 @@ The other two earn their place by covering what a typecheck structurally cannot:
 that Metro really resolved `@minigames/admin-core`, that the ATS/cleartext
 exception really took, and that a rejected token is really cleared rather than
 left in the keychain to fail on every later request.
+
+`claims-redeem.yaml` covers the counter's transaction: a won code typed as a
+customer reads it out, the confirmation gating the hand-over, cancelling leaving
+the prize owed, redeeming from a row, and the same code being refused a second
+time. **What no test on any platform covers is the decode itself** — Maestro can
+tap the button that opens the camera, but nothing can hold a QR in front of an
+emulator's simulated lens, and the web scanner cannot run at all (above). Every
+step *after* the lookup is shared with the typed path, so the gap is narrowly
+`onBarcodeScanned` — worth knowing before trusting a change to it.
 
 ### The remaining gap
 
