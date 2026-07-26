@@ -155,15 +155,15 @@ describe("countUpValue", () => {
 
 describe("tierFor", () => {
   it("picks the highest tier a fraction clears", () => {
-    expect(tierFor(0).label).toBe("Warming up");
-    expect(tierFor(0.2).label).toBe("Not bad");
-    expect(tierFor(0.55).label).toBe("Sharp");
-    expect(tierFor(1).label).toBe("Record breaker");
+    expect(tierFor(0).labelKey).toBe("reveal.tier.warmingUp");
+    expect(tierFor(0.2).labelKey).toBe("reveal.tier.notBad");
+    expect(tierFor(0.55).labelKey).toBe("reveal.tier.sharp");
+    expect(tierFor(1).labelKey).toBe("reveal.tier.recordBreaker");
   });
 
   it("always resolves, even for out-of-range input", () => {
     expect(tierFor(-1)).toBe(TIERS[0]);
-    expect(tierFor(99).label).toBe("Record breaker");
+    expect(tierFor(99).labelKey).toBe("reveal.tier.recordBreaker");
   });
 });
 

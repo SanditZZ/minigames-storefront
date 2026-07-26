@@ -1,5 +1,6 @@
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { isNewRecord } from "@minigames/player-core";
+import { useT } from "../i18n";
 import { AppearIn, Badge, Button, HighlightCard, Stack, Stat } from "../ui";
 import { ClaimCard } from "./ClaimCard";
 
@@ -18,6 +19,7 @@ interface Props {
  * only presents result.award — it never re-derives who won what.
  */
 export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Props) {
+  const t = useT();
   const won = Boolean(result.award);
   const record = isNewRecord(result.rank);
 
@@ -26,7 +28,9 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
       <AppearIn variant="pop" className="text-center">
         <Stat value={result.score.value} label={game.scoreUnit} />
         <div className="mt-3 flex items-center justify-center gap-2">
-          <Badge tone={record ? "brand" : "muted"}>{record ? "🏆 Top score" : `Rank #${result.rank}`}</Badge>
+          <Badge tone={record ? "brand" : "muted"}>
+            {record ? t("result.topScore") : t("result.rank", { rank: result.rank })}
+          </Badge>
           <Badge tone="muted">{result.score.playerName}</Badge>
         </div>
       </AppearIn>
@@ -47,17 +51,19 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           <HighlightCard
             icon="🎉"
             imageUrl={result.award!.imageUrl}
-            eyebrow="You won"
+            eyebrow={t("result.won")}
+            // The award's own name and blurb are admin free text and are shown
+            // exactly as typed, in every language.
             title={result.award!.name}
             body={result.award!.description || undefined}
-            note="No claim code was issued for this round — show this screen to staff and they can sort it out."
+            note={t("result.noClaimNote")}
           />
         ) : (
           <HighlightCard
             icon="💪"
             tone="muted"
-            title="So close!"
-            body="No prize this time — give it another go for a higher score."
+            title={t("result.noPrize.title")}
+            body={t("result.noPrize.body")}
           />
         )}
       </AppearIn>
@@ -65,10 +71,10 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
       <AppearIn delayMs={260} className="w-full">
         <Stack gap="sm" className="items-center">
           <Button size="lg" fullWidth onClick={onPlayAgain}>
-            Play again
+            {t("result.playAgain")}
           </Button>
           <Button variant="quiet" fullWidth onClick={onPickAnother}>
-            Pick another game
+            {t("result.pickAnother")}
           </Button>
         </Stack>
       </AppearIn>

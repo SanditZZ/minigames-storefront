@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/app"
+	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 )
 
@@ -25,36 +26,61 @@ type errorBody struct {
 	Error string `json:"error"`
 }
 
+// writeError sends a literal English message. It is for failures only an ADMIN
+// can provoke — a malformed award payload, an upload of the wrong type, a bad
+// token — which the admin app renders untranslated. Anything a player can read
+// goes through writeMessage instead.
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, errorBody{Error: msg})
 }
 
+// writeMessage sends a catalog message in the caller's locale. This is the one
+// used on the play flow: the player app shows the API's `error` string verbatim
+// in a StatusMessage, so an English sentence on a Thai screen is not a rough
+// edge, it is the feature failing at the only moment it is visible.
+func writeMessage(w http.ResponseWriter, loc i18n.Locale, status int, id i18n.MessageID) {
+	writeJSON(w, status, errorBody{Error: i18n.Message(id, loc)})
+}
+
 // writeAppError maps domain/storage errors to HTTP status codes in one place,
-// keeping handlers free of status-code bookkeeping.
-func writeAppError(w http.ResponseWriter, err error) {
+// keeping handlers free of status-code bookkeeping. The locale comes from the
+// request (see localeOf) so the same mapping serves both languages.
+func writeAppError(w http.ResponseWriter, loc i18n.Locale, err error) {
 	switch {
 	case errors.Is(err, storage.ErrNotFound):
-		writeError(w, http.StatusNotFound, "not found")
+		writeMessage(w, loc, http.StatusNotFound, i18n.MsgNotFound)
 	case errors.Is(err, app.ErrGameUnavailable):
-		writeError(w, http.StatusNotFound, "game unavailable")
+		writeMessage(w, loc, http.StatusNotFound, i18n.MsgGameUnavailable)
 	case errors.Is(err, app.ErrInvalidSession):
-		writeError(w, http.StatusBadRequest, "invalid session")
+		writeMessage(w, loc, http.StatusBadRequest, i18n.MsgInvalidSession)
 	case errors.Is(err, app.ErrSessionExpired):
-		writeError(w, http.StatusGone, "session expired")
+		writeMessage(w, loc, http.StatusGone, i18n.MsgSessionExpired)
 	case errors.Is(err, app.ErrSessionConsumed):
-		writeError(w, http.StatusConflict, "session already used")
+		writeMessage(w, loc, http.StatusConflict, i18n.MsgSessionConsumed)
 	case errors.Is(err, app.ErrScoreRejected):
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
+		// The wrapped reason is a diagnostic COMPOSED at the point of rejection
+		// ("score 900 exceeds plausible maximum 120 for 5000ms"), not a
+		// sentence looked up from a table, so there is no Thai equivalent to
+		// reach for. English keeps it — it is the only account of a rejection
+		// that reaches the wire — and Thai gets the plain sentence rather than
+		// an English string wearing a Thai status code. Translating the
+		// validators properly is filed in docs/potential-features.md.
+		if loc == i18n.English {
+			writeError(w, http.StatusUnprocessableEntity, err.Error())
+			return
+		}
+		writeMessage(w, loc, http.StatusUnprocessableEntity, i18n.MsgScoreRejected)
 	case errors.Is(err, app.ErrClaimNotFound):
-		writeError(w, http.StatusNotFound, "claim not found")
+		writeMessage(w, loc, http.StatusNotFound, i18n.MsgClaimNotFound)
 	case errors.Is(err, app.ErrClaimNotRedeemable):
 		// The wrapped reason (already redeemed / expired) is the message: it is
 		// what the admin at the counter has to tell the person in front of them.
+		// Admin-facing, and so untranslated with the rest of that app.
 		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, storage.ErrConflict):
-		writeError(w, http.StatusConflict, "conflict")
+		writeMessage(w, loc, http.StatusConflict, i18n.MsgConflict)
 	default:
-		writeError(w, http.StatusInternalServerError, "internal error")
+		writeMessage(w, loc, http.StatusInternalServerError, i18n.MsgInternalError)
 	}
 }
 

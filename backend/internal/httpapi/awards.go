@@ -24,7 +24,7 @@ type awardRequest struct {
 func (s *Server) handleListAwards(w http.ResponseWriter, r *http.Request) {
 	awards, err := s.svc.Store().Awards().List(r.Context())
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	if awards == nil {
@@ -36,7 +36,7 @@ func (s *Server) handleListAwards(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGetAward(w http.ResponseWriter, r *http.Request) {
 	a, err := s.svc.Store().Awards().Get(r.Context(), r.PathValue("id"))
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, a)
@@ -68,7 +68,7 @@ func (s *Server) handleCreateAward(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := s.svc.Store().Awards().Create(r.Context(), a)
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, created)
@@ -78,7 +78,7 @@ func (s *Server) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	existing, err := s.svc.Store().Awards().Get(r.Context(), id)
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	var req awardRequest
@@ -103,7 +103,7 @@ func (s *Server) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 
 	updated, err := s.svc.Store().Awards().Update(r.Context(), existing)
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
@@ -111,7 +111,7 @@ func (s *Server) handleUpdateAward(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteAward(w http.ResponseWriter, r *http.Request) {
 	if err := s.svc.Store().Awards().Delete(r.Context(), r.PathValue("id")); err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

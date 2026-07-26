@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { finishPulse, tapPulse } from "../effects/haptics";
+import { useT } from "../i18n";
 import { CenterStack, RingTimer, Stat, TapMarks } from "../ui";
 import type { MiniGame, PlayProps } from "./types";
 
@@ -17,7 +18,8 @@ const URGENT_MS = 1500;
  * defines no colours of its own, so it matches every other game automatically.
  * It only *counts*; the backend decides plausibility and prizes.
  */
-function TapFastPlay({ durationMs, onFinish }: PlayProps) {
+function TapFastPlay({ durationMs, scoreUnit, onFinish }: PlayProps) {
+  const t = useT();
   const [count, setCount] = useState(0);
   const [remaining, setRemaining] = useState(durationMs);
   const [marks, setMarks] = useState<{ id: number; x: number }[]>([]);
@@ -61,7 +63,9 @@ function TapFastPlay({ durationMs, onFinish }: PlayProps) {
 
   return (
     <CenterStack>
-      <Stat value={count} label="taps" />
+      {/* The unit comes from the game the backend served, so the live counter
+          and the result screen's big number always say the same word. */}
+      <Stat value={count} label={scoreUnit} />
 
       <div className="relative">
         <TapMarks marks={marks} />
@@ -71,13 +75,13 @@ function TapFastPlay({ durationMs, onFinish }: PlayProps) {
             onPointerDown={handleTap}
             className="aspect-square w-52 max-w-[66vw] select-none rounded-full bg-brand text-3xl font-black text-ink shadow-2xl ring-4 ring-white/50 transition-transform duration-75 active:scale-90"
           >
-            TAP!
+            {t("tapFast.tap")}
           </button>
         </RingTimer>
       </div>
 
       <div className={`text-sm font-bold tabular-nums text-ink/70 ${urgent ? "animate-urgent" : ""}`}>
-        {seconds}s left
+        {t("play.secondsLeft", { seconds })}
       </div>
     </CenterStack>
   );

@@ -14,6 +14,7 @@ import type {
   SubmitScoreInput,
   UploadedImage,
 } from "./types";
+import { LANG_PARAM } from "./locale";
 
 /** Error thrown for any non-2xx API response, carrying the HTTP status so
  *  callers can branch on it (e.g. 409 = session already used). */
@@ -31,6 +32,21 @@ export interface ClientOptions {
   baseUrl: string;
   /** Shared secret for /admin routes. Only the admin app sets this. */
   adminToken?: string;
+  /**
+   * Language to ask the API to answer in ("en", "th"). Only the player app
+   * sets this; the admin is not translated.
+   *
+   * A client is built PER LOCALE rather than given a mutable setting, which is
+   * what keeps this dependency-free module free of state: switching language
+   * builds a new client, so no request can be issued against a locale that
+   * changed while it was in flight.
+   *
+   * Sent as a query parameter rather than an Accept-Language header on purpose.
+   * It is visible in a log and in the address bar, it needs no CORS preflight
+   * on a cross-origin API — which this always is, since the apps are built with
+   * an absolute API base — and it caches correctly without a Vary.
+   */
+  locale?: string;
 }
 
 /**
@@ -41,6 +57,12 @@ export interface ClientOptions {
 export function createClient(opts: ClientOptions) {
   const base = opts.baseUrl.replace(/\/$/, "");
 
+  /** Appends the requested language, if this client has one. */
+  function withLocale(path: string): string {
+    if (!opts.locale) return path;
+    return `${path}${path.includes("?") ? "&" : "?"}${LANG_PARAM}=${encodeURIComponent(opts.locale)}`;
+  }
+
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     // FormData must set its own Content-Type: the browser appends the multipart
@@ -50,7 +72,7 @@ export function createClient(opts: ClientOptions) {
     }
     if (opts.adminToken) headers.set("X-Admin-Token", opts.adminToken);
 
-    const res = await fetch(`${base}${path}`, { ...init, headers });
+    const res = await fetch(`${base}${withLocale(path)}`, { ...init, headers });
     if (res.status === 204) return undefined as T;
 
     const text = await res.text();

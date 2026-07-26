@@ -90,9 +90,10 @@ packages/api-client    typed HTTP client + wire types
 packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
                        plus the runtime-override precedence rule (override.ts)
 packages/image-core    crop-and-zoom geometry: cover scale, pan clamp, export map
-packages/player-core   route grammar, reveal maths, prize merge, game scoring
+packages/player-core   route grammar, reveal maths, prize merge, game scoring,
+                       the en/th dictionaries + locale precedence (i18n/)
 packages/admin-core    route grammar, award filter/sort, branding + benchmark forms
-apps/player            React DOM: screens, UI kit, useRouter, the games
+apps/player            React DOM: screens, UI kit, useRouter, LocaleProvider, the games
 apps/admin             React DOM: panels, UI kit, useRouter
 ```
 
@@ -104,7 +105,34 @@ thing knowing about history.
 
 Both apps re-export their package's routing through `src/router/index.ts`, so
 screens import `"../router"` and never have to know which side of the line a
-symbol falls on.
+symbol falls on. `apps/player/src/i18n/` is the same arrangement for language:
+the dictionaries and the precedence rule are pure and shared, and only
+`LocaleProvider` — which reads `navigator.languages` and sets `<html lang>` —
+is per-platform.
+
+**Language follows the same line as everything else.** The rule for where a
+string lives is which side of the wire decides it:
+
+- **The server owns what the server decides.** Game names, descriptions and
+  score units (`backend/internal/game/i18n.go`) and every error a player reads
+  (`backend/internal/i18n`) are translated server-side and arrive ready to
+  render. The client never re-derives them.
+- **The client owns chrome.** Buttons, headings, the reveal's tier ladder —
+  `packages/player-core/src/i18n`. Round-tripping a button label through HTTP
+  would make every screen wait on the network for its own furniture.
+- **A package may not hold prose.** Calculations return message *keys*
+  (`claimCopy`, `precisionVerdict`, `Tier.labelKey`); the component looks them
+  up. English text inside `player-core` would pin the one package a native
+  client reuses verbatim to a single language.
+- **The locale is addressable**, like every other piece of state: `?lang=th` is
+  a *pin*, and its absence means "follow the device" rather than "English" —
+  which is why `Location.lang` is nullable and an unpinned URL stays bare.
+- **Admin-entered free text is translated nowhere.** A store's name and an
+  award's name are served exactly as typed, in every language; doing better is
+  a schema change, and it is filed rather than half-done.
+
+Adding a message means adding it to `en.ts` *and* `th.ts` — `Messages` is a
+complete record, so a missing translation fails `npm run typecheck`.
 
 **Design tokens are data, not CSS.** `packages/tokens` holds the five brand
 colours and every animation's duration/easing as TypeScript; each app's

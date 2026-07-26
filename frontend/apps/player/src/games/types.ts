@@ -9,6 +9,15 @@ import type { ComponentType } from "react";
 export interface PlayProps {
   /** Round length in ms, from the game's catalog config. */
   durationMs: number;
+  /**
+   * What the score is counted in ("taps", "ครั้ง"), already in the player's
+   * language — the backend serves it with the game (see internal/i18n).
+   *
+   * Passed in rather than hardcoded by the game that displays it: a live tap
+   * counter and the result screen's big number are the same quantity, and they
+   * were free to disagree while one of them spelled the unit itself.
+   */
+  scoreUnit: string;
   /** Called once with the final raw score when the round ends. */
   onFinish: (value: number) => void;
 }

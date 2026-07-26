@@ -1,6 +1,13 @@
 // The storefront's identity: the fallback strings, and the pure reader that
 // turns the backend's public settings into them.
 //
+// Note the division of labour once this app became bilingual: the FALLBACK is
+// translated (it is the app's own voice, so `defaultIdentity` takes a
+// translator), while a name an operator actually typed is served verbatim in
+// every language. Translating admin free text would need a second column in the
+// settings table, which is the same schema decision the awards face — filed in
+// docs/potential-features.md rather than half-done here.
+//
 // Identity used to be compile-time data — renaming the shop meant editing this
 // file and redeploying, which is fine for one store and absurd for two. It is
 // now an admin setting served by GET /api/v1/settings/public. The constants
@@ -13,14 +20,9 @@
 // is what decides they may be read without a token.
 
 import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import type { Translator } from "./i18n";
 
 export { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY };
-
-/** Store name shown to players when the backend has not been asked yet. */
-export const BRAND_NAME = "Fun Store";
-
-/** Short line under the brand on the landing screen. */
-export const BRAND_TAGLINE = "Thanks for shopping with us — try your luck!";
 
 /** The player-facing identity of the store, resolved and ready to render. */
 export interface StoreIdentity {
@@ -30,14 +32,24 @@ export interface StoreIdentity {
   logoUrl: string;
 }
 
-/** What the app shows before the first fetch resolves, and if it never does. */
-export const DEFAULT_IDENTITY: StoreIdentity = {
-  name: BRAND_NAME,
-  tagline: BRAND_TAGLINE,
-  // No default logo, deliberately: the wordmark IS the fallback, and shipping a
-  // stock logo would put someone else's mark on an unconfigured storefront.
-  logoUrl: "",
-};
+/**
+ * What the app shows before the first fetch resolves, and if it never does.
+ *
+ * A function of the translator rather than a constant, because the fallback is
+ * CHROME even though what it stands in for is data: an operator who never set a
+ * name has not chosen an English one, so a Thai storefront with an unreachable
+ * API should read as a Thai storefront. The moment a name IS configured it
+ * wins in every language — an operator's own words are never translated.
+ */
+export function defaultIdentity(t: Translator): StoreIdentity {
+  return {
+    name: t("brand.name"),
+    tagline: t("brand.tagline"),
+    // No default logo, deliberately: the wordmark IS the fallback, and shipping
+    // a stock logo would put someone else's mark on an unconfigured storefront.
+    logoUrl: "",
+  };
+}
 
 /**
  * storeIdentity resolves the public settings map into the strings the header
@@ -48,14 +60,19 @@ export const DEFAULT_IDENTITY: StoreIdentity = {
  * Blank and whitespace-only values are treated as unset. An admin who empties
  * the box means "use the default", and the alternative — an empty header —
  * looks like a broken deploy rather than a choice.
+ *
+ * The fallback is passed IN rather than read from a constant, which is what
+ * keeps this pure once the defaults became language-dependent: build it with
+ * `defaultIdentity(t)` at the call site.
  */
 export function storeIdentity(
   settings: Record<string, string> | null | undefined,
+  fallback: StoreIdentity,
 ): StoreIdentity {
   return {
-    name: pick(settings?.[STORE_NAME_KEY], DEFAULT_IDENTITY.name),
-    tagline: pick(settings?.[STORE_TAGLINE_KEY], DEFAULT_IDENTITY.tagline),
-    logoUrl: pick(settings?.[STORE_LOGO_KEY], DEFAULT_IDENTITY.logoUrl),
+    name: pick(settings?.[STORE_NAME_KEY], fallback.name),
+    tagline: pick(settings?.[STORE_TAGLINE_KEY], fallback.tagline),
+    logoUrl: pick(settings?.[STORE_LOGO_KEY], fallback.logoUrl),
   };
 }
 

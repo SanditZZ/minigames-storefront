@@ -1,4 +1,5 @@
 import type { ShowcasePrize } from "@minigames/player-core";
+import { useT } from "../i18n";
 import { Panel, PrizeImage } from "../ui";
 
 /**
@@ -13,10 +14,16 @@ import { Panel, PrizeImage } from "../ui";
  * store gets a clean picker rather than an empty box.
  */
 export function PrizeShowcase({ prizes }: { prizes: ShowcasePrize[] }) {
+  const t = useT();
+
   if (prizes.length === 0) return null;
 
   return (
-    <Panel title="Today's prizes" tone="muted">
+    // The prize NAMES stay in whatever language the operator typed them: they
+    // are admin free text, and translating them is a schema change rather than
+    // a lookup (see docs/potential-features.md). Only the chrome around them
+    // follows the player's language.
+    <Panel title={t("home.prizes.title")} tone="muted">
       <ul className="flex flex-col gap-2">
         {prizes.map((p) => (
           <li key={p.name} className={`flex items-center gap-3 ${p.soldOut ? "opacity-50" : ""}`}>
@@ -36,7 +43,7 @@ export function PrizeShowcase({ prizes }: { prizes: ShowcasePrize[] }) {
 
             {p.soldOut && (
               <span className="shrink-0 whitespace-nowrap rounded-full bg-ink/10 px-2 py-1 text-[11px] font-bold text-ink/60">
-                Sold out
+                {t("home.prizes.soldOut")}
               </span>
             )}
           </li>

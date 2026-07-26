@@ -7,6 +7,7 @@ import {
   TIERS,
   type Direction,
 } from "@minigames/player-core";
+import { useT } from "../i18n";
 import { useAnimationProgress, usePrefersReducedMotion } from "../reveal/useAnimationProgress";
 import { Confetti, Eyebrow, RevealMeter } from "../ui";
 
@@ -40,6 +41,7 @@ interface Props {
  * jumps straight to the settled state; that is a preference, not a stray tap.
  */
 export function ScoreReveal({ value, unit, direction, benchmark, isRecord, onDone }: Props) {
+  const t = useT();
   const reducedMotion = usePrefersReducedMotion();
   const progress = useAnimationProgress(REVEAL_DURATION_MS, reducedMotion, onDone);
 
@@ -51,13 +53,16 @@ export function ScoreReveal({ value, unit, direction, benchmark, isRecord, onDon
 
   return (
     <section
-      aria-label="Revealing your score."
+      aria-label={t("reveal.aria")}
       // The tap-storm can still be running through the reveal. The score is
       // shown again, selectably, on the result screen right after this.
       className="no-select relative flex flex-1 flex-col items-center justify-center gap-8"
     >
       <div className="text-center">
-        <Eyebrow>{settled ? tier.label : "Measuring…"}</Eyebrow>
+        {/* The ladder carries message keys rather than words, so a rung means
+            the same thing in both languages — see tiers.ts. `unit` below is
+            already translated: it comes off the game the backend served. */}
+        <Eyebrow>{settled ? t(tier.labelKey) : t("reveal.measuring")}</Eyebrow>
         <div className="mt-1 text-7xl font-black tabular-nums leading-none text-ink" aria-hidden>
           {shown}
         </div>
@@ -78,7 +83,7 @@ export function ScoreReveal({ value, unit, direction, benchmark, isRecord, onDon
           when it means something. The line also holds the slot open so the
           layout does not jump as the reveal settles. */}
       <p className="text-sm font-medium text-ink/40" role="status">
-        {settled ? `${shown} ${unit}` : "Hold tight…"}
+        {settled ? `${shown} ${unit}` : t("reveal.holdTight")}
       </p>
     </section>
   );

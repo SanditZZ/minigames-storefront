@@ -19,7 +19,7 @@ import (
 func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 	all, err := s.svc.Store().Settings().List(r.Context())
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, settings.Public(all))
@@ -28,7 +28,7 @@ func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := s.svc.Store().Settings().List(r.Context())
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	if settings == nil {
@@ -66,7 +66,7 @@ func (s *Server) handleUpsertSetting(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   time.Now(),
 	})
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, set)
@@ -74,7 +74,7 @@ func (s *Server) handleUpsertSetting(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteSetting(w http.ResponseWriter, r *http.Request) {
 	if err := s.svc.Store().Settings().Delete(r.Context(), r.PathValue("key")); err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -1,4 +1,5 @@
 import type { ScoreEntry } from "@minigames/api-client";
+import { useT } from "../i18n";
 import { EmptyNote, Panel, ScoreRow } from "../ui";
 
 interface Props {
@@ -14,12 +15,16 @@ interface Props {
  * requesting it twice.
  */
 export function Leaderboard({ scores, unit, highlightId }: Props) {
+  const t = useT();
+
   return (
-    <Panel title="Top players" className="w-full max-w-sm">
+    // `unit` arrives already translated — it is the game's score unit, which
+    // the backend serves in the requested language (see internal/i18n).
+    <Panel title={t("board.title")} className="w-full max-w-sm">
       {scores === null ? (
-        <EmptyNote>Loading…</EmptyNote>
+        <EmptyNote>{t("board.loading")}</EmptyNote>
       ) : scores.length === 0 ? (
-        <EmptyNote>Be the first on the board!</EmptyNote>
+        <EmptyNote>{t("board.empty")}</EmptyNote>
       ) : (
         <ol className="flex flex-col gap-1">
           {scores.map((s, i) => (

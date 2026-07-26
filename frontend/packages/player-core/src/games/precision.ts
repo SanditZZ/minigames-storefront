@@ -2,6 +2,8 @@
 // rAF, no DOM, no React. The component runs the clock and paints; every rule
 // about where the marker is and what a stop is worth lives here.
 
+import type { MessageKey } from "../i18n";
+
 /**
  * Half the track's virtual width, and therefore the worst possible score:
  * stopping at either end is this far off centre.
@@ -104,11 +106,17 @@ export function zoneWidthPercent(off: number): number {
   return Math.min(100, ((safe * 2) / TRACK_WIDTH) * 100);
 }
 
-/** Rating shown the moment a stop lands, for immediate feedback. */
-export function precisionVerdict(off: number): string {
-  if (off <= 0) return "Perfect";
-  if (off <= BULLSEYE_OFF) return "Dead on";
-  if (off <= 12) return "Close";
-  if (off <= NEAR_OFF) return "Near";
-  return "Wide";
+/**
+ * Rating shown the moment a stop lands, for immediate feedback.
+ *
+ * Returns a message key, not a word: which band a stop falls into is a rule
+ * about this game and belongs here, while what that band is CALLED is a
+ * translation and belongs in ../i18n. The component looks it up.
+ */
+export function precisionVerdict(off: number): MessageKey {
+  if (off <= 0) return "precision.verdict.perfect";
+  if (off <= BULLSEYE_OFF) return "precision.verdict.deadOn";
+  if (off <= 12) return "precision.verdict.close";
+  if (off <= NEAR_OFF) return "precision.verdict.near";
+  return "precision.verdict.wide";
 }

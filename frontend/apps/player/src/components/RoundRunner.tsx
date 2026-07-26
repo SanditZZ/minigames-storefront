@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { ApiError } from "@minigames/api-client";
-import { api } from "../api";
 import { getMiniGame } from "../games/registry";
+import { useApi, useT } from "../i18n";
 import { Countdown, GameStage, Spinner, StatusMessage } from "../ui";
 import { GameCompleteStage } from "./GameCompleteStage";
 
@@ -24,6 +24,11 @@ type Phase = "loading" | "countdown" | "playing" | "complete" | "error";
  * and every game inherits the same chrome and the same ending.
  */
 export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
+  const t = useT();
+  // The API's own error messages are shown to the player verbatim below, so
+  // they have to arrive in the player's language — which is what this client
+  // asks for. See backend/internal/i18n.
+  const api = useApi();
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
   const [result, setResult] = useState<SubmitResult | null>(null);
@@ -44,13 +49,13 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
       })
       .catch((e) => {
         if (!alive) return;
-        setError(e instanceof ApiError ? e.message : "Could not start the game.");
+        setError(e instanceof ApiError ? e.message : t("play.startFailed"));
         setPhase("error");
       });
     return () => {
       alive = false;
     };
-  }, [game.slug]);
+  }, [api, t, game.slug]);
 
   // The countdown finishing is what starts the round. Games therefore mount
   // already-counted-in and can begin timing on their first frame, instead of
@@ -66,11 +71,11 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
         .submitScore(game.slug, { token: tokenRef.current, playerName, value })
         .then(setResult)
         .catch((e) => {
-          setError(e instanceof ApiError ? e.message : "Could not submit your score.");
+          setError(e instanceof ApiError ? e.message : t("play.submitFailed"));
           setPhase("error");
         });
     },
-    [game.slug, playerName],
+    [api, t, game.slug, playerName],
   );
 
   // Hand over as soon as BOTH the player has tapped continue and the score has
@@ -83,9 +88,9 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
     return (
       <StatusMessage
         icon="🧩"
-        title="Not available yet"
-        detail="This game isn’t in this app version yet."
-        action={{ label: "Back", onClick: onCancel }}
+        title={t("play.unsupported.title")}
+        detail={t("play.unsupported.detail")}
+        action={{ label: t("play.back"), onClick: onCancel }}
       />
     );
   }
@@ -97,15 +102,15 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
       <StatusMessage
         tone="error"
         icon="😕"
-        title="Something went wrong"
+        title={t("play.failed.title")}
         detail={error}
-        action={{ label: "Back", onClick: onCancel }}
+        action={{ label: t("play.back"), onClick: onCancel }}
       />
     );
   }
 
   if (phase === "loading") {
-    return <Spinner label="Getting ready…" />;
+    return <Spinner label={t("play.loading")} />;
   }
 
   if (phase === "complete") {
@@ -120,14 +125,14 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
     // backing out before you begin costs nothing and needs no ceremony.
     <GameStage
       title={game.name}
-      subtitle={`Playing as ${playerName}`}
+      subtitle={t("play.playingAs", { name: playerName })}
       onQuit={onCancel}
       confirmQuit={phase === "playing"}
     >
       {phase === "countdown" ? (
         <Countdown label={game.name} onDone={startPlaying} />
       ) : (
-        <Play durationMs={durationRef.current} onFinish={handleFinish} />
+        <Play durationMs={durationRef.current} scoreUnit={game.scoreUnit} onFinish={handleFinish} />
       )}
     </GameStage>
   );

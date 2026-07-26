@@ -66,7 +66,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	name := blob.NewObjectName(ext)
 	body := io.MultiReader(strings.NewReader(string(head)), file)
 	if err := s.blobs.Put(r.Context(), name, contentType, body); err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 

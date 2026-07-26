@@ -2,6 +2,7 @@
 // React, no side effects — given the same strings these always return the same
 // value, which is what makes the routing logic testable in isolation.
 
+import { LANG_PARAM, parseLang } from "../i18n";
 import { MAX_NAME_LENGTH, NAME_PARAM, REVEAL_PARAM, type Location, type Route } from "./routes";
 
 /** Splits a pathname into its non-empty segments. */
@@ -52,6 +53,11 @@ export function parseLocation(pathname: string, search: string): Location {
     route: parsePath(pathname),
     playerName: parsePlayerName(search),
     reveal: parseReveal(search),
+    // parseLang lives with the dictionary rather than here: what counts as a
+    // language is the i18n layer's decision, and this module only knows that a
+    // Location has one. An unrecognised tag comes back null, so a hand-typed
+    // ?lang=xx follows the device instead of pinning a language nobody wrote.
+    lang: parseLang(search),
   };
 }
 
@@ -74,12 +80,19 @@ export function pathFor(route: Route): string {
  * survives every navigation (and stays visible/editable in the address bar).
  * The reveal flag is only ever emitted for a result URL — it is meaningless
  * anywhere else.
+ *
+ * An unpinned language writes no ?lang= at all, per the repo's rule that a
+ * parameter at its default value stays out of the URL. "Unpinned" is not the
+ * same as "English", though: it means the device decides, so a Thai phone
+ * opening a bare link still gets Thai. Only an explicit choice is written, and
+ * once written it travels with the link.
  */
 export function hrefFor(location: Location): string {
   const params = new URLSearchParams();
   const name = location.playerName.trim().slice(0, MAX_NAME_LENGTH);
   if (name) params.set(NAME_PARAM, name);
   if (location.reveal && location.route.name === "result") params.set(REVEAL_PARAM, "1");
+  if (location.lang) params.set(LANG_PARAM, location.lang);
 
   const query = params.toString();
   return query ? `${pathFor(location.route)}?${query}` : pathFor(location.route);

@@ -66,23 +66,38 @@ describe("hrefFor", () => {
   const result: Route = { name: "result", slug: "tap-fast", scoreId: "abc" };
 
   it("omits empty query state", () => {
-    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: false })).toBe("/");
+    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: false, lang: null })).toBe("/");
   });
 
   it("carries the player name", () => {
-    expect(hrefFor({ route: { name: "play", slug: "tap-fast" }, playerName: "Po", reveal: false })).toBe(
+    expect(hrefFor({ route: { name: "play", slug: "tap-fast" }, playerName: "Po", reveal: false, lang: null })).toBe(
       "/play/tap-fast?name=Po",
     );
   });
 
   it("emits reveal only on a result route", () => {
-    expect(hrefFor({ route: result, playerName: "", reveal: true })).toBe("/result/tap-fast/abc?reveal=1");
+    expect(hrefFor({ route: result, playerName: "", reveal: true, lang: null })).toBe("/result/tap-fast/abc?reveal=1");
     // Meaningless anywhere else, so it must not leak into other URLs.
-    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: true })).toBe("/");
+    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: true, lang: null })).toBe("/");
+  });
+
+  // An unpinned language writes nothing, so a bare link stays bare and still
+  // adapts to the device that opens it. A pinned one travels with the link,
+  // which is the point of pinning: the kiosk's language survives being shared.
+  it("writes the language only when it is pinned", () => {
+    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: false, lang: null })).toBe("/");
+    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: false, lang: "th" })).toBe(
+      "/?lang=th",
+    );
+    // Pinned English is still a pin, not a default: it has to survive a reload
+    // on a Thai phone, so it is written like any other choice.
+    expect(hrefFor({ route: { name: "home" }, playerName: "", reveal: false, lang: "en" })).toBe(
+      "/?lang=en",
+    );
   });
 
   it("encodes names that would otherwise break the query string", () => {
-    const href = hrefFor({ route: { name: "home" }, playerName: "A&B=C", reveal: false });
+    const href = hrefFor({ route: { name: "home" }, playerName: "A&B=C", reveal: false, lang: null });
     expect(href).toBe("/?name=A%26B%3DC");
     expect(parsePlayerName(href.slice(href.indexOf("?")))).toBe("A&B=C");
   });
@@ -90,11 +105,13 @@ describe("hrefFor", () => {
 
 describe("round-tripping", () => {
   const locations: Location[] = [
-    { route: { name: "home" }, playerName: "", reveal: false },
-    { route: { name: "home" }, playerName: "Po", reveal: false },
-    { route: { name: "play", slug: "tap-fast" }, playerName: "Po", reveal: false },
-    { route: { name: "result", slug: "tap-fast", scoreId: "abc-123" }, playerName: "Po", reveal: true },
-    { route: { name: "result", slug: "tap-fast", scoreId: "abc-123" }, playerName: "", reveal: false },
+    { route: { name: "home" }, playerName: "", reveal: false, lang: null },
+    { route: { name: "home" }, playerName: "Po", reveal: false, lang: null },
+    { route: { name: "play", slug: "tap-fast" }, playerName: "Po", reveal: false, lang: null },
+    { route: { name: "result", slug: "tap-fast", scoreId: "abc-123" }, playerName: "Po", reveal: true, lang: null },
+    { route: { name: "result", slug: "tap-fast", scoreId: "abc-123" }, playerName: "", reveal: false, lang: null },
+    { route: { name: "home" }, playerName: "Po", reveal: false, lang: "th" },
+    { route: { name: "play", slug: "tap-fast" }, playerName: "", reveal: false, lang: "en" },
   ];
 
   it("parses back to exactly what it rendered", () => {
@@ -114,7 +131,7 @@ describe("round-tripping", () => {
 
 describe("sameLocation", () => {
   it("compares the whole addressable location, query included", () => {
-    const base: Location = { route: { name: "home" }, playerName: "Po", reveal: false };
+    const base: Location = { route: { name: "home" }, playerName: "Po", reveal: false, lang: null };
     expect(sameLocation(base, { ...base })).toBe(true);
     expect(sameLocation(base, { ...base, playerName: "Sam" })).toBe(false);
   });

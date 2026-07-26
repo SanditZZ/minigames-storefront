@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
 import { goPulse, tapPulse } from "../effects/haptics";
+import { useT } from "../i18n";
 import { Eyebrow } from "./Card";
 import { CenterStack } from "./Layout";
 
-/** Ticks shown before a round: 3, 2, 1, then GO. */
-const TICKS = ["3", "2", "1", "GO!"];
+/**
+ * Ticks shown before a round: 3, 2, 1, then GO.
+ *
+ * The digits are digits in every language — Thai has its own numerals but
+ * Arabic ones are what a Thai phone shows and what the score readouts use, so
+ * translating these would make the count-in disagree with the scoreboard.
+ * Only the final word is a word, and it is looked up.
+ */
+const TICKS = ["3", "2", "1"];
+
+/** Total beats, digits plus the GO — a constant, so the effect below has no
+ *  dependency on the translated array being referentially stable. */
+const TICK_COUNT = TICKS.length + 1;
 
 /** How long each tick holds. Four ticks ≈ 2s of build-up. */
 const TICK_MS = 500;
@@ -21,23 +33,25 @@ const TICK_MS = 500;
  * same rhythm, exactly like the colour tokens.
  */
 export function Countdown({ label, onDone }: { label?: string; onDone: () => void }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
+  const ticks = [...TICKS, t("countdown.go")];
 
   useEffect(() => {
-    if (index >= TICKS.length) {
+    if (index >= TICK_COUNT) {
       onDone();
       return;
     }
     // The final tick is GO — a firmer buzz, so the start is felt as well as seen.
-    if (index === TICKS.length - 1) goPulse();
+    if (index === TICK_COUNT - 1) goPulse();
     else tapPulse();
 
     const id = window.setTimeout(() => setIndex((n) => n + 1), TICK_MS);
     return () => window.clearTimeout(id);
   }, [index, onDone]);
 
-  const tick = TICKS[Math.min(index, TICKS.length - 1)];
-  const isGo = index === TICKS.length - 1;
+  const tick = ticks[Math.min(index, TICK_COUNT - 1)];
+  const isGo = index === TICK_COUNT - 1;
 
   return (
     <CenterStack>
@@ -55,7 +69,7 @@ export function Countdown({ label, onDone }: { label?: string; onDone: () => voi
       </div>
       {/* The count is decorative; this is what a screen reader announces. */}
       <p className="sr-only" role="status">
-        Starting in {TICKS.length - index - 1} seconds
+        {t("countdown.starting", { seconds: TICK_COUNT - index - 1 })}
       </p>
     </CenterStack>
   );

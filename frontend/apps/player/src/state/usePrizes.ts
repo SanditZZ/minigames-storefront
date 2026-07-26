@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from "react";
 import type { Game } from "@minigames/api-client";
-import { api } from "../api";
 import { mergePrizes, orderPrizes, type ShowcasePrize } from "@minigames/player-core";
+import { useApi } from "../i18n";
 
 /**
  * Loads the prizes on offer across every game, for the landing screen.
@@ -19,6 +19,11 @@ import { mergePrizes, orderPrizes, type ShowcasePrize } from "@minigames/player-
  * missing strip.
  */
 export function usePrizes(games: Game[] | null): ShowcasePrize[] {
+  // The prize NAMES are admin free text and are not translated today, so this
+  // re-reads on a language switch for nothing. That is deliberate rather than
+  // an oversight: it is one request, and it is the line that starts working the
+  // day awards grow a per-locale column (see docs/potential-features.md).
+  const api = useApi();
   const [prizes, setPrizes] = useState<ShowcasePrize[]>([]);
 
   // Keyed on the slug list rather than the array identity, so a re-fetch of the
@@ -36,7 +41,7 @@ export function usePrizes(games: Game[] | null): ShowcasePrize[] {
     return () => {
       alive = false;
     };
-  }, [key]);
+  }, [api, key]);
 
   return prizes;
 }

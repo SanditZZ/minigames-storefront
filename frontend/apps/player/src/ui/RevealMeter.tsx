@@ -1,4 +1,5 @@
 import type { Tier } from "@minigames/player-core";
+import { useT } from "../i18n";
 
 interface Props {
   /** Current puck height, 0–100 (% of the tower). */
@@ -18,8 +19,15 @@ interface Props {
  * easing and overshoot all stay in @minigames/player-core where they are tested.
  * The whole thing is aria-hidden — the score is announced as text by the screen
  * that owns it, so a screen-reader user hears the number instead of a meter.
+ *
+ * The ladder's rungs arrive as message keys and are looked up here. That is
+ * also what identifies a rung: `labelKey` is the React key and the equality
+ * check for "the puck is in this one", neither of which survives comparing text
+ * that changes with the language.
  */
 export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
+  const t = useT();
+
   return (
     <div className="flex h-72 w-full max-w-xs items-stretch gap-4" aria-hidden>
       {/* Tower */}
@@ -40,11 +48,11 @@ export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
             style={{ height: `${heightPct}%` }}
           />
           {/* Tick marks up the tower */}
-          {tiers.map((t) => (
+          {tiers.map((tier) => (
             <div
-              key={t.label}
+              key={tier.labelKey}
               className="absolute inset-x-0 border-t border-dashed border-ink/15"
-              style={{ bottom: `${t.from * 100}%` }}
+              style={{ bottom: `${tier.from * 100}%` }}
             />
           ))}
           {/* Puck — the slider the punch drives up the rail */}
@@ -59,22 +67,25 @@ export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
 
       {/* Rating ladder */}
       <div className="relative min-w-0 flex-1">
-        {tiers.map((t) => {
-          const active = t.label === activeTier.label;
+        {tiers.map((tier) => {
+          const active = tier.labelKey === activeTier.labelKey;
           return (
             <div
-              key={t.label}
+              key={tier.labelKey}
               className="absolute inset-x-0 flex translate-y-1/2 items-center gap-2"
-              style={{ bottom: `${t.from * 100}%` }}
+              style={{ bottom: `${tier.from * 100}%` }}
             >
               <span className={`h-px w-3 shrink-0 ${active ? "bg-brand" : "bg-ink/20"}`} />
-              <span className="shrink-0 text-base">{t.icon}</span>
+              <span className="shrink-0 text-base">{tier.icon}</span>
+              {/* `truncate` on a Thai label cuts mid-word, since Thai has no
+                  spaces — which is why the rung names in the dictionary are
+                  kept short rather than translated phrase for phrase. */}
               <span
                 className={`min-w-0 truncate text-sm ${
                   active ? "font-black text-ink" : "font-medium text-ink/40"
                 }`}
               >
-                {t.label}
+                {t(tier.labelKey)}
               </span>
             </div>
           );

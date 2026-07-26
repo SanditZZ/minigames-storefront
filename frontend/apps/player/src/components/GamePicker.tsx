@@ -1,7 +1,9 @@
 import type { Game } from "@minigames/api-client";
 import { MAX_NAME_LENGTH, type ShowcasePrize, type StoreIdentity } from "@minigames/player-core";
 import { gameIcon, getMiniGame } from "../games/registry";
+import { useT, type Locale } from "../i18n";
 import { IconButton, PageHeader, SelectCard, Stack, TextField } from "../ui";
+import { LanguageToggle } from "./LanguageToggle";
 import { PrizeShowcase } from "./PrizeShowcase";
 
 interface Props {
@@ -11,6 +13,7 @@ interface Props {
   prizes: ShowcasePrize[];
   playerName: string;
   onNameChange: (name: string) => void;
+  onLangChange: (locale: Locale) => void;
   onPick: (game: Game) => void;
   onRefresh: () => void;
   refreshing: boolean;
@@ -29,16 +32,28 @@ export function GamePicker({
   prizes,
   playerName,
   onNameChange,
+  onLangChange,
   onPick,
   onRefresh,
   refreshing,
 }: Props) {
+  const t = useT();
+
   return (
     <Stack gap="lg" className="flex-1">
+      {/* Above the hero rather than beside it: PageHeader's action slot is
+          width-mirrored by a fixed spacer so the headline stays optically
+          centred, and a second control in there would push the title off
+          centre on a 320px screen. A player also chooses a language BEFORE
+          reading anything, so first is where it belongs. */}
+      <div className="flex justify-end">
+        <LanguageToggle onChange={onLangChange} />
+      </div>
+
       <PageHeader
         brand={identity.name}
         logoUrl={identity.logoUrl}
-        title="Play & Win 🎁"
+        title={t("home.title")}
         subtitle={identity.tagline}
         // The store's identity, prizes and games are all admin-editable while
         // this screen sits open on a till-side phone that nobody reloads. This
@@ -46,7 +61,7 @@ export function GamePicker({
         action={
           <IconButton
             variant="quiet"
-            label={refreshing ? "Refreshing…" : "Refresh store details"}
+            label={refreshing ? t("home.refreshing") : t("home.refresh")}
             disabled={refreshing}
             onClick={onRefresh}
           >
@@ -63,11 +78,13 @@ export function GamePicker({
       <PrizeShowcase prizes={prizes} />
 
       <TextField
-        label="Your name (optional)"
+        label={t("home.nameLabel")}
         value={playerName}
         onChange={(e) => onNameChange(e.target.value)}
         maxLength={MAX_NAME_LENGTH}
-        placeholder="Guest"
+        // The same string the round submits when this is left empty, so the
+        // placeholder is a promise the leaderboard keeps.
+        placeholder={t("player.guest")}
         autoComplete="given-name"
       />
 
@@ -80,7 +97,7 @@ export function GamePicker({
             media={gameIcon(game.slug)}
             title={game.name}
             subtitle={game.description}
-            action={getMiniGame(game.slug) ? "Play" : "Soon"}
+            action={getMiniGame(game.slug) ? t("home.play") : t("home.soon")}
             disabled={!getMiniGame(game.slug)}
             onClick={() => onPick(game)}
           />

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { errorPulse, finishPulse, goPulse } from "../effects/haptics";
+import { useT } from "../i18n";
 import { CenterStack, Eyebrow } from "../ui";
 import { isFalseStart, reactionScore, waitDelayMs } from "@minigames/player-core";
 import type { MiniGame, PlayProps } from "./types";
@@ -22,6 +23,7 @@ type Phase = "waiting" | "go";
  * runs the clock and paints the result.
  */
 function ReactionTimerPlay({ durationMs, onFinish }: PlayProps) {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>("waiting");
   const [falseStarts, setFalseStarts] = useState(0);
   const flippedAtRef = useRef(0);
@@ -73,29 +75,29 @@ function ReactionTimerPlay({ durationMs, onFinish }: PlayProps) {
   return (
     <CenterStack>
       <div className="text-center">
-        <Eyebrow>{go ? "Now!" : "Wait for it…"}</Eyebrow>
+        <Eyebrow>{go ? t("reaction.now") : t("reaction.wait")}</Eyebrow>
         {/* Reserved height: without it the layout jumps by a line the first
             time a false start message appears mid-round. */}
         <p className="mt-1 flex h-6 items-center justify-center text-sm font-semibold text-ink/60">
-          {falseStarts > 0 && !go ? "Too soon! Waiting again…" : ""}
+          {falseStarts > 0 && !go ? t("reaction.tooSoon") : ""}
         </p>
       </div>
 
       <button
         type="button"
         onPointerDown={handleTap}
-        aria-label={go ? "Tap now" : "Wait for the signal, then tap"}
+        aria-label={go ? t("reaction.ariaGo") : t("reaction.ariaWait")}
         className={`grid aspect-square w-64 max-w-[78vw] select-none place-items-center rounded-full text-3xl font-black shadow-2xl outline-none ring-4 transition-transform duration-75 focus-visible:ring-brand/50 active:scale-95 ${
           go
             ? "animate-pop-in bg-brand text-ink ring-white/50"
             : "bg-brand-4 text-ink/50 ring-ink/10"
         }`}
       >
-        {go ? "TAP!" : "WAIT"}
+        {go ? t("reaction.tap") : t("reaction.hold")}
       </button>
 
       <p className="text-center text-sm text-ink/50">
-        {go ? "Tap the moment it turns coral" : "Don’t tap until the circle lights up"}
+        {go ? t("reaction.hintGo") : t("reaction.hintWait")}
       </p>
     </CenterStack>
   );

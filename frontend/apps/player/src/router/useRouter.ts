@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hrefFor, parseLocation, sameLocation } from "@minigames/player-core";
-import type { Location, Route } from "@minigames/player-core";
+import type { Locale, Location, Route } from "@minigames/player-core";
 
 /** Reads the browser's current URL as a Location. */
 function readLocation(): Location {
@@ -14,6 +14,8 @@ function readLocation(): Location {
 export interface NavOptions {
   playerName?: string;
   reveal?: boolean;
+  /** Pinned language. Omitted means "keep whatever the current URL pins". */
+  lang?: Locale | null;
 }
 
 export interface Router {
@@ -25,6 +27,8 @@ export interface Router {
   playerName: string;
   /** Whether the score-reveal animation should play. */
   reveal: boolean;
+  /** Language pinned by ?lang=, or null when the device decides. */
+  lang: Locale | null;
   /** Pushes a new entry — the player can press Back to return here. */
   navigate: (route: Route, opts?: NavOptions) => void;
   /** Replaces the current entry — used when Back should skip this step. */
@@ -33,6 +37,8 @@ export interface Router {
   setPlayerName: (name: string) => void;
   /** Clears ?reveal= in place once the animation has played. */
   clearReveal: () => void;
+  /** Pins the language in place, so switching it is not a new history entry. */
+  setLang: (lang: Locale) => void;
   /** Goes back one entry, or home when this is the first page in the tab. */
   back: () => void;
 }
@@ -61,6 +67,11 @@ export function useRouter(): Router {
         playerName: opts.playerName ?? location.playerName,
         // reveal is one-shot: it never carries over unless asked for explicitly.
         reveal: opts.reveal ?? false,
+        // The language does the opposite — it is sticky, like the name. A pin
+        // that fell off on the first navigation would be no pin at all: the
+        // kiosk would revert to the phone's language the moment someone
+        // picked a game.
+        lang: opts.lang === undefined ? location.lang : opts.lang,
       };
       if (mode === "push" && sameLocation(next, location)) return; // no duplicate entries
       const href = hrefFor(next);
@@ -88,6 +99,15 @@ export function useRouter(): Router {
     go("replace", location.route, { reveal: false });
   }, [go, location.route, location.reveal]);
 
+  // Switching language is `replace`, not `push`, for the same reason typing a
+  // name is: it changes how the current screen reads, not which screen it is,
+  // and a Back button that walked backwards through language changes would be
+  // a trap rather than a feature.
+  const setLang = useCallback(
+    (lang: Locale) => go("replace", location.route, { lang, reveal: location.reveal }),
+    [go, location.route, location.reveal],
+  );
+
   // A player who lands directly on a result link has no history to go back to;
   // send them to the picker instead of leaving Back dead.
   const back = useCallback(() => {
@@ -101,12 +121,14 @@ export function useRouter(): Router {
       route: location.route,
       playerName: location.playerName,
       reveal: location.reveal,
+      lang: location.lang,
       navigate,
       replace,
       setPlayerName,
       clearReveal,
+      setLang,
       back,
     }),
-    [location, navigate, replace, setPlayerName, clearReveal, back],
+    [location, navigate, replace, setPlayerName, clearReveal, setLang, back],
   );
 }

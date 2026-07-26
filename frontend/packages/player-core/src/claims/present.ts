@@ -12,6 +12,7 @@
 // whether that date has passed is not, and never happens on this side.
 
 import type { ClaimStatus } from "@minigames/api-client";
+import type { MessageKey } from "../i18n";
 
 /**
  * Splits a claim code into readable groups: "ABCD2345" → "ABCD-2345".
@@ -29,14 +30,23 @@ export function groupClaimCode(code: string): string {
   return `${code.slice(0, 4)}-${code.slice(4)}`;
 }
 
-/** What the result screen should say and do about a claim. */
+/**
+ * What the result screen should say and do about a claim.
+ *
+ * The two strings are message KEYS rather than text. This function decides
+ * WHICH sentence a claim state earns — a decision, and so a calculation worth
+ * testing — while the sentence itself is a translation, which is the
+ * dictionary's business (../i18n). Returning prose here would have pinned this
+ * package to one language, and it is the package a native client reuses
+ * verbatim.
+ */
 export interface ClaimCopy {
   /** Whether the code is still worth showing to staff. */
   redeemable: boolean;
   /** The line under the code. */
-  note: string;
+  noteKey: MessageKey;
   /** Short label for the state, shown beside the code when it is not live. */
-  label: string;
+  labelKey: MessageKey;
 }
 
 /**
@@ -53,20 +63,20 @@ export function claimCopy(status: ClaimStatus): ClaimCopy {
     case "redeemed":
       return {
         redeemable: false,
-        label: "Collected",
-        note: "You've already picked this one up. Nice.",
+        labelKey: "claim.label.collected",
+        noteKey: "claim.note.collected",
       };
     case "expired":
       return {
         redeemable: false,
-        label: "Expired",
-        note: "This claim ran out of time. Ask staff if that looks wrong.",
+        labelKey: "claim.label.expired",
+        noteKey: "claim.note.expired",
       };
     default:
       return {
         redeemable: true,
-        label: "Ready to collect",
-        note: "Show this code at the counter to collect your prize.",
+        labelKey: "claim.label.ready",
+        noteKey: "claim.note.ready",
       };
   }
 }

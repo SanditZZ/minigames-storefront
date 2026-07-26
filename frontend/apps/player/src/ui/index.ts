@@ -13,6 +13,7 @@ export { PrizeImage } from "./PrizeImage";
 export { RevealMeter } from "./RevealMeter";
 export { RingTimer } from "./RingTimer";
 export { ScoreRow, SelectCard } from "./SelectCard";
+export { SegmentedControl } from "./SegmentedControl";
 export { Badge, ProgressBar, Stat } from "./Stat";
 export { TextField } from "./TextField";
 export { AppearIn, Confetti, Halo, HaloBox, TapMarks } from "./Vfx";

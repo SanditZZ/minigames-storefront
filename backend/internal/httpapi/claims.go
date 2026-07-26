@@ -25,7 +25,7 @@ func (s *Server) handleListClaims(w http.ResponseWriter, r *http.Request) {
 
 	claims, err := s.svc.ListClaims(r.Context(), status)
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, claims)
@@ -41,7 +41,7 @@ func (s *Server) handleListClaims(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRedeemClaim(w http.ResponseWriter, r *http.Request) {
 	view, err := s.svc.RedeemClaim(r.Context(), r.PathValue("code"))
 	if err != nil {
-		writeAppError(w, err)
+		writeAppError(w, localeOf(r), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, view)

@@ -112,8 +112,8 @@ describe("STOP_HOLD_MS", () => {
 
 describe("precisionVerdict", () => {
   it("reserves its best word for an exact stop", () => {
-    expect(precisionVerdict(0)).toBe("Perfect");
-    expect(precisionVerdict(BULLSEYE_OFF)).toBe("Dead on");
-    expect(precisionVerdict(40)).toBe("Wide");
+    expect(precisionVerdict(0)).toBe("precision.verdict.perfect");
+    expect(precisionVerdict(BULLSEYE_OFF)).toBe("precision.verdict.deadOn");
+    expect(precisionVerdict(40)).toBe("precision.verdict.wide");
   });
 });

@@ -9,13 +9,20 @@
 //   /result/tap-fast/{scoreId}           → the finished round (permanent, shareable)
 //   /result/tap-fast/{scoreId}?reveal=1  → …the first time, with the score-reveal animation
 //
-// Two pieces of state ride in the query string rather than in React state:
+// Three pieces of state ride in the query string rather than in React state:
 //   ?name=   the display name, so it survives navigation and can be pre-filled
 //            by a kiosk link.
 //   ?reveal= set once when arriving fresh from a round. The result screen drops
 //            it from the URL as soon as the animation finishes, so a reload or a
 //            shared link shows the score immediately instead of replaying the
 //            build-up to someone who already knows the number.
+//   ?lang=   pins the language. Absent means "follow the device", which is why
+//            it is nullable rather than defaulted: an unpinned app has to react
+//            to the phone it is opened on, while a kiosk in a Thai venue has to
+//            stay Thai on a phone whose OS is in English. Pinning it makes the
+//            language shareable — a link carries the language it was read in.
+
+import type { Locale } from "../i18n";
 
 /** The parsed, validated location the app renders. */
 export type Route =
@@ -31,6 +38,8 @@ export interface Location {
   playerName: string;
   /** True when the score-reveal animation should play on arrival. */
   reveal: boolean;
+  /** Language pinned by ?lang=; null when the device's own languages decide. */
+  lang: Locale | null;
 }
 
 /** Query-string key for the player's display name. */

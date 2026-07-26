@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PublicSettings } from "@minigames/api-client";
-import { api } from "../api";
+import { useApi } from "../i18n";
 
 export interface PublicSettingsState {
   /** null until the first response; never an error state — see below. */
@@ -28,6 +28,12 @@ export interface PublicSettingsState {
  * on the tablet by the till at closing time.
  */
 export function usePublicSettings(): PublicSettingsState {
+  // Nothing this endpoint returns is translated — a store's name is whatever
+  // the operator typed, in every language — so the re-read on a language switch
+  // is redundant work rather than a correctness need. It is kept for the same
+  // reason usePrizes keeps its own: one client, one rule, and it is already
+  // right if the allowlist ever grows a localized value.
+  const api = useApi();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [token, setToken] = useState(0);
@@ -47,7 +53,7 @@ export function usePublicSettings(): PublicSettingsState {
     return () => {
       alive = false;
     };
-  }, [token]);
+  }, [api, token]);
 
   return { settings, refresh, refreshing };
 }

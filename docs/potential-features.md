@@ -349,42 +349,130 @@ component each:
     resolving it once in `App` and passing it everywhere, is a small change now
     and a tangled one after the logo lands. It bites the moment a second screen
     needs identity — which the very next feature on this list does.
-- **Thai + English, with the backend as the source of truth for the strings.**
-  Nothing in this repo is translated today: both `index.html` files declare
-  `lang="en"`, every player-facing string is a literal in a component
-  (`"Play & Win 🎁"`, `"Your name (optional)"`, `"Record breaker"`), and the
-  store's own name and tagline are the *only* text an operator can change. A
-  storefront in a Thai venue is the obvious next market and the one this is
-  worth doing for.
-  - **Backend-owned wherever the string is data.** Anything the server already
-    decides should carry its own translation rather than have the client
-    re-derive it: game names and descriptions (`internal/game/catalog.go`),
-    award names and descriptions (admin-entered, so they need a *second field*
-    per locale rather than a lookup table), setting descriptions, and every
-    error message `writeError` produces — several of which are shown to a player
-    verbatim. The claim status vocabulary (`issued`/`redeemed`/`expired`) is
-    already derived server-side for exactly this kind of reason.
-  - **Client-owned only where the string is chrome.** Button labels, screen
-    headings and the reveal's tier names are presentation, and round-tripping
-    them through HTTP to render a button would make every screen wait on the
-    network for its own furniture. A small dictionary in `packages/player-core`
-    (and one in `admin-core`) keeps them pure, testable and reusable by a native
-    client — the same boundary the palette follows.
-  - **The locale has to be addressable**, like everything else here: `?lang=th`
-    parsed in `router/parse.ts` and defaulting from `navigator.language`, so a
-    kiosk can be pinned to Thai by URL and a link keeps its language.
-  - **Two things that will bite and are worth knowing first.** Award names are
-    admin-entered free text, so translating them is a schema change
-    (`awards.name_th`) rather than a message catalogue — decide that before
-    writing either. And Thai has no spaces between words: `truncate` and
-    `line-clamp` behave differently, and the anti-overlap rules in
-    `HeaderRow`/`ui/Layout.tsx` need re-checking at 320px with real Thai copy,
-    not with English text in a Thai font.
+- **A square logo and a full-width cover banner — two images, two shapes, two
+  jobs.** The store has one image today (`store_logo_url`, rendered by
+  `PageHeader` as `max-h-12 w-auto object-contain`), and it has to be both the
+  mark and the whole visual identity of the header. That is one image doing two
+  jobs badly: a wide wordmark and a square badge push the headline down by
+  different amounts, and neither fills the top of the screen the way a venue's
+  own photography would.
+  - **Square + rounded for the mark.** Constrain `store_logo_url` to a square
+    render (`aspect-square object-cover rounded-2xl`) so every store's header
+    is the same height whatever they upload. The cropper already exists and is
+    already pure — `packages/image-core` computes cover scale, pan clamp and the
+    export map — so this is a fixed 1:1 aspect passed into the existing
+    crop-and-zoom flow in the admin, not new geometry.
+  - **A separate `store_banner_url` for the cover.** A wide image spanning the
+    full app width above the header, in the shape people already understand from
+    a social profile cover (roughly 3:1). New public setting alongside
+    `STORE_LOGO_KEY` in `packages/api-client/src/settings-keys.ts`, a second
+    upload slot in `StoreBranding.tsx`, and a new `ui/` primitive rather than
+    markup inside `GamePicker` — it will want to appear on the result screen
+    too, which is the "only the landing screen knows the store's name" problem
+    above arriving for the third time.
+  - **Two constraints worth deciding before building.** The banner sits at the
+    very top, so it either replaces or sits above the `from-brand-4 to-brand-3`
+    gradient that every screen shares — decide which, because "both" is how a
+    header ends up with two backgrounds fighting. And an unset banner must
+    render as *nothing*, not as a grey placeholder box: an unconfigured
+    storefront should look clean, the same rule the missing logo already follows.
+- **Show durations in the unit an operator thinks in.** `claim_ttl_hours` is
+  seeded as `168` with the description "Hours a won prize stays claimable"
+  (`internal/app/seed.go`), and `SettingsPanel.tsx` renders it as a raw integer —
+  so an operator who wants "one week" has to know that is 168, and one who reads
+  `168` has to divide. Nobody thinks about prize expiry in hours; they think in
+  days.
+  - **Fix it in the admin, not the wire.** The setting stays `claim_ttl_hours`
+    and keeps storing hours: the backend divides it into `claim.TTL`, the
+    migration cost of renaming a key is real, and an operator who typed a value
+    in a previous version should not silently get a different policy. What
+    changes is the input — a days field beside the raw value, or a unit
+    dropdown — with the conversion as a pure function in `admin-core` so the
+    rounding rule is tested rather than inlined into a form.
+  - **Non-whole days are the case to decide first.** `0` means "never expires"
+    and must keep meaning that; a value like `36` is a day and a half and either
+    displays as `1.5` or refuses to be shown in days at all. Pick one before
+    writing the input, because the answer decides whether the field is a number
+    or a pair.
+  - It bites every time someone configures a store, which is the only time this
+    panel is used.
+- ~~**Thai + English, with the backend as the source of truth for the strings.**~~
+  — **built, and the split this entry proposed is exactly the one that shipped.**
+  The player app runs in Thai end to end: `backend/internal/i18n` owns the
+  server's half (game names, descriptions, score units in
+  `internal/game/i18n.go`, plus every error a player reads), and
+  `packages/player-core/src/i18n` owns the chrome. `?lang=th` is a route
+  parameter like every other piece of state, and a self-naming `EN / ไทย`
+  switcher sits above the landing hero.
+
+  Four things the build settled that the entry had not:
+  - **A pin is not a default.** `Location.lang` is `Locale | null`, where null
+    means "follow the device". That distinction is load-bearing and was not
+    obvious from "defaulting from `navigator.language`": an unpinned URL stays
+    bare and still adapts to a Thai phone, while an explicit choice — including
+    an explicit *English* one — is written and travels with the link. The
+    precedence rule (`?lang=` → device → English) exists twice, as
+    `pickLocale` in TypeScript and `i18n.Negotiate` in Go, and stays one rule
+    because the client sends the locale it already resolved.
+  - **Calculations return message KEYS, not prose.** `claimCopy`,
+    `precisionVerdict` and the reveal's tier ladder used to hold English
+    sentences inside `player-core`, which would have pinned the one package a
+    native client reuses verbatim to a single language. They now return keys and
+    the component looks them up — which also gave the tier ladder a stable
+    identity for its React key and its "puck is in this rung" comparison, both
+    of which had been comparing text that now changes with the language.
+  - **The dictionary's completeness is a type, not a test.** `Messages` is
+    `Record<MessageKey, string>`, so a key added to `en.ts` and forgotten in
+    `th.ts` fails `npm run typecheck`. What the *tests* add is the half types
+    cannot see: no Thai string is a copy of its English source, and both locales
+    carry the same `{placeholders}`.
+  - **Only the fallbacks follow the language.** A store name an operator typed
+    is served verbatim in both — `defaultIdentity(t)` is translated,
+    `storeIdentity` is not — and `"Guest"` is deliberately the same word in
+    every locale, because it is written to `scores` and then read by everyone
+    looking at that leaderboard.
+
+  What it did NOT cover, ordered by how soon each bites:
+  - **Award names and descriptions are still English-only** (or Thai-only —
+    whatever the operator typed). This was flagged in the original entry as a
+    schema change and it still is: `awards.name_th` / `description_th`, two more
+    fields on `AwardInput` and the admin form, and a locale-aware pick in
+    `reward.Showcase`. It bites the first time a Thai venue configures prizes,
+    which is the first time this feature is used for real — the chrome around
+    the prize list is Thai and the prize itself is not.
+  - **Score rejections keep an English diagnostic.** `writeAppError` in
+    `internal/httpapi/respond.go` serves `err.Error()` for `ErrScoreRejected` in
+    English and a plain sentence in Thai, because the validator messages in
+    `internal/game/catalog.go` are *composed* ("score 900 exceeds plausible
+    maximum 120 for 5000ms") rather than looked up. Translating them properly
+    means typed rejection reasons — a small enum plus formatting args — not a
+    bigger message table. Rare on a real device (it takes a fabricated score),
+    which is why it was filed rather than done.
+  - **The admin app is untranslated**, deliberately: it is operator-facing, and
+    one bilingual audience was the scope. `packages/admin-core` has no
+    dictionary, so this is the same job again against a smaller surface. It
+    bites when the venue's own staff, rather than its customers, are the Thai
+    speakers.
+  - **A store has one name, not one per language.** `store_name` and
+    `store_tagline` are single settings, so an operator who wants an English and
+    a Thai wordmark has nowhere to put the second. Same shape as the award
+    problem and worth solving once for both.
+  - **`index.html` still ships `lang="en"`.** `LocaleProvider` corrects
+    `document.documentElement.lang` on mount, so a Thai load is briefly declared
+    English — one frame of wrong line-breaking, invisible on a kiosk that never
+    reloads and worth fixing whenever the palette flash below is.
+  - **Nothing tests Thai at 320px.** Thai has no spaces between words, so
+    `truncate` cuts mid-word instead of shortening; the dictionary keeps every
+    string that lands in a fixed slot short *on purpose* (see the header comment
+    in `th.ts`), but that is a convention, not a check. A Playwright pass at
+    320px asserting no horizontal overflow would make it one.
 - **An admin panel for editing every string, filtered and searchable.**
-  Separate from the i18n work above and dependent on it: once strings are data
-  rather than literals, an operator wants to *edit* them — fix a typo, soften a
-  message, reword a prize — without a deploy. That is a CRUD panel over the
-  string catalogue, and this repo already has the grammar for one.
+  Separate from the i18n work above. That work moved the strings from literals
+  scattered through components into two dictionaries
+  (`packages/player-core/src/i18n/{en,th}.ts`) — which is most of the
+  organising this entry assumed, but they are still *compiled in*, so fixing a
+  typo is still a deploy. The remaining job is a migration from module to
+  database, and only then a panel over it.
   - **Model it on `AwardsPanel`, because the shape is already solved.** The
     awards panel has a filter (`?game=`, `?status=`), a search (`?q=`) and a
     sort (`?sort=`), all parsed by pure functions in
@@ -412,8 +500,10 @@ component each:
 - **Share score photo** — a "Share" button on the result screen that generates an
   image of the player's score, decorated with the store theme and name — which is
   now an admin setting, so read it from `storeIdentity`
-  (`packages/player-core/src/brand.ts`) rather than the `BRAND_NAME` fallback, or
-  every shared card will say "Fun Store" whatever the shop is called. Note the
+  (`packages/player-core/src/brand.ts`) rather than the fallback
+  `defaultIdentity(t)` returns, or every shared card will say "Fun Store"
+  whatever the shop is called — and, since that fallback is now translated,
+  will say something different depending on the language it was shared in. Note the
   result screen does not fetch settings today: only the landing screen does, so
   this needs the identity lifted or refetched there. Render the card to a `<canvas>` from
   the same palette tokens, then hand the blob to the Web Share API
@@ -427,9 +517,13 @@ component each:
   rotation) and the render as a pure `draw(state) → canvas` function, so the same
   description can be re-rendered at export resolution without a second code path.
   Worth scoping the sticker set to store branding to keep moderation trivial.
-- **Localization (i18n)** — e.g. Thai/English toggle for storefront use. Note the
-  reveal added a fair amount of new copy (tier ladder, "Game complete", empty and
-  error states) — worth extracting strings before it grows further.
+- ~~**Localization (i18n)**~~ — **built.** See the full entry under **Admin and
+  operations** above, which is where the design lived and where the remaining
+  gaps (award text, the admin app, a second store name) are recorded. The
+  warning here turned out to be the accurate part: the reveal's copy — tier
+  ladder, "Game complete", the empty and error states — was the largest single
+  block of strings to extract, and extracting it is what forced `player-core`
+  to stop returning English prose from its calculations.
 - **Sound and haptics** for the reveal — the animation beats are already there to
   hang them on (`navigator.vibrate` on the puck landing, a bell on a record).
 - **Accessibility** — larger tap targets, reduced-motion mode, screen-reader labels.

@@ -1,4 +1,5 @@
 import { COMPLETE_BEAT_MS, holdMs } from "@minigames/player-core";
+import { useT } from "../i18n";
 import { useHold, usePrefersReducedMotion } from "../reveal/useAnimationProgress";
 import { Confetti, Eyebrow, HaloBox } from "../ui";
 
@@ -24,12 +25,13 @@ import { Confetti, Eyebrow, HaloBox } from "../ui";
  * upload lengthens the wait rather than this stage having to know about it.
  */
 export function GameCompleteStage({ pending, onContinue }: { pending: boolean; onContinue: () => void }) {
+  const t = useT();
   const reducedMotion = usePrefersReducedMotion();
   useHold(holdMs(COMPLETE_BEAT_MS, reducedMotion), onContinue);
 
   return (
     <section
-      aria-label="Game complete. Your score is on its way."
+      aria-label={t("complete.aria")}
       // Still inside the tap-storm's blast radius, and not inside GameStage —
       // this renders in its place — so it carries `no-select` itself.
       className="no-select relative flex flex-1 flex-col items-center justify-center gap-6"
@@ -44,12 +46,12 @@ export function GameCompleteStage({ pending, onContinue }: { pending: boolean; o
       </div>
 
       <div className="animate-pop-in text-center">
-        <Eyebrow>Round over</Eyebrow>
-        <p className="mt-1 text-4xl font-black leading-tight text-ink">Game complete!</p>
+        <Eyebrow>{t("complete.eyebrow")}</Eyebrow>
+        <p className="mt-1 text-4xl font-black leading-tight text-ink">{t("complete.title")}</p>
       </div>
 
       <p className="animate-flash text-lg font-bold text-ink/70">
-        {pending ? "Scoring…" : "Revealing your score…"}
+        {pending ? t("complete.scoring") : t("complete.revealing")}
       </p>
     </section>
   );

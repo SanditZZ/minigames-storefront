@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LOCALES, translator } from "../i18n";
 import { claimCopy, groupClaimCode } from "./present";
 
 describe("groupClaimCode", () => {
@@ -25,7 +26,10 @@ describe("claimCopy", () => {
   it("presents an issued claim as collectable", () => {
     const copy = claimCopy("issued");
     expect(copy.redeemable).toBe(true);
-    expect(copy.note).toMatch(/counter/i);
+    // The wording is the dictionary's business; what this function decides is
+    // WHICH sentence the state earns. Asserting through the translator keeps
+    // the test honest about both without duplicating the copy here.
+    expect(translator("en")(copy.noteKey)).toMatch(/counter/i);
   });
 
   it("stands the code down once it is redeemed or expired", () => {
@@ -35,11 +39,23 @@ describe("claimCopy", () => {
 
   it("gives each state a distinct label and note", () => {
     const states = (["issued", "redeemed", "expired"] as const).map(claimCopy);
-    expect(new Set(states.map((s) => s.label)).size).toBe(3);
-    expect(new Set(states.map((s) => s.note)).size).toBe(3);
-    for (const s of states) {
-      expect(s.label).not.toBe("");
-      expect(s.note).not.toBe("");
+    expect(new Set(states.map((s) => s.labelKey)).size).toBe(3);
+    expect(new Set(states.map((s) => s.noteKey)).size).toBe(3);
+  });
+
+  // The keys have to resolve to real strings in EVERY language, or a state
+  // nobody tested by hand shows a raw key like "claim.note.expired" at the
+  // counter. The dictionary types make this unreachable at compile time; this
+  // asserts it at runtime, which is what a future loaded-not-compiled
+  // dictionary would need.
+  it("names strings that exist in every locale", () => {
+    for (const locale of LOCALES) {
+      const t = translator(locale);
+      for (const status of ["issued", "redeemed", "expired"] as const) {
+        const copy = claimCopy(status);
+        expect(t(copy.labelKey)).not.toBe(copy.labelKey);
+        expect(t(copy.noteKey)).not.toBe(copy.noteKey);
+      }
     }
   });
 

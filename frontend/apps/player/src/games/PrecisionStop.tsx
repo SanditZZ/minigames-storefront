@@ -11,6 +11,7 @@ import {
   zoneWidthPercent,
 } from "@minigames/player-core";
 import { finishPulse } from "../effects/haptics";
+import { useT } from "../i18n";
 import { CenterStack, Eyebrow, ProgressBar } from "../ui";
 import type { MiniGame, PlayProps } from "./types";
 
@@ -48,6 +49,7 @@ interface Landing {
  * as pure functions; this component only runs the clock and paints.
  */
 function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
+  const t = useT();
   const [position, setPosition] = useState(0);
   const [remaining, setRemaining] = useState(durationMs);
   const [landing, setLanding] = useState<Landing | null>(null);
@@ -126,11 +128,18 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
           marker lands, and a taller or shorter line would jolt the track
           underneath at exactly the moment the player is reading it. */}
       <div className="text-center">
+        {/* precisionVerdict returns a message key, not a word: which band a
+            stop falls into is this game's rule, what the band is called is the
+            dictionary's. See precision.ts. */}
         <Eyebrow>
-          {landing ? (landing.timedOut ? "Out of time" : precisionVerdict(landing.off)) : "Stop it dead centre"}
+          {landing
+            ? landing.timedOut
+              ? t("precision.outOfTime")
+              : t(precisionVerdict(landing.off))
+            : t("precision.aim")}
         </Eyebrow>
         <p className="mt-1 flex h-6 items-center justify-center text-sm text-ink/60">
-          {stopped ? `${landing.off} off centre` : "The closer you land, the lower your score"}
+          {stopped ? t("precision.offCentre", { off: landing.off }) : t("precision.hint")}
         </p>
       </div>
 
@@ -178,16 +187,16 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
         type="button"
         onPointerDown={handleStop}
         disabled={landing !== null}
-        aria-label="Stop the marker as close to the centre of the track as you can"
+        aria-label={t("precision.aria")}
         className="aspect-square w-44 max-w-[58vw] select-none rounded-full bg-brand text-3xl font-black text-ink shadow-2xl outline-none ring-4 ring-white/50 transition-transform duration-75 focus-visible:ring-brand/50 active:scale-90 disabled:bg-brand-3 disabled:text-ink/50 disabled:shadow-none disabled:active:scale-100"
       >
-        STOP!
+        {t("precision.stop")}
       </button>
 
       <ProgressBar
         pct={(remaining / durationMs) * 100}
-        caption={`${seconds}s left`}
-        label="Time left to stop the marker"
+        caption={t("play.secondsLeft", { seconds })}
+        label={t("precision.timeLeft")}
       />
     </CenterStack>
   );

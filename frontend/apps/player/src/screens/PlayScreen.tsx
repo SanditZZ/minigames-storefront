@@ -1,5 +1,6 @@
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { RoundRunner } from "../components/RoundRunner";
+import { useT } from "../i18n";
 import { Spinner, StatusMessage } from "../ui";
 
 interface Props {
@@ -18,15 +19,17 @@ interface Props {
  * single-use and lives on the server, so there is nothing to restore.
  */
 export function PlayScreen({ game, loading, playerName, onComplete, onCancel }: Props) {
-  if (loading) return <Spinner label="Getting ready…" />;
+  const t = useT();
+
+  if (loading) return <Spinner label={t("play.loading")} />;
 
   if (!game) {
     return (
       <StatusMessage
         icon="🔍"
-        title="Game not found"
-        detail="That game isn’t available right now."
-        action={{ label: "See all games", onClick: onCancel }}
+        title={t("play.notFound.title")}
+        detail={t("play.notFound.detail")}
+        action={{ label: t("play.notFound.action"), onClick: onCancel }}
       />
     );
   }
@@ -34,7 +37,12 @@ export function PlayScreen({ game, loading, playerName, onComplete, onCancel }: 
   return (
     <RoundRunner
       game={game}
-      playerName={playerName.trim() || "Guest"}
+      // The fallback name reads the same in every language on purpose. It is
+      // written to the scores table and then read by everyone looking at that
+      // leaderboard, so a round played in Thai must not appear under a name the
+      // next player cannot read — see the note on "player.guest" in the
+      // dictionary.
+      playerName={playerName.trim() || t("player.guest")}
       onComplete={onComplete}
       onCancel={onCancel}
     />

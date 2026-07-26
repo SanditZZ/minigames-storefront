@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Game, ScoreEntry, SubmitResult } from "@minigames/api-client";
-import { api } from "../api";
 import { Leaderboard } from "../components/Leaderboard";
 import { ResultSummary } from "../components/ResultSummary";
 import { ScoreReveal } from "../components/ScoreReveal";
+import { useApi, useT } from "../i18n";
 import { benchmarkFor, bestScore, isNewRecord } from "@minigames/player-core";
 import { takeResult } from "../state/resultCache";
 import { Spinner, Stack, StatusMessage } from "../ui";
@@ -36,6 +36,10 @@ export function ResultScreen({
   onPlayAgain,
   onPickAnother,
 }: Props) {
+  const t = useT();
+  // Language-aware, like every other fetch in this app: the score unit printed
+  // beside each leaderboard row arrives with the board.
+  const api = useApi();
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [scores, setScores] = useState<ScoreEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -65,7 +69,7 @@ export function ResultScreen({
     return () => {
       alive = false;
     };
-  }, [slug, scoreId]);
+  }, [api, slug, scoreId]);
 
   // The leaderboard. It is also the meter's FALLBACK scale, for a game whose
   // catalog entry declares no targetScore — see benchmarkFor.
@@ -79,22 +83,22 @@ export function ResultScreen({
     return () => {
       alive = false;
     };
-  }, [slug]);
+  }, [api, slug]);
 
   const finishReveal = useCallback(() => {
     setRevealed(true);
     onRevealed();
   }, [onRevealed]);
 
-  if (loading) return <Spinner label="Loading…" />;
+  if (loading) return <Spinner label={t("result.loading")} />;
 
   if (!game || failed) {
     return (
       <StatusMessage
         icon="🔍"
-        title="Result not found"
-        detail="This score link may have expired or been mistyped."
-        action={{ label: "Play a game", onClick: onPickAnother }}
+        title={t("result.notFound.title")}
+        detail={t("result.notFound.detail")}
+        action={{ label: t("result.notFound.action"), onClick: onPickAnother }}
       />
     );
   }
@@ -103,7 +107,7 @@ export function ResultScreen({
   // own targetScore and would not need it — but the board is still the fallback
   // for a game without one, and revealing before it lands would draw the tower
   // against the wrong scale in exactly the case that has no other scale.
-  if (!result || scores === null) return <Spinner label="Loading your score…" />;
+  if (!result || scores === null) return <Spinner label={t("result.loadingScore")} />;
 
   if (!revealed) {
     return (

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { useT } from "../i18n";
 import { Button } from "./Button";
 import { HeaderRow } from "./Layout";
 
@@ -29,6 +30,7 @@ export function GameStage({
   confirmQuit?: boolean;
   children: ReactNode;
 }) {
+  const t = useT();
   const [armed, setArmed] = useState(false);
 
   // The confirmation disarms itself, so a player who tapped Quit by accident
@@ -67,9 +69,9 @@ export function GameStage({
             variant={armed ? "primary" : "ghost"}
             size="sm"
             onClick={handleQuit}
-            aria-label={armed ? "Confirm quitting this round" : "Quit"}
+            aria-label={armed ? t("play.quitConfirmAria") : t("play.quit")}
           >
-            {armed ? "Sure?" : "Quit"}
+            {armed ? t("play.quitConfirm") : t("play.quit")}
           </Button>
         }
       />
