@@ -176,6 +176,11 @@ const (
 	// accidentally publish it.
 	SettingStoreName    = "store_name"
 	SettingStoreTagline = "store_tagline"
+	// SettingStoreLogoURL is an absolute URL to the store's logo, shown in
+	// place of the brand wordmark. It holds a URL rather than an object name
+	// because an admin may equally paste one from their own CDN — the upload
+	// endpoint is a convenience that produces such a URL, not the only source.
+	SettingStoreLogoURL = "store_logo_url"
 
 	// The five brand colours, overriding the compiled-in design tokens. They
 	// are public for the same reason the name is: the player's app renders

@@ -18,6 +18,7 @@ func TestOnlyIdentityKeysArePublic(t *testing.T) {
 	want := []string{
 		domain.SettingStoreName,
 		domain.SettingStoreTagline,
+		domain.SettingStoreLogoURL,
 		domain.SettingColorBrand,
 		domain.SettingColorBrand2,
 		domain.SettingColorBrand3,

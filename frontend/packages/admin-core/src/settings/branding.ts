@@ -15,7 +15,7 @@
 // the kind of bug that is only discovered by an operator.
 
 import type { Setting } from "@minigames/api-client";
-import { STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
 import { COLOR_SETTING_KEYS, isHexColor, type ColorName } from "@minigames/tokens";
 import { settingValue } from "./map";
 
@@ -23,7 +23,10 @@ import { settingValue } from "./map";
 export const BRANDING_COLOR_NAMES = Object.keys(COLOR_SETTING_KEYS) as ColorName[];
 
 /** The branding form's fields. "" means unset for every one of them. */
-export type BrandingDraft = { name: string; tagline: string } & Record<ColorName, string>;
+export type BrandingDraft = { name: string; tagline: string; logoUrl: string } & Record<
+  ColorName,
+  string
+>;
 
 /** One write a save must perform. `value` of "" with kind "color" is a delete. */
 export interface BrandingChange {
@@ -39,6 +42,7 @@ export function readBranding(settings: Setting[] | null | undefined): BrandingDr
   return {
     name: settingValue(settings, STORE_NAME_KEY),
     tagline: settingValue(settings, STORE_TAGLINE_KEY),
+    logoUrl: settingValue(settings, STORE_LOGO_KEY),
     ...(Object.fromEntries(
       BRANDING_COLOR_NAMES.map((n) => [n, settingValue(settings, COLOR_SETTING_KEYS[n])]),
     ) as Record<ColorName, string>),
@@ -64,6 +68,17 @@ export function brandingChanges(draft: BrandingDraft, saved: BrandingDraft): Bra
       key: STORE_TAGLINE_KEY,
       value: draft.tagline.trim(),
       previous: saved.tagline,
+      kind: "string",
+    });
+  }
+  if (draft.logoUrl !== saved.logoUrl) {
+    // A cleared logo stores "" rather than deleting the row: unlike a colour,
+    // this setting IS seeded-shaped — the client reads "" as "no logo, use the
+    // wordmark", so there is no default to fall back to and nothing to restore.
+    out.push({
+      key: STORE_LOGO_KEY,
+      value: draft.logoUrl.trim(),
+      previous: saved.logoUrl,
       kind: "string",
     });
   }

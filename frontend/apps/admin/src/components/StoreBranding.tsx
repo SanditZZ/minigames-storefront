@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ApiClient, Setting } from "@minigames/api-client";
-import { STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
 import {
   BRANDING_COLOR_NAMES,
   brandingChanges,
@@ -10,6 +10,7 @@ import {
   type BrandingDraft,
 } from "@minigames/admin-core";
 import { COLOR_SETTING_KEYS, PALETTE } from "@minigames/tokens";
+import { ImageField } from "./ImageField";
 import { Alert, Button, Card, ColorInput, Field, Input, PanelHeader, Stack } from "../ui";
 
 /**
@@ -103,6 +104,14 @@ export function StoreBranding({
           </Field>
         </div>
 
+        <ImageField
+          api={api}
+          label="Logo"
+          value={draft.logoUrl}
+          onChange={set("logoUrl")}
+          hint="Replaces the store name above the headline. Wide marks work best; leave empty to show the name as text."
+        />
+
         <div className="grid gap-4 sm:grid-cols-2">
           {BRANDING_COLOR_NAMES.map((name) => (
             <Field key={name} label={`${PALETTE[name].name} — ${name}`}>
@@ -150,6 +159,7 @@ const BLANK_COLORS = Object.fromEntries(BRANDING_COLOR_NAMES.map((n) => [n, ""])
 const DESCRIPTIONS: Record<string, string> = {
   [STORE_NAME_KEY]: "Store name shown to players above the headline. Public.",
   [STORE_TAGLINE_KEY]: "Short line under the headline on the landing screen. Public.",
+  [STORE_LOGO_KEY]: "Absolute URL of the store logo, shown instead of the name. Public.",
   ...Object.fromEntries(
     BRANDING_COLOR_NAMES.map((n) => [
       COLOR_SETTING_KEYS[n],

@@ -16,6 +16,14 @@ type Config struct {
 	DBPath      string // sqlite file path
 	CORSOrigins string // comma-separated allowed origins for the browser apps
 	AdminToken  string // shared secret guarding /api/v1/admin/* ("" = open, dev only)
+	UploadDir   string // directory uploaded images are stored in
+	// PublicURL is the absolute base this API is reached at, used to build
+	// object URLs. It must be the address the BROWSER uses, not a loopback
+	// one: the frontends are built with an absolute API URL baked in and run
+	// on their own origin, so an object URL pointing at localhost resolves to
+	// the player's own device. See scripts/serve-prod.sh, which passes the
+	// same value it bakes into the bundles.
+	PublicURL string
 }
 
 // Load reads config from env with sensible local-dev defaults.
@@ -25,6 +33,8 @@ func Load() Config {
 		DBPath:      env("APP_DB_PATH", "minigames.db"),
 		CORSOrigins: env("APP_CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
 		AdminToken:  env("APP_ADMIN_TOKEN", "admin"),
+		UploadDir:   env("APP_UPLOAD_DIR", "uploads"),
+		PublicURL:   env("APP_PUBLIC_URL", "http://localhost:8080"),
 	}
 }
 

@@ -1,9 +1,11 @@
 import { useState } from "react";
-import type { Award, AwardInput, Game } from "@minigames/api-client";
+import type { ApiClient, Award, AwardInput, Game } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
+import { ImageField } from "./ImageField";
 import { Button, Checkbox, Field, Input, Select, Textarea } from "../ui";
 
 interface Props {
+  api: ApiClient;
   initial?: Award;
   games: Game[];
   busy: boolean;
@@ -16,7 +18,7 @@ interface Props {
  * matches every other panel. Light client-side guards only — the backend
  * re-validates. "Unlimited stock" toggles the sentinel value the API expects.
  */
-export function AwardForm({ initial, games, busy, onSubmit, onCancel }: Props) {
+export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
@@ -51,9 +53,15 @@ export function AwardForm({ initial, games, busy, onSubmit, onCancel }: Props) {
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
       </Field>
 
-      <Field label="Image URL" className="sm:col-span-2">
-        <Input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://…" />
-      </Field>
+      <div className="sm:col-span-2">
+        <ImageField
+          api={api}
+          label="Image"
+          value={imageUrl}
+          onChange={setImageUrl}
+          hint="Shown in the prize showcase before a round and on the winner's result screen."
+        />
+      </div>
 
       <Field label="Game">
         <Select value={gameSlug} onChange={(e) => setGameSlug(e.target.value)}>

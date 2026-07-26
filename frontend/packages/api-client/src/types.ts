@@ -85,6 +85,18 @@ export type SettingInput = Pick<Setting, "value" | "type" | "description">;
  */
 export type PublicSettings = Record<string, string>;
 
+/**
+ * A stored image, as returned by the upload endpoint.
+ *
+ * `url` is absolute and is what gets saved onto an award or the logo setting.
+ * `name` is the server-minted object name — the client's filename is discarded
+ * on upload — and is only needed to delete the object later.
+ */
+export interface UploadedImage {
+  url: string;
+  name: string;
+}
+
 export interface StartSessionResponse {
   token: string;
   gameSlug: string;

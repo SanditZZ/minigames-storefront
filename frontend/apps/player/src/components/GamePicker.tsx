@@ -37,6 +37,7 @@ export function GamePicker({
     <Stack gap="lg" className="flex-1">
       <PageHeader
         brand={identity.name}
+        logoUrl={identity.logoUrl}
         title="Play & Win 🎁"
         subtitle={identity.tagline}
         // The store's identity, prizes and games are all admin-editable while

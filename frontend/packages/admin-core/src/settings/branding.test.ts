@@ -20,6 +20,7 @@ const row = (key: string, value: string): Setting => ({
 const blank: BrandingDraft = {
   name: "",
   tagline: "",
+  logoUrl: "",
   brand: "",
   "brand-2": "",
   "brand-3": "",
@@ -75,6 +76,15 @@ describe("brandingChanges", () => {
       previous: "Old",
       kind: "string",
     });
+  });
+
+  // Unlike a colour, a cleared logo is a WRITE of "": there is no built-in
+  // logo to fall back to, so "" is the real value meaning "use the wordmark".
+  it("stores a cleared logo rather than deleting the row", () => {
+    const saved = { ...blank, logoUrl: "http://api/uploads/abc.png" };
+    expect(brandingChanges({ ...saved, logoUrl: "" }, saved)).toEqual([
+      { key: "store_logo_url", value: "", previous: "http://api/uploads/abc.png", kind: "string" },
+    ]);
   });
 
   it("is empty when nothing changed", () => {

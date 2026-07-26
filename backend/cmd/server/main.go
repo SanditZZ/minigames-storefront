@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/app"
+	"github.com/sanditzz/minigames-storefront/backend/internal/blob"
+	"github.com/sanditzz/minigames-storefront/backend/internal/blob/localfs"
 	"github.com/sanditzz/minigames-storefront/backend/internal/config"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
 	"github.com/sanditzz/minigames-storefront/backend/internal/httpapi"
@@ -47,7 +49,24 @@ func run() error {
 		return err
 	}
 
-	server := httpapi.NewServer(svc, strings.Split(cfg.CORSOrigins, ","), cfg.AdminToken)
+	// Object storage. Swapping to S3 is this one line, for the same reason
+	// swapping the database is: everything downstream depends on the interface.
+	// A failure here is not fatal — the API still runs with image URLs typed by
+	// hand, which is what it did before uploads existed.
+	//
+	// Declared as the INTERFACE, not as *localfs.Store. Assigning a nil
+	// *localfs.Store to a blob.Store variable would produce a non-nil interface
+	// holding a nil pointer, and every `if s.blobs == nil` guard downstream
+	// would quietly stop working.
+	var blobs blob.Store
+	if fs, err := localfs.Open(cfg.UploadDir, cfg.PublicURL); err != nil {
+		log.Printf("WARNING: uploads disabled (%v)", err)
+	} else {
+		blobs = fs
+		log.Printf("uploads: %s served at %s%s", cfg.UploadDir, cfg.PublicURL, blob.URLPrefix)
+	}
+
+	server := httpapi.NewServer(svc, strings.Split(cfg.CORSOrigins, ","), cfg.AdminToken, blobs)
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           server.Handler(),

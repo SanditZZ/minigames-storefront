@@ -14,19 +14,37 @@ import type { ReactNode } from "react";
  */
 export function PageHeader({
   brand,
+  logoUrl,
   title,
   subtitle,
   action,
 }: {
   brand?: string;
+  /**
+   * The store's logo, shown INSTEAD of the wordmark. `brand` is still required
+   * alongside it — it becomes the image's alt text, so the store is named for a
+   * screen reader and for anyone whose logo fails to load.
+   */
+  logoUrl?: string;
   title: ReactNode;
   subtitle?: ReactNode;
   action?: ReactNode;
 }) {
   const hero = (
     <div className="min-w-0 flex-1 text-center">
-      {brand && (
-        <p className="truncate text-xs font-black uppercase tracking-[0.3em] text-ink/50">{brand}</p>
+      {logoUrl ? (
+        // Height-capped, width-free: a logo is any aspect ratio, and bounding
+        // the height is what keeps a wide wordmark and a square badge from
+        // pushing the headline down the screen by different amounts.
+        <img
+          src={logoUrl}
+          alt={brand ?? ""}
+          className="mx-auto max-h-12 w-auto max-w-full object-contain"
+        />
+      ) : (
+        brand && (
+          <p className="truncate text-xs font-black uppercase tracking-[0.3em] text-ink/50">{brand}</p>
+        )
       )}
       <h1 className="mt-1 text-3xl font-black leading-tight text-ink">{title}</h1>
       {subtitle != null && <p className="mt-1 text-ink/70">{subtitle}</p>}

@@ -11,12 +11,17 @@ const WEB_PORT = 5299;
 const API_URL = `http://127.0.0.1:${API_PORT}`;
 const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
 const DB_PATH = join(tmpdir(), "minigames-e2e.db");
+// Uploads land in a throwaway directory for the same reason the database does —
+// and pointedly NOT in the default `uploads/`, which is relative to the API's
+// working directory and would leave a stray folder inside backend/ on every run.
+const UPLOAD_DIR = join(tmpdir(), "minigames-e2e-uploads");
 
 // Start from an empty database every run: leftover scores would change ranks and
 // silently invalidate assertions about being top of the board.
 for (const suffix of ["", "-wal", "-shm"]) {
   rmSync(`${DB_PATH}${suffix}`, { force: true });
 }
+rmSync(UPLOAD_DIR, { recursive: true, force: true });
 
 export default defineConfig({
   testDir: "./tests",
@@ -66,6 +71,8 @@ export default defineConfig({
         APP_DB_PATH: DB_PATH,
         APP_CORS_ORIGINS: WEB_URL,
         APP_ADMIN_TOKEN: "admin",
+        APP_UPLOAD_DIR: UPLOAD_DIR,
+        APP_PUBLIC_URL: API_URL,
       },
     },
     {

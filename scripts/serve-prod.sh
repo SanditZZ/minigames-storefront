@@ -119,6 +119,8 @@ APP_ADDR=":${API_PORT}" \
 APP_DB_PATH="$STATE_DIR/minigames.db" \
 APP_CORS_ORIGINS="${PLAYER_URL},${ADMIN_URL},${PLAYER_LOCAL},${ADMIN_LOCAL}" \
 APP_ADMIN_TOKEN="$ADMIN_TOKEN" \
+APP_UPLOAD_DIR="$STATE_DIR/uploads" \
+APP_PUBLIC_URL="$API_URL" \
   "$ROOT/backend/bin/server" >"$LOG_DIR/api.log" 2>&1 &
 echo $! >>"$PID_FILE"
 

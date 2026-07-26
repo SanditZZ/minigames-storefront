@@ -24,3 +24,7 @@ dist/
 .vscode/
 *.log
 .prod/
+
+# Default APP_UPLOAD_DIR when the API is run without serve-prod.sh, which
+# points it at .prod/uploads instead.
+backend/uploads/

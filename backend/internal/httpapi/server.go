@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/app"
+	"github.com/sanditzz/minigames-storefront/backend/internal/blob"
 )
 
 // Server binds the app service to an HTTP router.
@@ -17,16 +18,21 @@ type Server struct {
 	svc        *app.Service
 	cors       []string
 	adminToken string
+	blobs      blob.Store // nil disables the upload routes
 	handler    http.Handler
 }
 
 // NewServer builds the router with all routes and middleware wired. adminToken
 // guards the /api/v1/admin/* routes; an empty token leaves them open (dev only).
-func NewServer(svc *app.Service, corsOrigins []string, adminToken string) *Server {
+//
+// blobs may be nil, which disables uploads rather than crashing — the API is
+// still fully usable with image URLs typed by hand, which is what it did before
+// object storage existed.
+func NewServer(svc *app.Service, corsOrigins []string, adminToken string, blobs blob.Store) *Server {
 	if adminToken == "" {
 		log.Print("WARNING: admin API is unauthenticated (APP_ADMIN_TOKEN is empty)")
 	}
-	s := &Server{svc: svc, cors: corsOrigins, adminToken: adminToken}
+	s := &Server{svc: svc, cors: corsOrigins, adminToken: adminToken, blobs: blobs}
 	s.handler = chain(s.routes(),
 		recoverMiddleware,
 		logMiddleware,
@@ -91,6 +97,16 @@ func (s *Server) routes() http.Handler {
 	// and redeeming is the act of giving one away.
 	mux.HandleFunc("GET /api/v1/admin/claims", s.requireAdmin(s.handleListClaims))
 	mux.HandleFunc("POST /api/v1/admin/claims/{code}/redeem", s.requireAdmin(s.handleRedeemClaim))
+
+	// Uploads are admin-only to WRITE and public to READ — an image nobody can
+	// fetch is not an image. Serving is mounted only when the configured store
+	// serves its own bytes; an S3-backed one would hand out its own URLs and
+	// this route would not exist.
+	mux.HandleFunc("POST /api/v1/admin/uploads", s.requireAdmin(s.handleUpload))
+	mux.HandleFunc("DELETE /api/v1/admin/uploads/{name}", s.requireAdmin(s.handleDeleteUpload))
+	if served, ok := s.blobs.(blob.HTTPServed); ok {
+		mux.Handle("GET "+blob.URLPrefix, served.Handler())
+	}
 
 	mux.HandleFunc("GET /api/v1/admin/settings", s.requireAdmin(s.handleListSettings))
 	mux.HandleFunc("PUT /api/v1/admin/settings/{key}", s.requireAdmin(s.handleUpsertSetting))

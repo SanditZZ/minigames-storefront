@@ -177,32 +177,54 @@ component each:
   so "how many prizes did we actually hand over?" is a query rather than a
   guess. It was the missing piece when this entry was written; the rest of the
   funnel still is not instrumented.
-- **Award image uploads** (currently a URL field) with storage + CDN.
-- **Store logo upload.** An admin picks an image; the player app shows it where
-  `PageHeader` currently renders the brand wordmark (`PageHeader.tsx` already
-  says in its own comment that a logo should be able to replace the text "in one
-  edit", so the seam exists). Three things this repo does not have yet, worth
-  knowing before it is scoped as small:
-  - **There is no file handling anywhere in the backend.** No `multipart` parse,
-    no `http.FileServer`, no `ServeFile` — grep confirms it. This is a new
-    capability with its own size limits, content-type allowlist and filename
-    sanitising, not a new field on an existing handler.
-  - **Storage should be an interface from the first commit, and the repo already
-    has the pattern to copy.** `storage.Store` is an interface whose only
-    implementation is SQLite, which is exactly what makes "DynamoDB adapter"
-    above a drop-in. A `BlobStore` with `Put`/`URL`/`Delete` and a `localfs`
-    implementation gives S3 the same treatment: a sibling package, no caller
-    changes. Local files go under `.prod/uploads/` — **already gitignored**,
-    since `.gitignore` ends with `.prod/`; anywhere else needs a new rule and
-    will eventually be committed by accident.
-  - **The served URL is the trap.** `serve-prod.sh` bakes an absolute API base
-    into the frontend bundles, so a stored `/uploads/logo.png` resolves against
-    the *player* origin (port 3000), not the API (8081), and silently 404s
-    across the tailnet. Whatever `BlobStore.URL` returns has to be absolute for
-    the same reason the API URL is.
+- ~~**Award image uploads** (currently a URL field) with storage + CDN.~~ —
+  **built** (the storage half; there is no CDN, see below).
+- ~~**Store logo upload.**~~ — **built**, and done once for both this and the
+  award images as the entry demanded: `ImageField.tsx` is the single admin
+  control, used by `StoreBranding` and `AwardForm` alike. The three warnings
+  were all real:
+  - **File handling is a new capability, and it landed as one.** `internal/blob`
+    holds the interface plus the pure rules (`DetectImageType`,
+    `NewObjectName`, `IsSafeObjectName`, `MaxUploadBytes`); `internal/blob/localfs`
+    is the only implementation. **The entry said "filename sanitising" and that
+    turned out to be the wrong goal**: the client's filename is *discarded*, not
+    sanitised, and the object name is a fresh nanoid plus an extension derived
+    from the sniffed bytes. Every traversal, NUL-byte and Unicode-lookalike bug
+    is then unreachable rather than defended against. The type is sniffed too —
+    the multipart `Content-Type` is a claim by the client, not a fact — and SVG
+    is refused outright: it is the one image format that is also a document, and
+    these bytes are served from the API's own origin, so accepting one would be
+    stored XSS against every admin session.
+  - **`BlobStore` is an interface from the first commit**, exactly as the entry
+    asked, with `Put`/`URL`/`Delete`. Serving is a *second*, optional interface
+    (`blob.HTTPServed`) because an S3 store would hand out its own URLs and
+    should not be forced to proxy bytes; the route only exists when something
+    implements it. Files go under `.prod/uploads/` via `serve-prod.sh`, and
+    `backend/uploads/` (the default when the API is run directly) was added to
+    `.gitignore` for the reason the entry gives.
+  - **The absolute-URL trap was real and is now covered by a test.**
+    `localfs.Open` takes the public base URL — `serve-prod.sh` passes the same
+    `API_URL` it bakes into the bundles — and `TestURLIsAbsolute` names the
+    failure so nobody "tidies" it into a relative path later.
 
-  Do this once for both this and the award images above — they are the same
-  problem, and `PrizeImage.tsx` is already the shared render primitive.
+  Two follow-ups this work surfaced:
+  - **Nothing ever reclaims an orphaned object.** Replacing an award's image or
+    the store logo overwrites the URL and leaves the previous file on disk
+    forever; `DELETE /api/v1/admin/uploads/{name}` exists and no UI calls it.
+    Deleting on replace would need to know the old URL was ours *and* that
+    nothing else references it, which is reference counting — the honest fix is
+    a sweep that lists objects, subtracts every URL mentioned by an award or a
+    setting, and deletes the rest, run from `cmd/` under the repo's script rules
+    (dry run by default, timestamped backup, `-apply`). Each orphan is bounded
+    by `MaxUploadBytes` (2 MiB), so this is disk creep rather than a leak: it
+    bites a store that re-photographs its prize list a few hundred times, not
+    one that sets a logo once.
+  - **There is still no CDN, and the API is now serving image bytes.** Objects
+    go out with `Cache-Control: immutable` — safe, because a replacement mints a
+    new name — so a browser fetches each one once, but every cold visit hits the
+    Go process, which had served nothing but JSON until now. Fine for one venue;
+    the fix when it stops being fine is the S3 implementation the interface was
+    shaped for, not a cache bolted in front of `localfs`.
 - ~~**Store identity editable from the admin: name, tagline, colours.**~~ —
   **built, all three.** Renaming or recolouring the shop used to be a code edit
   and a `ship.sh` run, which is fine for one store and absurd for two; it is now

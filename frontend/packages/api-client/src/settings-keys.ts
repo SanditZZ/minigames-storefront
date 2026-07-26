@@ -13,3 +13,6 @@ export const STORE_NAME_KEY = "store_name";
 
 /** Short line under the headline on the landing screen. Public. */
 export const STORE_TAGLINE_KEY = "store_tagline";
+
+/** Absolute URL of the store's logo, shown instead of the wordmark. Public. */
+export const STORE_LOGO_KEY = "store_logo_url";

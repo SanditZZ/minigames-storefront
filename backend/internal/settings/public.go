@@ -26,6 +26,7 @@ import "github.com/sanditzz/minigames-storefront/backend/internal/domain"
 var publicKeys = map[string]bool{
 	domain.SettingStoreName:    true,
 	domain.SettingStoreTagline: true,
+	domain.SettingStoreLogoURL: true,
 	// The palette. Public because the player's browser is what applies it —
 	// there is no version of "the store picks its colours" that keeps them
 	// secret, and a hex triple is not information about the store's defences.

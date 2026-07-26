@@ -12,6 +12,7 @@ import type {
   StartSessionResponse,
   SubmitResult,
   SubmitScoreInput,
+  UploadedImage,
 } from "./types";
 
 /** Error thrown for any non-2xx API response, carrying the HTTP status so
@@ -42,7 +43,11 @@ export function createClient(opts: ClientOptions) {
 
   async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
-    if (init?.body) headers.set("Content-Type", "application/json");
+    // FormData must set its own Content-Type: the browser appends the multipart
+    // boundary, and overriding it here produces a body the server cannot parse.
+    if (init?.body && !(init.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
     if (opts.adminToken) headers.set("X-Admin-Token", opts.adminToken);
 
     const res = await fetch(`${base}${path}`, { ...init, headers });
@@ -117,6 +122,27 @@ export function createClient(opts: ClientOptions) {
       request<ClaimView>(`/api/v1/admin/claims/${encodeURIComponent(code)}/redeem`, {
         method: "POST",
       }),
+
+    /**
+     * Uploads one image and returns where it can be fetched.
+     *
+     * The returned URL is ABSOLUTE — it has to be, because the apps are built
+     * with an absolute API base baked in and therefore run on a different
+     * origin than the API. Store it verbatim in `Award.imageUrl` or the store
+     * logo setting; do not try to make it relative.
+     *
+     * Throws ApiError(415) for a file that is not an accepted image and
+     * ApiError(413) for one over the size cap — both carry a message worth
+     * showing the operator as-is.
+     */
+    uploadImage: (file: File) => {
+      const body = new FormData();
+      body.append("file", file);
+      return request<UploadedImage>("/api/v1/admin/uploads", { method: "POST", body });
+    },
+    /** Removes an uploaded object. Idempotent — an already-deleted name is fine. */
+    deleteUpload: (name: string) =>
+      request<void>(`/api/v1/admin/uploads/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
     listSettings: () => request<Setting[]>("/api/v1/admin/settings"),
     upsertSetting: (key: string, body: SettingInput) =>

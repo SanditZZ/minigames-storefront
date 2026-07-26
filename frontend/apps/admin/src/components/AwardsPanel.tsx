@@ -113,6 +113,7 @@ export function AwardsPanel({ api, games, router }: Props) {
         </h2>
         <Alert message={error} />
         <AwardForm
+          api={api}
           initial={editing}
           games={games}
           busy={busy}

@@ -12,9 +12,9 @@
 // spelled two ways is a bug that typechecks. `settings.IsPublic` on the Go side
 // is what decides they may be read without a token.
 
-import { STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
 
-export { STORE_NAME_KEY, STORE_TAGLINE_KEY };
+export { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY };
 
 /** Store name shown to players when the backend has not been asked yet. */
 export const BRAND_NAME = "Fun Store";
@@ -26,12 +26,17 @@ export const BRAND_TAGLINE = "Thanks for shopping with us — try your luck!";
 export interface StoreIdentity {
   name: string;
   tagline: string;
+  /** Absolute URL of the store's logo, or "" when there is none. */
+  logoUrl: string;
 }
 
 /** What the app shows before the first fetch resolves, and if it never does. */
 export const DEFAULT_IDENTITY: StoreIdentity = {
   name: BRAND_NAME,
   tagline: BRAND_TAGLINE,
+  // No default logo, deliberately: the wordmark IS the fallback, and shipping a
+  // stock logo would put someone else's mark on an unconfigured storefront.
+  logoUrl: "",
 };
 
 /**
@@ -50,6 +55,7 @@ export function storeIdentity(
   return {
     name: pick(settings?.[STORE_NAME_KEY], DEFAULT_IDENTITY.name),
     tagline: pick(settings?.[STORE_TAGLINE_KEY], DEFAULT_IDENTITY.tagline),
+    logoUrl: pick(settings?.[STORE_LOGO_KEY], DEFAULT_IDENTITY.logoUrl),
   };
 }
 

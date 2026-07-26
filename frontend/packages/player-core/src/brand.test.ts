@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_IDENTITY,
+  STORE_LOGO_KEY,
   STORE_NAME_KEY,
   STORE_TAGLINE_KEY,
   storeIdentity,
@@ -13,7 +14,20 @@ describe("storeIdentity", () => {
         [STORE_NAME_KEY]: "Corner Cafe",
         [STORE_TAGLINE_KEY]: "Coffee and prizes",
       }),
-    ).toEqual({ name: "Corner Cafe", tagline: "Coffee and prizes" });
+    ).toEqual({ name: "Corner Cafe", tagline: "Coffee and prizes", logoUrl: "" });
+  });
+
+  it("carries the logo URL when one is set", () => {
+    expect(storeIdentity({ [STORE_LOGO_KEY]: "http://api/uploads/abc.png" }).logoUrl).toBe(
+      "http://api/uploads/abc.png",
+    );
+  });
+
+  // No stock logo ships: an unconfigured storefront shows its wordmark rather
+  // than somebody else's mark.
+  it("has no logo by default", () => {
+    expect(DEFAULT_IDENTITY.logoUrl).toBe("");
+    expect(storeIdentity({}).logoUrl).toBe("");
   });
 
   // The reason this is per-field: an operator who names the shop but never
@@ -22,12 +36,17 @@ describe("storeIdentity", () => {
     expect(storeIdentity({ [STORE_NAME_KEY]: "Corner Cafe" })).toEqual({
       name: "Corner Cafe",
       tagline: DEFAULT_IDENTITY.tagline,
+      logoUrl: DEFAULT_IDENTITY.logoUrl,
     });
   });
 
   it("treats a blank or whitespace-only value as unset", () => {
     expect(
-      storeIdentity({ [STORE_NAME_KEY]: "   ", [STORE_TAGLINE_KEY]: "" }),
+      storeIdentity({
+        [STORE_NAME_KEY]: "   ",
+        [STORE_TAGLINE_KEY]: "",
+        [STORE_LOGO_KEY]: "  ",
+      }),
     ).toEqual(DEFAULT_IDENTITY);
   });
 
@@ -48,6 +67,6 @@ describe("storeIdentity", () => {
   // Unrelated public keys will appear here as the allowlist grows (colours,
   // logo). Reading by key rather than by shape keeps that from mattering.
   it("ignores keys it does not know about", () => {
-    expect(storeIdentity({ store_logo_url: "/x.png" })).toEqual(DEFAULT_IDENTITY);
+    expect(storeIdentity({ color_brand: "#ff0000" })).toEqual(DEFAULT_IDENTITY);
   });
 });
