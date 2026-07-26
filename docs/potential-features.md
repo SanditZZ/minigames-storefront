@@ -124,9 +124,13 @@ component each:
     call. If scan-to-redeem is built once, the phone is the honest place.
   - For the browser suite, Playwright can feed a fake camera
     (`--use-fake-device-for-media-stream --use-file-for-fake-video-capture`) with
-    a pre-rendered QR video, so the scan path is testable without hardware —
-    but `e2e/` does not start the admin app at all yet, which is a prerequisite
-    listed under "Admin lists at scale".
+    a pre-rendered QR video, so the scan path is testable without hardware.
+    **The prerequisite this used to name is now met**: `e2e/` starts the admin
+    app as a third `webServer` (port 5298, see `stack.ts`), and
+    `tests/admin-claims.spec.ts` already drives the redeem box, so a scanner
+    filling that box has somewhere to be tested. What remains unmet is the
+    secure-context problem two bullets up — a fake camera does not conjure
+    `navigator.mediaDevices` onto an insecure origin.
   - Decoding in the browser needs a dependency decision: `BarcodeDetector` is
     Chromium-only, so portable decoding means shipping a wasm/JS decoder into an
     app whose only runtime dependency today is React.
@@ -488,6 +492,21 @@ component each:
     `reward.Showcase`. It bites the first time a Thai venue configures prizes,
     which is the first time this feature is used for real — the chrome around
     the prize list is Thai and the prize itself is not.
+    **The fallback rule is decided: PER FIELD.** An award with a Thai name and
+    no Thai description shows the Thai name and the English description, rather
+    than dropping the whole pair back to English. That is the rule
+    `storeIdentity` (`player-core/brand.ts`) already follows for name/tagline,
+    so the app has one answer to "what happens when half a translation exists"
+    instead of two — and it lets an operator translate a prize list
+    incrementally rather than in one sitting. The cost, stated so it is not a
+    surprise: a card can be visibly bilingual mid-migration. That is the honest
+    display of a half-finished translation, and it is what makes the missing
+    half obvious enough to finish.
+    Note this reaches `claims.award_name` too, which is a *snapshot* of the name
+    at issue time (see the deleted-award entry below). A claim issued before the
+    Thai name existed keeps the English one forever, which is correct — it says
+    what was won — but means the counter and the result screen can disagree with
+    the current award. Decide that deliberately rather than discovering it.
   - **Score rejections keep an English diagnostic.** `writeAppError` in
     `internal/httpapi/respond.go` serves `err.Error()` for `ErrScoreRejected` in
     English and a plain sentence in Thai, because the validator messages in
@@ -513,7 +532,12 @@ component each:
     `truncate` cuts mid-word instead of shortening; the dictionary keeps every
     string that lands in a fixed slot short *on purpose* (see the header comment
     in `th.ts`), but that is a convention, not a check. A Playwright pass at
-    320px asserting no horizontal overflow would make it one.
+    320px asserting no horizontal overflow would make it one — and the suite now
+    runs at Pixel 7 width (`devices["Pixel 7"]`, 412px) for every spec, so this
+    wants a narrower `test.use({ viewport })` block rather than a new project.
+    Cheap, and it is the check that would catch the Thai store name an operator
+    types into `StoreBranding` — admin free text is translated nowhere, so the
+    longest string on the landing header is the one nobody reviewed.
 - **An admin panel for editing every string, filtered and searchable.**
   Separate from the i18n work above. That work moved the strings from literals
   scattered through components into two dictionaries
@@ -713,15 +737,24 @@ rather than re-argued.
   the first game where **"server-authoritative scoring"** in the anti-abuse
   section buys something concrete: sending the phase seed with the session and
   the stop timestamp with the score would make it checkable.
-- **`reactionVerdict` is written, exported, and rendered nowhere.** It grades a
-  reaction ("Lightning", "Sharp", "Solid"…) and nothing displays it — the
-  reveal's tier ladder took over the job of grading a round. Its twin
-  `precisionVerdict` was in the same state for about an hour: adding the
-  post-stop hold to Precision Stop gave it a surface (the track's readout, where
-  it names the landing before the score reveal opens), which is the argument for
-  what to do with this one. Either every game gets a moment that grades the
-  round in its own vocabulary, or the verdict helpers go and the tier ladder is
-  the only voice.
+- **`reactionVerdict` is written, exported, rendered nowhere — and now breaks a
+  rule.** It grades a reaction and nothing displays it; the reveal's tier ladder
+  took over the job of grading a round. Its twin `precisionVerdict` was in the
+  same state for about an hour, until the post-stop hold gave it a surface (the
+  track's readout, where it names the landing before the reveal opens), which is
+  the argument for what to do with this one: either every game gets a moment
+  that grades the round in its own vocabulary, or the verdict helpers go and the
+  tier ladder is the only voice.
+  **The i18n work raised the stakes and skipped this function.**
+  `precisionVerdict` now returns a `MessageKey`; `reactionVerdict`
+  (`player-core/src/games/reaction.ts`) still returns English words —
+  `"Lightning"`, `"Sharp"`, `"Solid"` — which is exactly what
+  `frontend/CLAUDE.md` forbids a package to hold, and its unit test asserts
+  those strings. It was missed because it is dead: nothing rendered it, so
+  nothing showed up untranslated. That makes deleting it the cheaper of the two
+  options unless a per-game verdict moment is actually wanted, and it means the
+  "no prose in packages" rule is currently enforced by convention rather than by
+  anything that runs.
 - **Link previews for shared results.** Result URLs are now permanent and worth
   sharing, but the SPA serves the same empty `index.html` to every crawler, so a
   pasted link shows nothing. Needs a small server-rendered route emitting OG/
@@ -799,7 +832,8 @@ are the seams that give way as the catalog and the score table grow.
   still cannot answer it by person or by date.
 - **Changing the claim TTL does not move existing claims.** `app.issueClaim`
   reads `claim_ttl_hours` once and stamps the result into `claims.expires_at`
-  (`service.go:264`), so the setting only governs claims issued afterwards. That
+  (the `claim.TTL(...)` call in `service.go`), so the setting only governs claims
+  issued afterwards. That
   is the right storage model — a claim's deadline should not move under the
   person holding it — but `SettingsPanel` renders every setting the same generic
   way, so an admin shortening the window sees a knob that looks retroactive and
@@ -815,6 +849,12 @@ are the seams that give way as the catalog and the score table grow.
   pointed at the wrong screen is not, which is why that entry insists on a
   confirmation step — and why the inverse should exist before the trigger gets
   that much easier to pull.
+  **It is now asserted, not merely true.** `admin-claims.spec.ts` › "refuses the
+  same code a second time" redeems a real won code twice and expects the second
+  attempt to fail, so single-use is a tested guarantee rather than a comment.
+  That cuts both ways: the test would also fail the day someone adds an
+  un-redeem and wires it into the same path, which is the right place to be
+  forced to think about it.
 - **`redeemed_at` records when, never who.** The claims table has no actor
   column (`003_claims.sql`), and the admin API is one shared secret with no
   identities behind it, so "who handed this prize over?" is unanswerable by
@@ -825,23 +865,67 @@ are the seams that give way as the catalog and the score table grow.
   found everything else labelled — inside `Field` (`AwardForm`,
   `NewSettingForm`), wrapped in its own `<label>` (`AwardFilters`), carrying an
   `aria-label` (`ScoresPanel`, the claims status filter) or an `id` its label
-  points at (`ClaimsPanel`'s redeem box) — **except one**, below.
-- **The settings row's value editor is unlabelled.** `SettingRow` renders
-  `<ValueInput>` bare (`SettingsPanel.tsx:89`); the setting's key sits next to it
-  in a `<code>` element that nothing associates with the control, so a screen
-  reader hears an edit box with no name, once per setting. Unlike the token gate
-  this is not a one-attribute fix: `ValueInput` is not given the key it would
-  need to name itself, so it wants a `label` prop threaded from the row. Found
-  while sweeping for the entry above; deliberately left rather than folded into
-  it.
-- **The admin claims panel has no browser coverage.** `e2e/` starts the API and
-  the PLAYER app only, so nothing exercises `ClaimsPanel.tsx` in a browser — the
-  redeem box, the status filter and the row buttons are covered by unit tests on
-  their pure parts (`admin-core/claims/present.ts`) and by nothing else. The
-  player's claim code is E2E-tested; the counter's side of the same transaction
-  is not. Adding the admin app to the Playwright `webServer` list is the fix,
-  and it would also cover the awards and settings panels, which have the same
-  gap and always have.
+  points at (`ClaimsPanel`'s redeem box) — **except one**, below, which is now
+  fixed too. **The sweep's method is what to distrust, not its diligence**: it
+  looked for controls with no label nearby and missed two cases where a label
+  *was* nearby and did not attach — `ColorInput` and `DurationInput`, each two
+  controls sharing one wrapping `<label>` that can only name the first of them.
+  A `<label>` in the markup reads as coverage; only the accessibility tree
+  settles it.
+- ~~**The settings row's value editor is unlabelled.**~~ — **built**, and it was
+  found again the way this doc hopes entries will be: by a compiler, not by a
+  sweep. `ValueInput` now takes the setting's key as its accessible name and
+  applies it on every branch — text, number, bool, colour and duration alike —
+  rather than only the one that prompted it.
+  **The entry undercounted the problem, and the reason is worth keeping.** It
+  described one anonymous edit box per setting. The same fix had to cover
+  `ColorInput`, which is *two* controls behind one label: a wrapping `<label>`
+  associates with the FIRST labelable descendant only, so on the branding card
+  the swatch took the field's name and the hex box got nothing — five colours
+  meaning five pickers all called "Pick a colour" and five nameless text boxes.
+  `DurationInput` had the same shape with "Amount"/"Unit". A screen reader user
+  could hear which *kind* of control they were on and never which *setting* it
+  changed.
+  The trigger was making `ColorInput`'s `label` required so a browser test could
+  address one colour out of five (`admin-branding.spec.ts`); `npm run typecheck`
+  then pointed straight at `SettingsPanel.tsx` as the second call site. An
+  accessibility gap that a type error can find is one that cannot come back.
+- ~~**The admin claims panel has no browser coverage.**~~ — **built.** `e2e/`
+  starts the admin as a third `webServer` (port 5298), and
+  `tests/admin-claims.spec.ts` drives the counter's side of the transaction:
+  the redeem box, the row buttons, the status filter, and both refusals (an
+  unknown code, and a code already spent).
+  - **No test fabricates a claim.** Every code under test is won by playing a
+    real round first, because the seam this closes is not "the panel renders" —
+    it is that the credential the player is holding is the one the counter can
+    find. Each app's own suite passes in full while that wire is cut.
+  - **The dash is part of the test.** `ClaimCard` shows `ABCD-2345` and
+    `ClaimRow` shows `ABCD2345`; the spec types the form the customer is
+    looking at, which is the behaviour the panel's own copy promises ("case and
+    the dash don't matter") and which nothing checked.
+  - **What it cost that was not obvious:** an "it left the list" assertion is
+    easy to write so it can never fail. `getByText(code)` also matches the
+    "Handed over: … (ABCD2345)" confirmation, so the row locator is scoped to
+    list items. A green assertion that could not have gone red is worse than no
+    assertion.
+  - The prediction that this "would also cover the awards and settings panels"
+    was half right: settings are now covered by `admin-branding.spec.ts`, and
+    **`AwardsPanel` still has none** — see the new entry below.
+- **The awards panel is now reachable and still untested in a browser.** The
+  blocker is gone — the admin app is in the `webServer` list — so this is the
+  cheapest browser coverage left in the repo, and it is the panel an operator
+  actually uses most. `filterAwards` is unit-tested and the URL grammar is
+  unit-tested; what nobody has ever run is creating a prize, editing it, and
+  deleting it through the form (`AwardForm.tsx`, `AwardsPanel.tsx`). Two things
+  make it more than box-ticking:
+  - **Delete confirms and then destroys, with no audit trail** (see the entry
+    at the end of this section). A flow whose only safeguard is a confirm dialog
+    is worth exercising before that safeguard is the thing that regresses.
+  - **A created award should show up for the player**, which is the same
+    cross-app assertion `admin-branding.spec.ts` makes for the store name — the
+    prize showcase on the landing screen reads what the admin wrote. Note the
+    ordering discipline that entry documents applies here too: an award created
+    by a test and left behind changes what every later test's round can win.
 - **The native admin still has no claims screen.** `mobile/admin` remains a
   one-screen skeleton (awards list). A phone at a counter is exactly the right
   device for redeeming a code, and the API is ready for it; it needs its own
@@ -865,29 +949,43 @@ are the seams that give way as the catalog and the score table grow.
 
 ### Testing
 
-- **The rename never happens in a browser.** Store identity is covered by
-  `settings/public_test.go` (the allowlist), `player-core/src/brand.test.ts` (the
-  fallbacks) and a `curl` — every part of it except the one that matters to an
-  operator: that editing `store_name` in the admin changes what the player's
-  header says. `play-flow.spec.ts` reads the landing screen already and asserts
-  nothing about the header, so the gap is one assertion wide *if* the admin app
-  is driven too — and it is not, which is the same prerequisite the admin claims
-  panel entry above is blocked on. Until then the whole feature is verified by
-  unit tests either side of a wire nobody crosses in anger.
-  **The palette made this worse, not equally bad.** A rename that fails to
-  apply is a wrong word on one line; a palette that fails to apply is the whole
-  app in the wrong colours, and the mechanism is a CSS custom property written
-  to `document.documentElement` — the one part of the feature that is *only*
-  exercisable in a real browser, and the one part no test touches.
-  `useBrandPalette` in each app has no coverage of any kind: the pure resolver
-  under it does, and the DOM write does not. One Playwright assertion that
-  `--color-brand` on the root element equals a value set through the API would
-  cover both apps' copies at once.
+- ~~**The rename never happens in a browser.**~~ — **built**, and the palette
+  half — which this entry correctly called the worse one — landed with it.
+  `admin-branding.spec.ts` renames the store through `StoreBranding.tsx` and
+  asserts the player's header says it; sets a colour and asserts
+  `--color-brand` on `documentElement` in **both** apps; then clears it and
+  asserts the token comes back. `useBrandPalette` had no coverage of any kind
+  before this — the pure resolver under it did, the DOM write did not.
+  Three things the build settled that the entry had not:
+  - **The baseline is captured, never hard-coded.** The token's value lives in
+    `packages/tokens`, which `e2e/` cannot import (it sits outside the frontend
+    workspace on purpose). Reading `--color-brand` *before* the override and
+    asserting the reset returns to that exact string tests the round trip
+    without restating a constant — the same drift `END_OF_ROUND_MS` below
+    demonstrates, avoided rather than repeated.
+  - **Clearing is a different operation from setting, and both are browser-only.**
+    The save DELETES the settings row and the hook REMOVES the custom property
+    rather than writing the old value back, which is what lets the cascade fall
+    through to the compiled `@theme` block with nothing needing to know what it
+    said. Only a real browser has that cascade.
+  - **A spec that writes global settings owns the cleanup, and must assert it.**
+    These settings are shared by the whole suite and this file sorts FIRST
+    alphabetically, so an override left behind re-colours every test after it.
+    Each test restores what it changed *and asserts the restore reached the
+    player* — an un-asserted cleanup that silently failed would poison 28 tests
+    and blame the first one to notice. Worth remembering for the awards-panel
+    coverage above, which has the same hazard with prize stock.
 - **Visual regression.** Every layout bug found during this work was purely
   visual (collapsed tier labels, a bell overlapping text, halo rings crossing a
   caption) — none of which a DOM assertion would catch. Playwright's
   `toHaveScreenshot()` would, but it needs a pinned container image for stable
   font/emoji rendering; deliberately deferred rather than half-done.
+  **The admin is now in scope for it, and has the worse record.** Both layout
+  bugs this repo has written down happened there — the duration control's
+  collapsed number field and Save landing on top of the unit dropdown — and the
+  panels were unreachable to any test at the time. They are reachable now, which
+  changes what a screenshot baseline would be worth without changing what it
+  costs.
 - ~~**Reveal timing is untested end-to-end.**~~ — **built**, and the entry was
   half wrong by the time it was: the animation can no longer be skipped at all.
   Both end-of-round stages were full-screen "tap to skip" buttons sitting exactly
@@ -903,17 +1001,21 @@ are the seams that give way as the catalog and the score table grow.
   import them. The floor has 800ms of slack, so drift degrades the assertion
   quietly rather than failing it. A generated constants file, or reading the
   values off the page, would close it.
-- **Every E2E round is now ~3.8s longer.** Six specs play a full round, so the
-  unskippable sequence adds roughly 20s to the local gate. **That count is
-  already stale and the entry is the reason to re-derive it rather than trust
-  it** — `playRound` has ten call sites across `play-flow.spec.ts` and
-  `result-url.spec.ts` today, plus the new Precision Stop test, which reaches
-  the same sequence by a different route (it ends the round on a tap instead of
-  waiting out a clock). The cost grows every time a game is added.
-  Acceptable today;
-  if the suite grows, the reveal needs a test-only way to shorten the beats that
-  is not the skip that was just removed — emulating `prefers-reduced-motion`
-  already collapses both holds to zero (`holdMs`) and is the obvious lever.
+- **Every E2E round costs ~3.8s of unskippable ending.** Do not trust a number
+  written here — **re-derive it**: `grep -c 'playRound(' e2e/tests/*.spec.ts`,
+  plus the Precision Stop test, which reaches the same sequence by a different
+  route (it ends the round on a tap instead of waiting out a clock). That
+  instruction has now paid for itself twice. The entry first said "six specs";
+  by the next reading it was ten call sites; **the admin claims coverage added
+  three more**, because every claim it redeems is won by playing a real round
+  rather than fabricated — deliberately, since the point is the wire between the
+  apps.
+  The cost grows with every game AND with every cross-app test, which is the
+  part the original framing missed: rounds are no longer played only by specs
+  that are *about* playing. Still acceptable — the full suite is ~3 minutes —
+  but if it grows, the reveal needs a test-only way to shorten the beats that is
+  not the skip that was just removed. Emulating `prefers-reduced-motion` already
+  collapses both holds to zero (`holdMs`) and is the obvious lever.
 - ~~**The suite produced its first flake, and it was blamed on the wrong
   thing.**~~ — **fixed, and the first guess written here was wrong**, which is
   the part worth keeping. The run that shipped the post-stop hold reported

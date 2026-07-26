@@ -13,9 +13,9 @@ The gate, in order — each step must pass before the next runs:
    committed `theme.css` still matches `packages/tokens`, then a project-wide TS
    build, then vitest over the calculation layers (URL router, score-reveal
    maths).
-3. `npx tsc --noEmit && npx playwright test` (e2e) — the real player flow in a
-   browser, against an isolated throwaway stack (own ports, own temp SQLite file
-   — never `.prod/`).
+3. `npx tsc --noEmit && npx playwright test` (e2e) — the real player flow **and
+   the admin's side of it** in a browser, against an isolated throwaway stack
+   (own ports, own temp SQLite file — never `.prod/`).
 4. Build + redeploy via `scripts/serve-prod.sh`.
 5. Only then: `git add -A`, commit, `git push origin main`.
 
@@ -73,11 +73,21 @@ ship flow before considering the change done — do not skip it:
   logic under it never got extracted.
 - `e2e/` — Playwright. A self-contained npm package, deliberately outside the
   frontend workspace so it never enters an app build. It starts its own API and
-  player app via `webServer` and wipes its database before each run.
+  **both** apps via `webServer` — player on 5299, admin on 5298 — and wipes its
+  database before each run. The ports and origins live in `e2e/stack.ts`, not in
+  the config, because only one app can be `baseURL` and a spec has to be able to
+  reach the other one without restating its address.
 
 When adding a game or a screen, add the pure logic to a calculation module and
 test it in vitest; add one E2E assertion only if it changes the player's path
 through the app.
+
+**A spec that writes admin settings owns the cleanup.** The suite shares one
+backend and runs sequentially, so a store name, a palette colour or a prize left
+changed is inherited by every test after it — and file order is alphabetical, so
+`admin-branding.spec.ts` runs before everything. Restore what you change, and
+*assert* the restore landed: a cleanup that silently fails poisons the rest of
+the run and the failure surfaces somewhere else entirely.
 
 ## Frontend package layout — the line native clients will be built along
 
@@ -222,10 +232,25 @@ Keeping it true is part of shipping a feature, not a follow-up to it:
   `Award.imageUrl`, which quietly made "award image URLs are unused" wrong while
   leaving a narrower gap (the result screen) that nobody had written down.
 - **Add the follow-ups the work surfaced**, ordered by how soon they will bite.
+- **Sweep out what has gone stale — every time, not only when it is convenient.**
+  Before shipping, re-read the entries your change came near and check each
+  against the code as it is now, not as the entry remembers it. Fix what is
+  wrong in place; if a claim is no longer true and nothing replaces it, delete
+  it. This is the rule that keeps the other three honest: a doc that is 90%
+  accurate is read as if it were 100%, so the 10% is not a small defect — it is
+  the entry that sends the next session to a file that no longer works that way.
 
 **Every claim in that doc is a claim about the code, so cite the file.** "Errors
 are not announced" is only actionable because it names `StatusMessage`; an entry
 that cannot be checked against a file is the kind that rots unnoticed.
+
+**Line numbers rot fastest; counts rot next.** `service.go:264` and "three
+identical requests" are both true only until the next edit, and neither fails
+anything when it stops being. Prefer naming a symbol over a line, and write a
+count so it says how to re-derive itself ("one per game") rather than freezing a
+number. Where a bare number really is the point, say so — an entry that admits
+"this count is already stale, re-derive it" is more useful than one that is
+quietly wrong.
 
 ### Suggested next steps go in the doc, not just in the chat
 

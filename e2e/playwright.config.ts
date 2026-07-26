@@ -2,14 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ADMIN_PORT, ADMIN_TOKEN, ADMIN_URL, API_PORT, API_URL, WEB_PORT, WEB_URL } from "./stack";
 
 // The suite runs against its OWN stack — a throwaway SQLite file and dedicated
 // ports — never the deployed one under .prod/. Test rounds must not land on the
-// real leaderboard or burn real prize stock.
-const API_PORT = 8299;
-const WEB_PORT = 5299;
-const API_URL = `http://127.0.0.1:${API_PORT}`;
-const WEB_URL = `http://127.0.0.1:${WEB_PORT}`;
+// real leaderboard or burn real prize stock. The ports and origins live in
+// stack.ts so the specs can reach the admin's origin without restating it.
 const DB_PATH = join(tmpdir(), "minigames-e2e.db");
 // Uploads land in a throwaway directory for the same reason the database does —
 // and pointedly NOT in the default `uploads/`, which is relative to the API's
@@ -69,8 +67,11 @@ export default defineConfig({
       env: {
         APP_ADDR: `:${API_PORT}`,
         APP_DB_PATH: DB_PATH,
-        APP_CORS_ORIGINS: WEB_URL,
-        APP_ADMIN_TOKEN: "admin",
+        // Both origins, because both apps are now driven. Getting this wrong
+        // fails as a browser CORS error rather than as an HTTP status, which
+        // is worth knowing before debugging a blank admin panel.
+        APP_CORS_ORIGINS: `${WEB_URL},${ADMIN_URL}`,
+        APP_ADMIN_TOKEN: ADMIN_TOKEN,
         APP_UPLOAD_DIR: UPLOAD_DIR,
         APP_PUBLIC_URL: API_URL,
       },
@@ -79,6 +80,20 @@ export default defineConfig({
       command: `npx vite --port ${WEB_PORT} --host 127.0.0.1 --strictPort apps/player`,
       cwd: "../frontend",
       url: WEB_URL,
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: { VITE_API_BASE_URL: API_URL },
+    },
+    // The admin app. It was left out of this list for as long as the suite only
+    // covered the player, and that gap had a cost worth naming: the claims
+    // panel, the awards panel and the settings panels had NO browser coverage
+    // of any kind, and the runtime palette's one action — writing a custom
+    // property to documentElement — is not reachable from any other layer.
+    // Adding it here is what makes those testable; see tests/admin-*.spec.ts.
+    {
+      command: `npx vite --port ${ADMIN_PORT} --host 127.0.0.1 --strictPort apps/admin`,
+      cwd: "../frontend",
+      url: ADMIN_URL,
       reuseExistingServer: false,
       timeout: 120_000,
       env: { VITE_API_BASE_URL: API_URL },

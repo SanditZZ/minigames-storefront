@@ -122,6 +122,7 @@ export function StoreBranding({
             <Field key={name} label={`${PALETTE[name].name} — ${name}`}>
               <ColorInput
                 value={draft[name]}
+                label={PALETTE[name].name}
                 placeholder={PALETTE[name].value.toLowerCase()}
                 onChange={set(name)}
               />

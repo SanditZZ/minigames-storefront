@@ -146,6 +146,13 @@ function SettingRow({
  * is passed alongside the type and checked first — the alternative would be a
  * new SettingType, which would mean a migration and a wire change to fix a
  * display problem.
+ *
+ * The key doubles as the control's accessible NAME, which is the other reason
+ * it is threaded down here. The row prints it in a `<code>` element that
+ * nothing associates with the input, so a screen reader used to hear an
+ * anonymous edit box once per setting — eight of them in a column, each one
+ * "edit text". Sighted users read the key above the box; this is that same
+ * information, delivered the other way.
  */
 function ValueInput({
   settingKey,
@@ -159,24 +166,31 @@ function ValueInput({
   onChange: (v: string) => void;
 }) {
   const duration = type === "int" ? durationSpecFor(settingKey) : null;
-  if (duration) return <DurationValueInput spec={duration} value={value} onChange={onChange} />;
+  if (duration) return <DurationValueInput spec={duration} label={settingKey} value={value} onChange={onChange} />;
 
   if (type === "color") {
     // No placeholder default here: a generic row edits an existing colour
     // setting, so there is always a value, and guessing which palette entry it
     // belongs to would be wrong as often as right. The branding card above is
     // where a colour has a known default to fall back to.
-    return <ColorInput value={value} placeholder="#ff9a86" onChange={onChange} />;
+    return <ColorInput value={value} label={settingKey} placeholder="#ff9a86" onChange={onChange} />;
   }
   if (type === "bool") {
     return (
-      <Select value={value} onChange={(e) => onChange(e.target.value)}>
+      <Select aria-label={settingKey} value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="true">true</option>
         <option value="false">false</option>
       </Select>
     );
   }
-  return <Input type={type === "int" ? "number" : "text"} value={value} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <Input
+      aria-label={settingKey}
+      type={type === "int" ? "number" : "text"}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
 }
 
 /**
@@ -194,10 +208,13 @@ function ValueInput({
  */
 function DurationValueInput({
   spec,
+  label,
   value,
   onChange,
 }: {
   spec: DurationSpec;
+  /** The setting's key, used to name whichever control ends up rendered. */
+  label: string;
   value: string;
   onChange: (v: string) => void;
 }) {
@@ -209,11 +226,12 @@ function DurationValueInput({
   const shown = draft ?? parsed;
 
   if (!shown) {
-    return <Input type="text" value={value} onChange={(e) => onChange(e.target.value)} />;
+    return <Input aria-label={label} type="text" value={value} onChange={(e) => onChange(e.target.value)} />;
   }
 
   return (
     <DurationInput
+      label={label}
       value={shown}
       units={spec.units}
       note={describeStored(shown, spec)}

@@ -78,16 +78,27 @@ export function Checkbox({
  * empty state and answers `#000000` when asked, so a store that has overridden
  * nothing would silently acquire a black palette the moment the picker rendered.
  * `placeholder` carries the token default for that reason.
+ *
+ * `label` names the COLOUR, not the control — "Coral", not "Coral hex value".
+ * Both inputs then name themselves from it, and they have to: a wrapping
+ * `<label>` associates with the FIRST labelable descendant only, so the swatch
+ * was taking the Field's name and the hex box was getting none at all. Five
+ * colours on the branding form meant five identically-named pickers and five
+ * anonymous text boxes — a screen reader user could hear which control they
+ * were on and never which colour it set.
  */
 export function ColorInput({
   value,
   placeholder,
   onChange,
+  label,
 }: {
   value: string;
   /** The token default shown when nothing is set — never submitted. */
   placeholder: string;
   onChange: (value: string) => void;
+  /** The colour's own name, e.g. "Coral". Required: see above. */
+  label: string;
 }) {
   const swatch = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(value.trim()) ? value.trim() : placeholder;
 
@@ -95,13 +106,14 @@ export function ColorInput({
     <div className="flex items-center gap-2">
       <input
         type="color"
-        aria-label="Pick a colour"
+        aria-label={`Pick ${label}`}
         value={swatch}
         onChange={(e) => onChange(e.target.value)}
         className="size-10 shrink-0 cursor-pointer rounded-lg border border-ink/15 bg-white p-1"
       />
       <Input
         value={value}
+        aria-label={`${label} hex value`}
         placeholder={placeholder}
         spellCheck={false}
         onChange={(e) => onChange(e.target.value)}
@@ -136,14 +148,24 @@ export function DurationInput({
   value,
   units,
   note,
+  label,
   onChange,
 }: {
   value: DurationValue;
   units: readonly DurationUnit[];
   /** The stored value in words, shown underneath ("168 hours"). */
   note?: ReactNode;
+  /**
+   * What this duration IS, e.g. `claim_ttl_hours`. Optional, and worth passing
+   * whenever more than one duration can be on screen: without it both halves
+   * are named "Amount" and "Unit", which is unambiguous for the eye (the key is
+   * printed above them) and not for a screen reader, which reads controls out
+   * of context and would hear the same four names twice over.
+   */
+  label?: string;
   onChange: (value: DurationValue) => void;
 }) {
+  const name = (part: string) => (label ? `${label} ${part}` : part.replace(/^./, (c) => c.toUpperCase()));
   return (
     <div>
       {/* The sizing lives on WRAPPERS, not on the controls. `Input` and
@@ -159,7 +181,7 @@ export function DurationInput({
             min={0}
             step={1}
             inputMode="numeric"
-            aria-label="Amount"
+            aria-label={name("amount")}
             value={String(value.amount)}
             onChange={(e) => onChange({ ...value, amount: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
           />
@@ -168,7 +190,7 @@ export function DurationInput({
             control never wraps mid-word or clips its own label at 320px. */}
         <div className="w-32 shrink-0">
           <Select
-            aria-label="Unit"
+            aria-label={name("unit")}
             value={value.unit}
             onChange={(e) => onChange({ ...value, unit: e.target.value as DurationUnit })}
           >
