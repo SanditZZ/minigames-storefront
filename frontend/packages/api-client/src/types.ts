@@ -122,12 +122,37 @@ export interface StartSessionResponse {
   gameSlug: string;
   durationMs: number;
   expiresAt: string;
+  /**
+   * The round description a SERVER-SCORED game needs in order to render itself
+   * — today the physics constants a simulation has to be driven by.
+   *
+   * Absent for every game that scores itself, which is most of them, and that
+   * absence is meaningful: it is how the client knows which of the two scoring
+   * protocols a game speaks. Typed `unknown` on purpose — its shape is the
+   * individual game's business, and each one narrows it with a pure parser in
+   * `@minigames/player-core` rather than this package guessing on their behalf.
+   */
+  challenge?: unknown;
 }
 
+/**
+ * A finished round, as the client reports it.
+ *
+ * `value` and `events` are alternatives, not a pair — which one a game sends is
+ * decided by its backend Definition, not by the caller:
+ *
+ * - `value` is what the game SCORED ITSELF. The server can only check that the
+ *   number is plausible, which is as far as anti-cheat reaches when the server
+ *   saw none of the round.
+ * - `events` are the moments the player acted, in ms from the start of play.
+ *   The server replays them and derives the score itself, so no number is being
+ *   trusted at all. Stack is the first game written this way.
+ */
 export interface SubmitScoreInput {
   token: string;
   playerName: string;
-  value: number;
+  value?: number;
+  events?: number[];
 }
 
 /**

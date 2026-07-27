@@ -32,5 +32,6 @@ func toSubmitInput(slug domain.GameSlug, req submitScoreRequest) app.SubmitInput
 		Token:      req.Token,
 		PlayerName: req.PlayerName,
 		Value:      req.Value,
+		Events:     req.Events,
 	}
 }

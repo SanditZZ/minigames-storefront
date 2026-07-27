@@ -47,6 +47,11 @@ var translations = map[i18n.Locale]map[domain.GameSlug]Text{
 			Description: "หยุดตัววิ่งให้ตรงกลางที่สุด ยิ่งใกล้คะแนนยิ่งน้อย — และน้อยที่สุดคือผู้ชนะ!",
 			ScoreUnit:   "ห่างกึ่งกลาง",
 		},
+		SlugStack: {
+			Name:        "ต่อบล็อก",
+			Description: "วางบล็อกให้ตรงกับหอคอย ส่วนที่เกินขอบจะถูกตัดทิ้ง — พลาดทั้งก้อนคือจบเกม!",
+			ScoreUnit:   "บล็อก",
+		},
 	},
 }
 

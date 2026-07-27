@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { ApiError } from "@minigames/api-client";
 import { getMiniGame } from "../games/registry";
+import type { RoundReport } from "../games/types";
 import { useApi, useT } from "../i18n";
 import { Countdown, GameStage, Spinner, StatusMessage } from "../ui";
 import { GameCompleteStage } from "./GameCompleteStage";
@@ -35,6 +36,11 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
   const [wantsContinue, setWantsContinue] = useState(false);
   const tokenRef = useRef("");
   const durationRef = useRef(game.durationMs);
+  // Held in state rather than a ref because it is RENDERED — the game cannot
+  // mount until the challenge that describes its round has arrived, and a ref
+  // would not re-render when it does. The three client-scored games leave it
+  // undefined and never look.
+  const [challenge, setChallenge] = useState<unknown>(undefined);
   const mini = getMiniGame(game.slug);
 
   useEffect(() => {
@@ -45,6 +51,7 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
         if (!alive) return;
         tokenRef.current = s.token;
         durationRef.current = s.durationMs;
+        setChallenge(s.challenge);
         setPhase("countdown");
       })
       .catch((e) => {
@@ -65,10 +72,14 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
   // The round ends → celebrate immediately and upload in the background, so the
   // network round-trip happens behind the confetti instead of behind a spinner.
   const handleFinish = useCallback(
-    (value: number) => {
+    (report: RoundReport) => {
       setPhase("complete");
+      // A game reports EITHER a score it worked out or the moments the player
+      // acted; this is the one place that distinction turns into a request
+      // shape, so no game has to know the wire. See RoundReport.
+      const round = Array.isArray(report) ? { events: report } : { value: report };
       api
-        .submitScore(game.slug, { token: tokenRef.current, playerName, value })
+        .submitScore(game.slug, { token: tokenRef.current, playerName, ...round })
         .then(setResult)
         .catch((e) => {
           setError(e instanceof ApiError ? e.message : t("play.submitFailed"));
@@ -132,7 +143,12 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
       {phase === "countdown" ? (
         <Countdown label={game.name} onDone={startPlaying} />
       ) : (
-        <Play durationMs={durationRef.current} scoreUnit={game.scoreUnit} onFinish={handleFinish} />
+        <Play
+          durationMs={durationRef.current}
+          scoreUnit={game.scoreUnit}
+          challenge={challenge}
+          onFinish={handleFinish}
+        />
       )}
     </GameStage>
   );

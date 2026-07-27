@@ -12,17 +12,68 @@ import (
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 )
 
-// Definition is the catalog entry plus its pure validation rule. The Validator
-// decides whether a raw client-reported score is plausible for a round of the
-// given elapsed duration — the server's defence against fabricated scores.
+// Definition is the catalog entry plus the pure rules for judging a round.
+//
+// A game answers "was this score real?" in one of two ways, and a Definition
+// carries whichever it uses:
+//
+//   - A Validator, for a game the client scores itself. The client reports a
+//     number and the server decides whether that number is PLAUSIBLE. This is
+//     as far as anti-cheat can go when the server saw none of the round, and
+//     it only works where the body has a limit to appeal to — a tap rate has a
+//     ceiling, a reaction has a floor. Precision Stop has neither, which is
+//     exactly why its validator can do so little.
+//
+//   - A Scorer, for a game the SERVER scores. The client reports what the
+//     player did — not what it was worth — and the server replays the round to
+//     compute the number itself. Nothing is being trusted and then checked;
+//     the client's opinion of its own score is never read.
+//
+// Scorer is the better answer wherever a game's rules can be replayed from its
+// inputs, and Stack is the first game written to it. Precision Stop is the
+// obvious next one: its stop time is a single event, and sending that instead
+// of a distance would make the one game in the catalog with no plausibility
+// check at all exactly checkable. See docs/potential-features.md.
+//
+// Both are optional and neither is required; a Definition with neither accepts
+// whatever it is told, which is a choice worth making out loud rather than by
+// omission.
 type Definition struct {
 	Game      domain.Game
 	Validator Validator
+	// Challenge returns the round description the client needs in order to
+	// render a scored game — today the physics constants, so the tuning has one
+	// home rather than one per simulation. Nil for games that need none.
+	//
+	// It is called per session and its result is serialised straight to JSON,
+	// so it must return a value, never a pointer into shared state.
+	Challenge Challenge
+	// Scorer computes the authoritative score from the events the client
+	// reported. When present it REPLACES the Validator path entirely: the
+	// client's `value` is not read, not compared, and not recorded.
+	Scorer Scorer
 }
 
 // Validator returns nil if value is an acceptable score for a round that lasted
 // elapsedMs, given tunable limits, or an error explaining why it is rejected.
 type Validator func(value int, elapsedMs int, limits Limits) error
+
+// Challenge produces the per-round data a scored game's client needs.
+type Challenge func() any
+
+// Scorer replays a round from the events the client reported and returns the
+// score it earned, or an error if the events could not describe a real round.
+//
+// Events are millisecond offsets from the start of play — the only shape the
+// two games that want a Scorer actually need (Stack's drops, and Precision
+// Stop's single stop). A game needing richer events than a timeline of moments
+// is the point at which this becomes a per-game type rather than []int; that
+// is a change to make when such a game arrives, not in anticipation of one.
+//
+// The distinction the implementation must keep: an ERROR means the events could
+// not have come from a real round, and the submission is rejected. A low score
+// — including zero — is an ordinary outcome and must not be an error.
+type Scorer func(events []int, durationMs int) (int, error)
 
 // Limits are runtime-tunable anti-cheat bounds, sourced from the Settings store
 // and passed in explicitly so this layer stays pure.

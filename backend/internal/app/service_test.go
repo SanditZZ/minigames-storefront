@@ -287,7 +287,144 @@ func newTestService(store *memStore) *Service {
 	})
 }
 
+// stackDrops plays `blocks` perfect drops of a Stack round, returning the
+// timings a real client would report. It searches each sweep for the moment the
+// block sits over the tower, exactly as game.ScoreStack's own tests do — a
+// Stack round cannot be written as literal numbers, because every drop's phase
+// is inherited from the drop before it.
+func stackDrops(blocks int) []int {
+	drops := make([]int, 0, blocks)
+	spawnedAt := 0
+	centre := game.StackTrackWidth / 2
+	for i := range blocks {
+		period := game.StackPeriodMs(i)
+		best, bestOff := spawnedAt+1, game.StackTrackWidth
+		for phase := 1; phase <= period; phase++ {
+			off := game.StackBlockCentre(phase, game.StackBaseWidth, period, i%2 == 0) - centre
+			if off < 0 {
+				off = -off
+			}
+			if off < bestOff {
+				best, bestOff = spawnedAt+phase, off
+			}
+		}
+		drops = append(drops, best)
+		spawnedAt = best
+	}
+	return drops
+}
+
 // --- tests ------------------------------------------------------------------
+
+// The headline claim of a server-scored game: the number the client asserts is
+// not merely checked, it is never read. This test sends a wildly inflated value
+// alongside honest events and expects the events to win — if scoreOf ever falls
+// back to in.Value for a game with a Scorer, this is what catches it.
+func TestSubmitScoreIgnoresTheClientsValueForAServerScoredGame(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugStack)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	drops := stackDrops(5)
+	res, err := svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugStack,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		Value:      9999, // a lie, and one the server has no reason to consult
+		Events:     drops,
+	})
+	if err != nil {
+		t.Fatalf("SubmitScore: %v", err)
+	}
+	if res.Score.Value != len(drops) {
+		t.Fatalf("recorded %d, want %d — the score must come from the events, not the client",
+			res.Score.Value, len(drops))
+	}
+}
+
+// The mirror of the above: with no events there is nothing to replay, so the
+// round scores zero rather than inheriting whatever value was sent.
+func TestSubmitScoreScoresAServerScoredGameZeroWithoutEvents(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugStack)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	res, err := svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugStack,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		Value:      40,
+	})
+	if err != nil {
+		t.Fatalf("SubmitScore: %v", err)
+	}
+	if res.Score.Value != 0 {
+		t.Fatalf("recorded %d, want 0 — no events means no blocks stacked", res.Score.Value)
+	}
+}
+
+// Events that could not have come from a real round are rejected outright,
+// rather than scored as far as they parse.
+func TestSubmitScoreRejectsImpossibleEvents(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugStack)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	_, err = svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugStack,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		Events:     []int{900, 400}, // time does not run backwards
+	})
+	if !errors.Is(err, ErrScoreRejected) {
+		t.Fatalf("err = %v, want ErrScoreRejected", err)
+	}
+}
+
+// A server-scored game must still hand the client the physics it has to render
+// the round with — without the challenge there is nothing to simulate.
+func TestStartSessionCarriesTheChallengeForAServerScoredGame(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	_, def, err := svc.StartSession(ctx, game.SlugStack)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if def.Challenge == nil {
+		t.Fatal("stack session carries no challenge")
+	}
+	ch, ok := def.Challenge().(game.StackChallenge)
+	if !ok {
+		t.Fatalf("challenge is %T, want game.StackChallenge", def.Challenge())
+	}
+	if ch.TrackWidth != game.StackTrackWidth || ch.BaseWidth != game.StackBaseWidth {
+		t.Fatalf("challenge geometry %+v does not match the catalog's constants", ch)
+	}
+
+	// And a client-scored game must not: an absent challenge is how the player
+	// app knows which of the two protocols a game speaks.
+	_, tapDef, err := svc.StartSession(ctx, game.SlugTapFast)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	if tapDef.Challenge != nil {
+		t.Fatal("tap-fast is client-scored and must carry no challenge")
+	}
+}
 
 func TestSubmitScorePersistsWonAwardOnTheScore(t *testing.T) {
 	store := newMemStore()

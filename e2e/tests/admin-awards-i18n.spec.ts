@@ -15,13 +15,16 @@ import { playRound, revealScore, ui } from "../helpers/round";
  * ## Why some tests translate the prize for all three games
  *
  * The landing showcase MERGES prizes by name across games (`mergePrizes` in
- * player-core), and all three games seed a prize called "Free Coffee" — so the
- * three collapse into one row. Translating tap-fast's alone therefore SPLITS
- * that row: "กาแฟฟรี" from tap-fast, "Free Coffee" still from the other two.
- * That is a real consequence of partial translation, filed in
+ * player-core), and EVERY game seeds a prize called "Free Coffee" — so they all
+ * collapse into one row. Translating tap-fast's alone therefore SPLITS that
+ * row: "กาแฟฟรี" from tap-fast, "Free Coffee" still from the rest. That is a
+ * real consequence of partial translation, filed in
  * docs/potential-features.md, and it is why the storefront-level test here
- * translates all three — which is also what a venue does, since it translates
+ * translates every game — which is also what a venue does, since it translates
  * its prize list rather than one game's.
+ *
+ * It also means GAMES below must track the catalog. A new game adds a fourth
+ * "Free Coffee" that no test translates, and the English row reappears.
  *
  * ## The restore is load-bearing
  *
@@ -35,8 +38,15 @@ const PRIZE_TH = "กาแฟฟรี";
 const DESC_EN = "Reach 40 taps to earn a free coffee.";
 const DESC_TH = "แตะให้ได้ 40 ครั้งเพื่อรับกาแฟฟรี";
 
-/** Every game that seeds a prize by this name — see app.starterAwards. */
-const GAMES = ["tap-fast", "reaction-timer", "precision-stop"];
+/**
+ * Every game that seeds a prize by this name — see app.starterAwards.
+ *
+ * Re-derive this rather than trusting it: EVERY game's ladder seeds a "Free
+ * Coffee", so the list grows with the catalog and a game missing from it
+ * silently breaks the assertion below that no English copy survives. That is
+ * not hypothetical — adding Stack is what caught it.
+ */
+const GAMES = ["tap-fast", "reaction-timer", "precision-stop", "stack"];
 
 /** tap-fast's full prize ladder, for the test that cannot predict which is won. */
 const TAP_PRIZES = [

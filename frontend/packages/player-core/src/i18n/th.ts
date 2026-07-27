@@ -160,4 +160,18 @@ export const th: Messages = {
   "precision.verdict.close": "ใกล้มาก",
   "precision.verdict.near": "ใกล้",
   "precision.verdict.wide": "ห่าง",
+
+  // --- Stack --------------------------------------------------------------
+  // Kept short for the same reason as everything else in this file: these land
+  // in fixed slots and Thai has no spaces, so `truncate` cuts mid-word.
+  "stack.aim": "วางให้ตรงกับหอคอย",
+  "stack.hint": "ส่วนที่เกินขอบจะถูกตัดทิ้ง",
+  "stack.drop": "วาง!",
+  "stack.aria": "วางบล็อกที่กำลังเลื่อนลงบนหอคอย",
+  "stack.timeLeft": "เวลาที่เหลือสำหรับต่อบล็อก",
+  "stack.stacked": "ต่อได้ {count}",
+  "stack.perfect": "ตรงเป๊ะ!",
+  "stack.trimmed": "โดนตัด",
+  "stack.missed": "พลาดหอคอย",
+  "stack.outOfTime": "หมดเวลา",
 };

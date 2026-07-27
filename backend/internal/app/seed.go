@@ -112,5 +112,9 @@ func starterAwards(now time.Time) []domain.Award {
 		mk(game.SlugPrecisionStop, "10% Off Coupon", "Stop within 25 of centre for a thank-you discount.", 25, domain.Unlimited, 1),
 		mk(game.SlugPrecisionStop, "Free Coffee", "Stop within 12 of centre to earn a free coffee.", 12, 100, 2),
 		mk(game.SlugPrecisionStop, "Store Tote Bag", "Stop within 5 of centre for a limited-edition tote.", 5, 25, 3),
+
+		mk(game.SlugStack, "10% Off Coupon", "Stack 4 blocks for a thank-you discount.", 4, domain.Unlimited, 1),
+		mk(game.SlugStack, "Free Coffee", "Stack 8 blocks to earn a free coffee.", 8, 100, 2),
+		mk(game.SlugStack, "Store Tote Bag", "Stack 12 blocks for a limited-edition tote.", game.StackTargetBlocks, 25, 3),
 	}
 }

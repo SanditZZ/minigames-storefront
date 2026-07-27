@@ -17,6 +17,7 @@ export * from "./claims/present";
 export * from "./i18n";
 export * from "./games/precision";
 export * from "./games/reaction";
+export * from "./games/stack";
 export * from "./prizes/merge";
 export * from "./reveal/calc";
 export * from "./reveal/pacing";

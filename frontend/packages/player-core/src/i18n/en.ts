@@ -168,6 +168,18 @@ export const en = {
   "precision.verdict.close": "Close",
   "precision.verdict.near": "Near",
   "precision.verdict.wide": "Wide",
+
+  // --- Stack --------------------------------------------------------------
+  "stack.aim": "Drop it dead on the tower",
+  "stack.hint": "Whatever hangs over the edge is trimmed away",
+  "stack.drop": "DROP",
+  "stack.aria": "Drop the sliding block onto the tower",
+  "stack.timeLeft": "Time left to keep stacking",
+  "stack.stacked": "{count} stacked",
+  "stack.perfect": "Dead on!",
+  "stack.trimmed": "Trimmed",
+  "stack.missed": "Missed the tower",
+  "stack.outOfTime": "Out of time",
 } as const;
 
 /** Every string the client owns. `t` accepts nothing else. */

@@ -32,11 +32,18 @@ func (s *Server) handleGetGame(w http.ResponseWriter, r *http.Request) {
 }
 
 // startSessionResponse is what the player app needs to run and time a round.
+//
+// Challenge is absent for every game the client scores itself, which is most of
+// them — hence the pointer and the omitempty. A game that HAS one cannot render
+// its round without it: it carries the physics the client must simulate, so
+// that the tuning has a single home rather than one copy per simulation. See
+// game.Definition.
 type startSessionResponse struct {
 	Token      string          `json:"token"`
 	GameSlug   domain.GameSlug `json:"gameSlug"`
 	DurationMs int             `json:"durationMs"`
 	ExpiresAt  string          `json:"expiresAt"`
+	Challenge  any             `json:"challenge,omitempty"`
 }
 
 func (s *Server) handleStartSession(w http.ResponseWriter, r *http.Request) {
@@ -46,20 +53,32 @@ func (s *Server) handleStartSession(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, localeOf(r), err)
 		return
 	}
+	var challenge any
+	if def.Challenge != nil {
+		challenge = def.Challenge()
+	}
 	writeJSON(w, http.StatusCreated, startSessionResponse{
 		Token:      sess.Token,
 		GameSlug:   sess.GameSlug,
-		DurationMs: def.DurationMs,
+		DurationMs: def.Game.DurationMs,
 		ExpiresAt:  sess.ExpiresAt.Format(timeFormat),
+		Challenge:  challenge,
 	})
 }
 
 // submitScoreRequest is the client payload. Elapsed time is deliberately NOT
 // accepted from the client — the server derives it from the session.
+//
+// Value and Events are alternatives, not a pair. A game the client scores sends
+// a value; a game the SERVER scores sends events — the moments the player
+// acted — and no value at all, because the number is the server's to compute.
+// Sending both is not an error, it is just half wasted: the game's Definition
+// decides which field is read and the other is ignored. See app.scoreOf.
 type submitScoreRequest struct {
 	Token      string `json:"token"`
 	PlayerName string `json:"playerName"`
 	Value      int    `json:"value"`
+	Events     []int  `json:"events,omitempty"`
 }
 
 func (s *Server) handleSubmitScore(w http.ResponseWriter, r *http.Request) {

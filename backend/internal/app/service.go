@@ -87,10 +87,14 @@ func (s *Service) allSettings(ctx context.Context) []domain.Setting {
 
 // StartSession issues a single-use permit for a game round. The server owns the
 // clock and TTL, so the client cannot lie about when its round began.
-func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domain.Session, domain.Game, error) {
+//
+// It returns the whole Definition rather than just its Game because a
+// server-scored game also has to hand the client the round's Challenge, and
+// which games have one is a property of the catalog, not of the session.
+func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domain.Session, game.Definition, error) {
 	def, ok := s.registry.Get(slug)
 	if !ok || !def.Game.Enabled {
-		return domain.Session{}, domain.Game{}, ErrGameUnavailable
+		return domain.Session{}, game.Definition{}, ErrGameUnavailable
 	}
 	ttl := time.Duration(s.settingInt(ctx, domain.SettingSessionTTLSeconds, 120)) * time.Second
 	now := s.now()
@@ -103,19 +107,28 @@ func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domai
 		ExpiresAt: now.Add(ttl),
 	}
 	if err := s.store.Sessions().Create(ctx, sess); err != nil {
-		return domain.Session{}, domain.Game{}, err
+		return domain.Session{}, game.Definition{}, err
 	}
-	return sess, def.Game, nil
+	return sess, def, nil
 }
 
 // --- Score submission ------------------------------------------------------
 
 // SubmitInput is the client-provided part of a score submission.
+//
+// Value and Events are the two ways a round reports itself, and a game uses
+// exactly one of them — whichever its Definition is written for. For a
+// server-scored game Value is not read at all: see scoreOf.
 type SubmitInput struct {
 	GameSlug   domain.GameSlug
 	Token      string
 	PlayerName string
-	Value      int
+	// Value is what the CLIENT thinks it scored. Only games with a Validator
+	// use it, and for those it is a claim to be checked, never a fact.
+	Value int
+	// Events is what the player DID — millisecond offsets from the start of
+	// play. Games with a Scorer replay these to derive the score themselves.
+	Events []int
 }
 
 // ClaimView is a claim plus its status at the moment it was read.
@@ -166,10 +179,9 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		MaxTapsPerSecond: s.settingInt(ctx, domain.SettingMaxTapsPerSecond, defaults.MaxTapsPerSecond),
 		MinReactionMs:    s.settingInt(ctx, domain.SettingMinReactionMs, defaults.MinReactionMs),
 	}
-	if def.Validator != nil {
-		if err := def.Validator(in.Value, elapsedMs, limits); err != nil {
-			return SubmitResult{}, fmt.Errorf("%w: %v", ErrScoreRejected, err)
-		}
+	value, err := scoreOf(def, in, elapsedMs, limits)
+	if err != nil {
+		return SubmitResult{}, err
 	}
 
 	// Consume the permit atomically; a replay returns conflict and cannot score.
@@ -181,7 +193,7 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 	// award id can be persisted on the row itself. That link is what lets the
 	// result be re-read later at a stable URL and still report the prize that
 	// was actually granted, rather than one re-derived from current stock.
-	award, err := s.reserveAward(ctx, def.Game, in.Value)
+	award, err := s.reserveAward(ctx, def.Game, value)
 	if err != nil {
 		return SubmitResult{}, err
 	}
@@ -190,7 +202,7 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		ID:         id.New(),
 		GameSlug:   in.GameSlug,
 		PlayerName: sanitizeName(in.PlayerName),
-		Value:      in.Value,
+		Value:      value,
 		AwardID:    awardID(award),
 		CreatedAt:  now,
 	}
@@ -210,6 +222,43 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		Award: award,
 		Claim: s.viewClaim(s.issueClaim(ctx, saved, award)),
 	}, nil
+}
+
+// scoreOf settles what a round was actually worth.
+//
+// This is where the catalog's two answers to "was this score real?" diverge,
+// and the difference is worth being precise about because it is the difference
+// between checking a claim and not needing one:
+//
+//   - A Scorer means the server REPLAYS the round from what the player did.
+//     in.Value is never read — a client that sends one is ignored rather than
+//     contradicted, because there is nothing to contradict: its opinion of its
+//     own score was never part of the protocol.
+//   - A Validator means the client scored itself and the server can only judge
+//     whether the number is plausible. That is as far as anti-cheat reaches
+//     when the server saw none of the round.
+//
+// A game with neither is taken at its word, deliberately and visibly.
+//
+// Pure: everything it needs is passed in. The elapsed time is the server's, not
+// the client's, and stays that way — a Scorer receives the game's own round
+// length rather than the wall-clock gap, because the events it replays are
+// offsets from the start of PLAY, and the session has been open since before
+// the countdown.
+func scoreOf(def game.Definition, in SubmitInput, elapsedMs int, limits game.Limits) (int, error) {
+	if def.Scorer != nil {
+		value, err := def.Scorer(in.Events, def.Game.DurationMs)
+		if err != nil {
+			return 0, fmt.Errorf("%w: %v", ErrScoreRejected, err)
+		}
+		return value, nil
+	}
+	if def.Validator != nil {
+		if err := def.Validator(in.Value, elapsedMs, limits); err != nil {
+			return 0, fmt.Errorf("%w: %v", ErrScoreRejected, err)
+		}
+	}
+	return in.Value, nil
 }
 
 // ScoreResult re-reads a finished round so a result URL stays addressable

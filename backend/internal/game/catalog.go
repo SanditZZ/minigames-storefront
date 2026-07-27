@@ -158,5 +158,5 @@ func validatePrecisionStop(value, elapsedMs int, limits Limits) error {
 
 // DefaultRegistry is the catalog the server boots with. Add new games here.
 func DefaultRegistry() *Registry {
-	return NewRegistry(TapFast, ReactionTimer, PrecisionStop)
+	return NewRegistry(TapFast, ReactionTimer, PrecisionStop, Stack)
 }
