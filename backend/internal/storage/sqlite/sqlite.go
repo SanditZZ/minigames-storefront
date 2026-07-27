@@ -6,36 +6,59 @@ package sqlite
 import (
 	"context"
 	"database/sql"
-	_ "embed"
+	"embed"
 	"fmt"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 	_ "modernc.org/sqlite"
 )
 
-//go:embed migrations/001_init.sql
-var schemaSQL string
+// migrationFS is the whole directory, embedded as ONE filesystem rather than as
+// one string variable per file.
+//
+// The difference is not tidiness. With a variable per file, adding a migration
+// meant writing a new //go:embed AND remembering to call it from Migrate, and
+// nothing anywhere compared the two lists — so a file that was embedded and never
+// applied was a silent no-op. That happened with 008: every session insert failed
+// against a table missing its column, the Go suite stayed green, and it took a
+// full browser-suite run to find. `migrationsAreAllApplied` in sqlite_test.go now
+// walks this filesystem and fails if any file is not named in `migrations` below,
+// which is only possible because the directory is readable at runtime.
+//
+//go:embed migrations/*.sql
+var migrationFS embed.FS
 
-//go:embed migrations/002_score_award.sql
-var scoreAwardSQL string
+func mustMigration(name string) string {
+	b, err := migrationFS.ReadFile("migrations/" + name)
+	if err != nil {
+		// Unreachable outside a broken build: the embed above is compile-time, so
+		// a missing file fails to compile rather than reaching here.
+		panic(fmt.Sprintf("read embedded migration %s: %v", name, err))
+	}
+	return string(b)
+}
 
-//go:embed migrations/003_claims.sql
-var claimsSQL string
-
-//go:embed migrations/004_game_target_score.sql
-var gameTargetScoreSQL string
-
-//go:embed migrations/005_award_name_th.sql
-var awardNameThSQL string
-
-//go:embed migrations/006_award_description_th.sql
-var awardDescriptionThSQL string
-
-//go:embed migrations/007_claim_award_name_th.sql
-var claimAwardNameThSQL string
-
-//go:embed migrations/008_session_challenge.sql
-var sessionChallengeSQL string
+// migrations is the ordered list Migrate applies, and the list the test above
+// checks the directory against. `column` empty means the file is not an ALTER and
+// is safe to re-run as written (CREATE ... IF NOT EXISTS throughout); otherwise it
+// names the table and column that guard it, since SQLite has no
+// ADD COLUMN IF NOT EXISTS.
+var migrations = []struct {
+	file   string
+	table  string
+	column string
+}{
+	{file: "001_init.sql"},
+	{file: "002_score_award.sql", table: "scores", column: "award_id"},
+	{file: "003_claims.sql"},
+	{file: "004_game_target_score.sql", table: "games", column: "target_score"},
+	// Two entries, not one, because each ALTER is guarded independently. See the
+	// header of 005_award_name_th.sql.
+	{file: "005_award_name_th.sql", table: "awards", column: "name_th"},
+	{file: "006_award_description_th.sql", table: "awards", column: "description_th"},
+	{file: "007_claim_award_name_th.sql", table: "claims", column: "award_name_th"},
+	{file: "008_session_challenge.sql", table: "sessions", column: "challenge"},
+}
 
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
@@ -77,33 +100,19 @@ func Open(path string) (*Store, error) {
 // column-existence check (SQLite has no ADD COLUMN IF NOT EXISTS), so running
 // this on every boot — against a fresh or an already-migrated database — is safe.
 func (s *Store) Migrate(ctx context.Context) error {
-	if _, err := s.db.ExecContext(ctx, schemaSQL); err != nil {
-		return fmt.Errorf("apply schema: %w", err)
-	}
-	if err := s.addColumnIfMissing(ctx, "scores", "award_id", scoreAwardSQL); err != nil {
-		return err
-	}
-	// A whole new table, so it needs no column-existence guard — the file is
-	// CREATE ... IF NOT EXISTS throughout, like the base schema.
-	if _, err := s.db.ExecContext(ctx, claimsSQL); err != nil {
-		return fmt.Errorf("apply claims schema: %w", err)
-	}
-	if err := s.addColumnIfMissing(ctx, "games", "target_score", gameTargetScoreSQL); err != nil {
-		return err
-	}
-	// Two calls, not one, because each ALTER is guarded independently. See the
-	// header of 005_award_name_th.sql.
-	if err := s.addColumnIfMissing(ctx, "awards", "name_th", awardNameThSQL); err != nil {
-		return err
-	}
-	if err := s.addColumnIfMissing(ctx, "awards", "description_th", awardDescriptionThSQL); err != nil {
-		return err
-	}
-	if err := s.addColumnIfMissing(ctx, "claims", "award_name_th", claimAwardNameThSQL); err != nil {
-		return err
-	}
-	if err := s.addColumnIfMissing(ctx, "sessions", "challenge", sessionChallengeSQL); err != nil {
-		return err
+	for _, m := range migrations {
+		sqlText := mustMigration(m.file)
+		// No column named means the file is not an ALTER: it is CREATE ... IF NOT
+		// EXISTS throughout and re-runnable as written.
+		if m.column == "" {
+			if _, err := s.db.ExecContext(ctx, sqlText); err != nil {
+				return fmt.Errorf("apply %s: %w", m.file, err)
+			}
+			continue
+		}
+		if err := s.addColumnIfMissing(ctx, m.table, m.column, sqlText); err != nil {
+			return fmt.Errorf("apply %s: %w", m.file, err)
+		}
 	}
 	return nil
 }

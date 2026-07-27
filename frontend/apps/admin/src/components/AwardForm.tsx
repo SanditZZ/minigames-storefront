@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ApiClient, Award, AwardInput, Game } from "@minigames/api-client";
 import { UNLIMITED_STOCK } from "@minigames/api-client";
 import { ImageField } from "./ImageField";
-import { Button, Checkbox, Field, Input, Select, Textarea } from "../ui";
+import { Button, Checkbox, Field, Input, NumberInput, Select, Textarea } from "../ui";
 
 interface Props {
   api: ApiClient;
@@ -25,11 +25,14 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
   const [descriptionTh, setDescriptionTh] = useState(initial?.descriptionTh ?? "");
   const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? "");
   const [gameSlug, setGameSlug] = useState(initial?.gameSlug ?? "");
-  const [minScore, setMinScore] = useState(initial?.minScore ?? 0);
+  // number | null throughout: an empty box is a real state an operator passes
+  // through while retyping, and coercing it to 0 here would propose a change
+  // nobody made. `submit` is the one place a blank becomes a number.
+  const [minScore, setMinScore] = useState<number | null>(initial?.minScore ?? 0);
   const [unlimited, setUnlimited] = useState((initial?.stock ?? UNLIMITED_STOCK) === UNLIMITED_STOCK);
-  const [stock, setStock] = useState(initial && initial.stock >= 0 ? initial.stock : 10);
+  const [stock, setStock] = useState<number | null>(initial && initial.stock >= 0 ? initial.stock : 10);
   const [active, setActive] = useState(initial?.active ?? true);
-  const [sortOrder, setSortOrder] = useState(initial?.sortOrder ?? 0);
+  const [sortOrder, setSortOrder] = useState<number | null>(initial?.sortOrder ?? 0);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -40,10 +43,10 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
       descriptionTh: descriptionTh.trim(),
       imageUrl: imageUrl.trim(),
       gameSlug,
-      minScore,
-      stock: unlimited ? UNLIMITED_STOCK : Math.max(0, stock),
+      minScore: minScore ?? 0,
+      stock: unlimited ? UNLIMITED_STOCK : Math.max(0, stock ?? 0),
       active,
-      sortOrder,
+      sortOrder: sortOrder ?? 0,
     });
   }
 
@@ -115,26 +118,33 @@ export function AwardForm({ api, initial, games, busy, onSubmit, onCancel }: Pro
       </Field>
 
       <Field label="Min score to win">
-        <Input type="number" value={minScore} min={0} onChange={(e) => setMinScore(Number(e.target.value))} />
+        {/* No steppers: a score threshold is typed, not nudged from 0 to 40. */}
+        <NumberInput label="Min score to win" bounds={{ min: 0, step: 1 }} value={minScore} onChange={setMinScore} />
       </Field>
 
       <Field label="Stock">
         <div className="flex items-center gap-3">
           <Checkbox label="Unlimited" checked={unlimited} onChange={setUnlimited} />
+          {/* Steppers here: stock is the one field an operator really does move
+              one at a time, and holding the button repeats. It cannot walk into
+              UNLIMITED_STOCK's -1 — `min: 0` stops it, and unlimited stays the
+              checkbox beside it. */}
           {!unlimited && (
-            <Input
-              type="number"
+            <NumberInput
+              label="Stock"
+              bounds={{ min: 0, step: 1 }}
+              steppers
               value={stock}
-              min={0}
-              onChange={(e) => setStock(Number(e.target.value))}
-              className="max-w-28"
+              onChange={setStock}
+              className="max-w-44"
             />
           )}
         </div>
       </Field>
 
       <Field label="Sort order">
-        <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(Number(e.target.value))} />
+        {/* Steppers: a sort order is almost always adjusted by one. */}
+        <NumberInput label="Sort order" bounds={{ step: 1 }} steppers value={sortOrder} onChange={setSortOrder} />
       </Field>
 
       <div className="sm:col-span-2">

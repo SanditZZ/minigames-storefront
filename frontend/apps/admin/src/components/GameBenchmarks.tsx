@@ -7,7 +7,7 @@ import {
   readBenchmarks,
   targetScoreKey,
 } from "@minigames/admin-core";
-import { Alert, Button, Card, Field, Input, PanelHeader, Stack } from "../ui";
+import { Alert, Button, Card, Field, NumberInput, PanelHeader, Stack } from "../ui";
 
 /**
  * Per-game benchmark overrides — the score at which the player's reveal meter
@@ -87,13 +87,18 @@ export function GameBenchmarks({
         <div className="grid gap-4 sm:grid-cols-2">
           {games.map((g) => (
             <Field key={g.slug} label={`${g.name} (${g.scoreUnit})`}>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                value={draft[g.slug] ?? ""}
+              {/* The draft stays a STRING because empty means "use the value
+                  built into the game" — a distinct state from any number, and the
+                  one the placeholder is advertising. NumberInput speaks
+                  number|null, so null maps back to "" and nothing else changes.
+                  No steppers: a benchmark is a score, typed rather than nudged. */}
+              <NumberInput
+                label={`${g.name} benchmark`}
+                bounds={{ min: 1, step: 1 }}
+                value={draft[g.slug] ? Number(draft[g.slug]) : null}
                 placeholder={String(g.targetScore)}
-                onChange={(e) => setDraft((d) => ({ ...d, [g.slug]: e.target.value }))}
+                suffix={g.scoreUnit}
+                onChange={(v) => setDraft((d) => ({ ...d, [g.slug]: v === null ? "" : String(v) }))}
               />
               <span className="mt-1 block text-xs text-ink/50">
                 {g.direction === "lower" ? "Lower is better" : "Higher is better"} ·{" "}

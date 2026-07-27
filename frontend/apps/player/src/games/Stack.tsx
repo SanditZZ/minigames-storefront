@@ -50,9 +50,15 @@ const SETTLE_MS = 700;
  * Keeping them in agreement takes TWO things, and the second was learned the hard
  * way. Identical integer arithmetic, pinned to a shared golden fixture — and
  * identical INPUTS, which the fixture cannot check because it only ever sees the
- * pure functions. `handleDrop` judges a drop from the centre recomputed at the
- * timestamp it reports, never from the last rendered frame; see the comment there
- * for what went wrong while it did the latter.
+ * pure functions. The input rule is one line: `handleDrop` recomputes the block's
+ * centre from the very timestamp it reports, so the preview is a prediction of the
+ * server's answer rather than an independent guess. It judged from the last
+ * frame's centre while reporting a fresh clock read for a while, and the two
+ * drifting by a frame was enough to turn a landing into a miss on a narrow tower.
+ *
+ * That timestamp is itself the last PAINTED frame's, which is a separate choice
+ * and the one that makes the drop land where the player was aiming rather than a
+ * frame further on. Both comments are in `handleDrop`.
  *
  * All the geometry lives in packages/player-core/src/games/stack.ts as pure
  * functions; this component only runs the clock and paints.
@@ -102,6 +108,7 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
   const towerRef = useRef<Tower>(baseTower(physics));
   const spawnedAtRef = useRef(0);
   const startedAtRef = useRef(0);
+  const elapsedRef = useRef(0);
   const overRef = useRef(false);
 
   // Ends the round. The timings are NOT reported here — the settle beat below
@@ -132,10 +139,14 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
     const frame = () => {
       if (overRef.current) return;
       const elapsed = performance.now() - startedAtRef.current;
+      // The frame's own time, kept for handleDrop. See the comment there: a drop
+      // is timed at the moment the player was LOOKING at, not at the moment the
+      // event handler happened to run.
+      elapsedRef.current = Math.floor(elapsed);
 
       const placedCount = dropsRef.current.length;
       const centre = stackBlockCentre(
-        Math.floor(elapsed) - spawnedAtRef.current,
+        elapsedRef.current - spawnedAtRef.current,
         towerWidth(towerRef.current),
         stackPeriodMs(placedCount, physics),
         placedCount % 2 === 0,
@@ -160,10 +171,21 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
 
   const handleDrop = useCallback(() => {
     if (overRef.current) return;
-    // The timing is taken from the same clock the loop runs on, and floored to
-    // whole milliseconds HERE rather than on the way out — the server replays
+    // The drop is timed at the LAST PAINTED FRAME, not at a clock read taken
+    // here, and the two are different by up to a frame.
+    //
+    // The player is aiming at what is on screen, which is frame N. Reading
+    // `performance.now()` in this handler dates the drop somewhere after frame N —
+    // and since the server replays from whatever timestamp it is given, the block
+    // would be scored a frame further along its travel than the one the player was
+    // looking at. Self-consistent, but systematically late, always in the
+    // direction the block is moving. Using the frame's own time instead makes the
+    // reported moment the same moment the player saw, which is what Precision Stop
+    // does with `elapsedRef` and for the same reason.
+    //
+    // Already floored to whole milliseconds by the loop: the server replays
     // integers, so a fractional drop time would be a different round.
-    const at = Math.floor(performance.now() - startedAtRef.current);
+    const at = elapsedRef.current;
     if (at < 0 || at > durationMs) return;
     // A drop landing in the same millisecond as the previous one would be
     // rejected by the server as impossible. Dropping it is right: the player

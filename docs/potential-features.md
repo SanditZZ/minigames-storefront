@@ -170,16 +170,6 @@ with their hands currently cannot win a prize at all.
   the only variable-sized player payload. Stack bounds it per round
   (`StackMaxDrops`) and Precision Stop accepts exactly one event, so the exposure
   is small, but it belongs with the rate-limiting entry below rather than nowhere.
-- **`Migrate` is a hand-maintained list, and an unregistered migration is
-  silently skipped.** Every file in `internal/storage/sqlite/migrations/` needs a
-  matching `//go:embed` and a call in `Store.Migrate`; nothing checks that the
-  directory and the function agree. Adding `008_session_challenge.sql` and
-  forgetting the call is exactly what happened, and it cost a full browser-suite
-  run to diagnose — the Go suite was green because the sessions table had no test.
-  It has one now (`sessions_test.go`), which catches *that* column, but not the
-  next one. The fix is a test that walks the embedded `migrations/` directory and
-  asserts every file is applied, which needs the embed to become an `embed.FS`
-  over the whole directory rather than one variable per file.
 - **Rate limiting** per IP/device/session on session-create and submit.
 - **Signed sessions / nonce** and device attestation for kiosk mode.
 - **Anomaly detection** — flag improbable score distributions per device.
@@ -294,41 +284,25 @@ with their hands currently cannot win a prize at all.
     header ends up with two backgrounds fighting. And an unset banner must
     render as *nothing*, not as a grey placeholder box: an unconfigured
     storefront should look clean, the same rule the missing logo already follows.
-- **One number input for the whole admin, with real controls on it.** Every
-  numeric field in the admin is a bare `<Input type="number">` — the settings
-  rows (`SettingsPanel.tsx`), the per-game benchmarks (`GameBenchmarks.tsx`),
-  and the award form's `minScore` / `stock` / `sortOrder` (`AwardForm.tsx`).
-  They inherit the browser's native spinner, which is roughly a 10px target
-  stacked two-high: it fails the project's own 44px tap-target rule outright, and
-  on a phone it is not there at all. A `NumberInput` in
-  `apps/admin/src/ui/Controls.tsx` with **optional `+` / `−` buttons** is the
-  fix, and it is the natural home for several other things currently missing:
-  - **Steppers only where a step means something.** `+`/`−` is right for
-    `sortOrder` and `stock`; it is silly for a value of 168, which is why the
-    `step` should come from the caller and the buttons should be opt-in rather
-    than automatic. Press-and-hold to repeat is what makes a stepper usable
-    beyond about five presses — worth building once, here, rather than never.
-  - **Clamping belongs in `admin-core`, not in an onChange.** `min`/`max`/`step`
-    rounding is a pure function and should sit beside `duration.ts` so it is
-    tested. `DurationInput` should then be rebuilt on top of `NumberInput`
-    instead of hand-rolling `Math.max(0, Math.floor(...))` as it does today.
-  - **`Award.stock` has a sentinel and a stepper must respect it.** `-1` means
-    unlimited (`UNLIMITED_STOCK` in `packages/api-client`), so decrementing from
-    0 must stop rather than walk into it, and the field wants an explicit
-    "unlimited" affordance rather than expecting an operator to type minus one.
-  - **A cleared field is not zero.** Today `Number(e.target.value) || 0` turns a
-    half-typed value into `0` mid-keystroke, so backspacing to retype silently
-    proposes a real change. The component should hold the empty string as a
-    distinct state and only coerce on blur.
-  - **Two small correctness fixes it can carry for free:** a `wheel` handler
-    that blurs instead of scrolling the value — a focused number input silently
-    changing while the page scrolls is a genuine data-loss bug — and
-    `inputMode="numeric"` everywhere so a phone offers a number pad
-    (`DurationInput` sets it; nothing else does).
-  - **A suffix slot** for the unit, so "taps/second" and "ms" sit inside the
-    field rather than only in the prose description above it.
-  - It bites on every admin visit from a phone, which is the device an operator
-    at a counter actually has.
+- **`NumberInput` has no browser test, and its stepper is the part that needs
+  one.** `packages/admin-core/src/settings/number.ts` is unit-tested — parsing,
+  clamping, snapping, the step bounds — but the component in
+  `apps/admin/src/ui/Controls.tsx` is not, and everything interesting about it is
+  behaviour a pure test cannot reach: press-and-hold repeating on a timer, the
+  draft string that keeps a cleared field from becoming 0, the wheel handler that
+  blurs. `admin-awards-i18n.spec.ts` already opens an award form, so the cheapest
+  version is a few assertions there — hold `+`, check the value climbed by more
+  than one; clear the field, check nothing was submitted as 0. It bites when
+  someone refactors the timer cleanup, which is the fiddliest part and the one
+  with no coverage at all.
+- **The `NumberInput` suffix reserves a fixed `pr-12`.** Room for "ms" or "taps",
+  not for a long unit — and the units come from the server already translated
+  (`internal/game/i18n.go`), so the value this was sized against is not the value
+  a Thai storefront renders. A long suffix will sit on top of the digits rather
+  than beside them. The honest fix is measuring the suffix and padding to it,
+  which needs a layout effect; the cheap one is a `max-w` plus `truncate` on the
+  span so it clips instead of overlapping. Worth doing before the admin is
+  translated, which is the entry two sections down.
 
 ### What the bilingual player app does not cover
 
@@ -476,9 +450,11 @@ soon each bites. The rules for *where* a string lives are in the repo-root
 - **Sound and haptics** for the reveal — the animation beats are already there to
   hang them on (`navigator.vibrate` on the puck landing, a bell on a record).
 - **Accessibility** — larger tap targets and screen-reader labels. Reduced
-  motion, focus rings, the announced score (`ScoreReveal`) and announced errors
-  (`StatusMessage`'s `tone`) are done. The largest remaining target problem is
-  the admin's native number spinners — see the `NumberInput` entry above.
+  motion, focus rings, the announced score (`ScoreReveal`), announced errors
+  (`StatusMessage`'s `tone`) and the admin's number fields (`NumberInput`, which
+  replaced the native spinners) are done. What is left is a sweep rather than a
+  known offender: nothing has audited either app against the 44px rule, so the
+  next failure will be found by measuring, not by remembering.
 - **Pin the player's own leaderboard row.** `Leaderboard` shows the top ten; a
   player ranked #23 sees ten strangers and no sign of themselves. Their row
   belongs below an ellipsis when they fall outside the visible window (the rank
@@ -702,19 +678,6 @@ and the score table grow.
   `RoundRunner` deliberately knows nothing about any game's maths, so the preview
   would have to be something a game OFFERS — an optional field on the report, or a
   `data-` attribute the runner reads — rather than something the runner computes.
-- **The two server-scored games disagree about WHICH moment a tap is.** Precision
-  Stop reports the last painted frame's elapsed time (`elapsedRef`, captured in the
-  same frame as the position it shows), so the score describes the marker exactly
-  where the player saw it. Stack reports a freshly-read `performance.now()` and
-  judges the drop at that instant, so client and server agree with each other but
-  both describe the block up to a frame — twenty-odd virtual units — PAST where the
-  player saw it, biased in the direction of travel. Neither is broken and the
-  scores are self-consistent either way; the asymmetry is that Stack's version is
-  systematically slightly late, which a player would experience as the block
-  landing further along than they aimed. Making Stack read the frame's elapsed time
-  the way Precision Stop does is a few lines and would make the two consistent. It
-  bites nobody today, which is why it is filed rather than folded into the fix that
-  found it.
 - **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
   `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
   `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —

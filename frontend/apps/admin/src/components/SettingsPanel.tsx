@@ -19,6 +19,7 @@ import {
   DurationInput,
   Field,
   Input,
+  NumberInput,
   Loading,
   PanelHeader,
   Select,
@@ -183,14 +184,24 @@ function ValueInput({
       </Select>
     );
   }
-  return (
-    <Input
-      aria-label={settingKey}
-      type={type === "int" ? "number" : "text"}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
+  // An int setting with no duration spec still gets the real number control —
+  // the generic row is where an arbitrary knob is edited, and it inherited the
+  // native spinner along with everything else. The value stays a STRING on the way
+  // in and out because the row's dirty check, save and delete all compare against
+  // what the backend stores; NumberInput speaks number|null, so this is the one
+  // place that conversion lives. No steppers: nothing here knows what a step
+  // would mean for an unknown key.
+  if (type === "int") {
+    return (
+      <NumberInput
+        label={settingKey}
+        bounds={{ step: 1 }}
+        value={value.trim() === "" ? null : Number(value)}
+        onChange={(v) => onChange(v === null ? "" : String(v))}
+      />
+    );
+  }
+  return <Input aria-label={settingKey} type="text" value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
 /**
