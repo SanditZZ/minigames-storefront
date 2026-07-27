@@ -170,21 +170,47 @@ export function AwardsPanel({ api, games, router }: Props) {
                       {a.stock === UNLIMITED_STOCK ? "unlimited stock" : `${a.stock} in stock`}
                     </div>
                   </div>
+                  {/* Every control here names the prize it acts on. The visible
+                      labels are deliberately short — a column of buttons reading
+                      "Delete Free Coffee" is unreadable — but a screen reader
+                      hearing "Edit, Delete, Edit, Delete…" down a list cannot tell
+                      which row it is on, and neither can a test locator, which is
+                      how this surfaced: admin-awards-i18n.spec.ts has to narrow the
+                      list to one row before it can click anything. Same pattern as
+                      ClaimRow's `Redeem claim ${code}`. Confirm matters most of the
+                      four: it is the destructive one, and it is the only label a
+                      screen reader would otherwise hear with no object at all. */}
                   <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" onClick={() => router.openAward(a.id)}>
+                    <Button
+                      variant="ghost"
+                      aria-label={`Edit ${a.name}`}
+                      onClick={() => router.openAward(a.id)}
+                    >
                       Edit
                     </Button>
                     {confirmId === a.id ? (
                       <>
-                        <Button variant="danger" onClick={() => remove(a.id)}>
+                        <Button
+                          variant="danger"
+                          aria-label={`Confirm deleting ${a.name}`}
+                          onClick={() => remove(a.id)}
+                        >
                           Confirm
                         </Button>
-                        <Button variant="ghost" onClick={() => setConfirmId(null)}>
+                        <Button
+                          variant="ghost"
+                          aria-label={`Cancel deleting ${a.name}`}
+                          onClick={() => setConfirmId(null)}
+                        >
                           Cancel
                         </Button>
                       </>
                     ) : (
-                      <Button variant="danger" onClick={() => setConfirmId(a.id)}>
+                      <Button
+                        variant="danger"
+                        aria-label={`Delete ${a.name}`}
+                        onClick={() => setConfirmId(a.id)}
+                      >
                         Delete
                       </Button>
                     )}

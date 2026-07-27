@@ -47,11 +47,12 @@ export function isFalseStart(flipped: boolean): boolean {
   return !flipped;
 }
 
-/** Rating shown beside a finished reaction, for immediate feedback. */
-export function reactionVerdict(ms: number): string {
-  if (ms < 200) return "Lightning";
-  if (ms < 260) return "Sharp";
-  if (ms < 350) return "Solid";
-  if (ms < 500) return "Steady";
-  return "Sleepy";
-}
+// A per-game verdict used to live here, grading a reaction as "Lightning" or
+// "Sleepy". It is gone rather than translated: the reveal's tier ladder took over
+// grading a round for every game, so nothing rendered it — and while it was dead
+// it quietly held English prose inside a package, which is the one thing a
+// package may not do (see frontend/CLAUDE.md). Precision Stop's equivalent
+// survived by getting a surface and returning a MessageKey; this one had none.
+//
+// If a per-game verdict moment is ever wanted back, it returns a MessageKey and
+// the component looks it up — see precisionVerdict.

@@ -15,9 +15,9 @@ type sessionRepo struct{ db *sql.DB }
 
 func (r *sessionRepo) Create(ctx context.Context, s domain.Session) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO sessions (token, game_slug, issued_at, expires_at, consumed_at)
-		VALUES (?, ?, ?, ?, ?)`,
-		s.Token, s.GameSlug, fmtTime(s.IssuedAt), fmtTime(s.ExpiresAt), fmtNullTime(s.ConsumedAt))
+		INSERT INTO sessions (token, game_slug, issued_at, expires_at, consumed_at, challenge)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		s.Token, s.GameSlug, fmtTime(s.IssuedAt), fmtTime(s.ExpiresAt), fmtNullTime(s.ConsumedAt), s.Challenge)
 	if err != nil {
 		return fmt.Errorf("create session: %w", err)
 	}
@@ -26,7 +26,7 @@ func (r *sessionRepo) Create(ctx context.Context, s domain.Session) error {
 
 func (r *sessionRepo) Get(ctx context.Context, token string) (domain.Session, error) {
 	return scanSession(r.db.QueryRowContext(ctx, `
-		SELECT token, game_slug, issued_at, expires_at, consumed_at
+		SELECT token, game_slug, issued_at, expires_at, consumed_at, challenge
 		FROM sessions WHERE token = ?`, token))
 }
 
@@ -59,7 +59,7 @@ func scanSession(row *sql.Row) (domain.Session, error) {
 	var s domain.Session
 	var issued, expires string
 	var consumed sql.NullString
-	err := row.Scan(&s.Token, &s.GameSlug, &issued, &expires, &consumed)
+	err := row.Scan(&s.Token, &s.GameSlug, &issued, &expires, &consumed, &s.Challenge)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Session{}, storage.ErrNotFound
 	}

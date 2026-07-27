@@ -1,0 +1,24 @@
+-- The round description a session was issued with, as raw JSON.
+--
+-- Until now the challenge was minted in the HTTP handler, sent to the client and
+-- thrown away. That worked for exactly one game: Stack's challenge is a block of
+-- constants, so the server could always regenerate it at scoring time. Precision
+-- Stop cannot be scored that way, because its marker's starting phase is DRAWN
+-- per round — and a server that cannot say which phase it issued cannot
+-- recompute where the marker was when the player stopped it. Storing the
+-- challenge is what turns "the client tells us its score" into "the client tells
+-- us when it acted"; see game.ScorePrecisionStop.
+--
+-- It belongs on the session rather than on the score because it describes the
+-- round that was OFFERED, and it has to be readable at submit time — which is
+-- before a score row exists. The session is also already the thing whose whole
+-- job is to be the server's memory of a round in progress.
+--
+-- '' means "this game needs no challenge", which covers every client-scored game
+-- and every session issued before this column existed. Those sessions are
+-- single-use permits with a TTL measured in minutes, so there is nothing to
+-- backfill: any row predating this migration has long since been consumed or
+-- expired, and a Scorer that requires a challenge rejects an empty one rather
+-- than guessing at it.
+
+ALTER TABLE sessions ADD COLUMN challenge TEXT NOT NULL DEFAULT '';

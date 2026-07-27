@@ -158,24 +158,47 @@ describe("scoreStack", () => {
 });
 
 describe("stackPhysics", () => {
-  it("falls back whole when the challenge is absent or not an object", () => {
+  /**
+   * ABSENT and UNREADABLE are different answers, and conflating them is what this
+   * function used to do. No challenge means the built-ins — they are the same
+   * numbers the server holds, so nothing is being contradicted.
+   */
+  it("falls back whole when no challenge was sent at all", () => {
     expect(stackPhysics(undefined)).toEqual(STACK_DEFAULTS);
     expect(stackPhysics(null)).toEqual(STACK_DEFAULTS);
-    expect(stackPhysics("1000")).toEqual(STACK_DEFAULTS);
   });
 
-  // Per field rather than all-or-nothing: a server that grows a constant this
-  // build does not know about must not blank the ones it does.
-  it("takes each valid field and leaves the rest at their defaults", () => {
-    const p = stackPhysics({ trackWidth: 2000, baseWidth: "wide", basePeriodMs: 0, nonsense: 1 });
-    expect(p.trackWidth).toBe(2000);
-    expect(p.baseWidth).toBe(STACK_DEFAULTS.baseWidth);
-    expect(p.basePeriodMs).toBe(STACK_DEFAULTS.basePeriodMs);
+  // Per field, but only for fields that are MISSING: a server that grows a
+  // constant this build does not know about must not blank the ones it does.
+  it("takes each present field and leaves absent ones at their defaults", () => {
+    const p = stackPhysics({ trackWidth: 2000, nonsense: 1 });
+    expect(p?.trackWidth).toBe(2000);
+    expect(p?.baseWidth).toBe(STACK_DEFAULTS.baseWidth);
+    expect(p?.basePeriodMs).toBe(STACK_DEFAULTS.basePeriodMs);
+  });
+
+  /**
+   * The case that used to degrade silently. A field the server SENT and this
+   * build cannot read is not a missing field: the round would be played by
+   * different physics than the one being scored, so every drop would land
+   * somewhere the server did not put it, and the player would watch a block
+   * settle squarely on the tower and be told they missed. Refusing to start is
+   * the only honest option, and the component renders an error instead.
+   */
+  it("refuses a challenge whose fields it cannot read", () => {
+    expect(stackPhysics({ baseWidth: "wide" })).toBeNull();
+    expect(stackPhysics({ basePeriodMs: 0 })).toBeNull();
+    expect(stackPhysics({ trackWidth: -1 })).toBeNull();
+    expect(stackPhysics({ minPeriodMs: Number.NaN })).toBeNull();
+    // Sent, but not a challenge. Not the same as sending nothing.
+    expect(stackPhysics("1000")).toBeNull();
+    expect(stackPhysics(42)).toBeNull();
   });
 
   it("refuses a base wider than the track, which would freeze the block", () => {
-    const p = stackPhysics({ trackWidth: 100, baseWidth: 900 });
-    expect(p.baseWidth).toBeLessThanOrEqual(p.trackWidth);
+    // Contradictory rather than merely odd, and unrepairable: whichever of the
+    // two is kept, the round stops matching the one the server scores.
+    expect(stackPhysics({ trackWidth: 100, baseWidth: 900 })).toBeNull();
   });
 });
 

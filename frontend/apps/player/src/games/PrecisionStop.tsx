@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BULLSEYE_OFF,
   NEAR_OFF,
   STOP_HOLD_MS,
   WORST_SCORE,
   missDistance,
+  precisionSweep,
   precisionVerdict,
   sweepPosition,
   trackPercent,
@@ -12,13 +13,15 @@ import {
 } from "@minigames/player-core";
 import { finishPulse } from "../effects/haptics";
 import { useT } from "../i18n";
-import { CenterStack, Eyebrow, ProgressBar } from "../ui";
+import { CenterStack, Eyebrow, ProgressBar, StatusMessage } from "../ui";
 import type { MiniGame, PlayProps } from "./types";
 
 /** Where the marker came to rest, and how it got there. */
 interface Landing {
   position: number;
   off: number;
+  /** Ms from the start of play — the ONE number this round reports. */
+  atMs: number;
   /** True when the clock ran out rather than the player stopping it. */
   timedOut: boolean;
 }
@@ -45,19 +48,28 @@ interface Landing {
  * for why the beat exists and why it does not honour reduced motion the way the
  * celebration beats do.
  *
+ * THIS COMPONENT DOES NOT SCORE THE ROUND. It reports the millisecond the player
+ * stopped the marker and the server replays the sweep to work out the distance.
+ * The `off` it computes locally exists only to show the player where they landed
+ * during the hold — the number on the result screen comes back over the wire. The
+ * marker's starting phase arrives in the challenge for the same reason: a phase
+ * drawn here would be one the server could not score against, which is the hole
+ * this game had for as long as it reported its own distance.
+ *
  * All the geometry lives in ../../packages/player-core/src/games/precision.ts
  * as pure functions; this component only runs the clock and paints.
  */
-function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
+function PrecisionStopPlay({ durationMs, challenge, onFinish }: PlayProps) {
   const t = useT();
   const [position, setPosition] = useState(0);
   const [remaining, setRemaining] = useState(durationMs);
   const [landing, setLanding] = useState<Landing | null>(null);
   const landedRef = useRef(false);
   const positionRef = useRef(0);
-  // Drawn once per round: a fixed opening would be learnable, and a player who
-  // can count their way to the centre is not playing this game any more.
-  const phaseRef = useRef(Math.random());
+  const elapsedRef = useRef(0);
+  // The sweep the SERVER issued. Null means it could not be read, and this game
+  // cannot substitute a default the way Stack can: see precisionSweep.
+  const sweep = useMemo(() => precisionSweep(challenge), [challenge]);
 
   // Ends the round: freezes the marker and shows where it stopped. The score is
   // NOT reported here — the hold below does that once the player has seen it.
@@ -71,16 +83,29 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
   // The hold, and the only place onFinish is called. Its cleanup matters: a
   // player who quits mid-hold unmounts this, and the round must not go on to
   // submit a score behind the screen they just left.
+  //
+  // What is reported is the stop TIME, as a one-element event list — or an EMPTY
+  // one when the clock ran out, which is how the server is told the marker was
+  // never stopped. Neither carries a distance: that is the server's to compute.
   useEffect(() => {
     if (!landing) return;
-    const id = window.setTimeout(() => onFinish(landing.off), STOP_HOLD_MS);
+    const id = window.setTimeout(
+      () => onFinish(landing.timedOut ? [] : [landing.atMs]),
+      STOP_HOLD_MS,
+    );
     return () => window.clearTimeout(id);
   }, [landing, onFinish]);
 
   // One rAF loop drives both the marker and the clock. rAF rather than an
   // interval because the marker's position IS the game — a stutter here is a
   // player stopping somewhere they did not aim at.
+  //
+  // The elapsed time is floored to whole milliseconds before it reaches
+  // sweepPosition, because that is the unit the server replays in: a stop
+  // reported as 349ms must be drawn from 349, not from 349.7, or the frozen
+  // marker sits a step away from the position the score was computed at.
   useEffect(() => {
+    if (!sweep) return;
     const startedAt = performance.now();
     let raf = 0;
 
@@ -88,10 +113,11 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
       // Landing stops the loop, which is what freezes the marker where the
       // player stopped it for the duration of the hold.
       if (landedRef.current) return;
-      const elapsed = performance.now() - startedAt;
+      const elapsed = Math.floor(performance.now() - startedAt);
 
-      const pos = sweepPosition(elapsed, phaseRef.current);
+      const pos = sweepPosition(elapsed, sweep.phaseMs, sweep.periodMs);
       positionRef.current = pos;
+      elapsedRef.current = elapsed;
       setPosition(pos);
       setRemaining(Math.max(0, durationMs - elapsed));
 
@@ -101,7 +127,7 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
       // time" rather than a distance — the marker's position is not what was
       // scored, and showing a verdict for it would be a lie.
       if (elapsed >= durationMs) {
-        land({ position: pos, off: WORST_SCORE, timedOut: true });
+        land({ position: pos, off: WORST_SCORE, atMs: elapsed, timedOut: true });
         return;
       }
       raf = requestAnimationFrame(frame);
@@ -109,14 +135,36 @@ function PrecisionStopPlay({ durationMs, onFinish }: PlayProps) {
 
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [durationMs, land]);
+  }, [durationMs, land, sweep]);
 
-  // Read the position from the ref, not from state: state is a frame behind by
-  // the time a pointer event is handled, and on this game that lag is the score.
+  // Read the position and the time from refs, not from state: state is a frame
+  // behind by the time a pointer event is handled, and on this game that lag is
+  // the score.
+  //
+  // The two are captured in the same frame, so the `off` shown during the hold and
+  // the `atMs` the server scores describe the same moment. Recomputing the
+  // position from a freshly-read clock here would let them disagree by a frame,
+  // and the disagreement would be visible: a marker frozen where the player
+  // stopped it beside a distance from slightly later.
   const handleStop = useCallback(() => {
     const pos = positionRef.current;
-    land({ position: pos, off: missDistance(pos), timedOut: false });
+    land({ position: pos, off: missDistance(pos), atMs: elapsedRef.current, timedOut: false });
   }, [land]);
+
+  // No readable sweep means no round. Refusing is the honest option: the server
+  // scores from the phase it issued, so playing at a substituted one would show
+  // the player a marker stopping in a place their score does not describe. See
+  // precisionSweep for why this game cannot degrade the way Stack does.
+  if (!sweep) {
+    return (
+      <StatusMessage
+        tone="error"
+        icon="😕"
+        title={t("play.failed.title")}
+        detail={t("play.badChallenge")}
+      />
+    );
+  }
 
   const markerPct = trackPercent(landing ? landing.position : position);
   const seconds = (remaining / 1000).toFixed(1);

@@ -47,12 +47,27 @@ type Game struct {
 // Session is a server-issued, single-use permit to submit one score for one
 // game. It exists so the backend — not the client — is the source of truth for
 // when a round started and whether a submission has already been consumed.
+//
+// Challenge is the round's description as JSON, exactly as it was handed to the
+// client ("" for a game that needs none). It is STORED rather than regenerated
+// because a challenge may contain randomness the score depends on: Precision
+// Stop's marker phase is drawn per round, and a server that could not say which
+// phase it issued could not recompute where the marker was when the player
+// stopped it. Stack's challenge happens to be constant and would survive being
+// regenerated; relying on that would make "the challenge is reproducible" a
+// property every future game had to preserve, which is not a property worth
+// depending on.
+//
+// Kept as raw JSON rather than a typed field: the shape belongs to the
+// individual game, and this layer is the one place that must not know which
+// game it is holding.
 type Session struct {
 	Token      string     `json:"token"`
 	GameSlug   GameSlug   `json:"gameSlug"`
 	IssuedAt   time.Time  `json:"issuedAt"`
 	ExpiresAt  time.Time  `json:"expiresAt"`
 	ConsumedAt *time.Time `json:"consumedAt,omitempty"`
+	Challenge  string     `json:"challenge,omitempty"`
 }
 
 // ScoreEntry is a persisted result of one completed round.

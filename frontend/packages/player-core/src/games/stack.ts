@@ -71,24 +71,45 @@ function isPositiveInt(v: unknown): v is number {
 }
 
 /**
- * Narrows the server's challenge into the physics a round is played by.
+ * Narrows the server's challenge into the physics a round is played by, or
+ * returns null when it cannot be read.
  *
- * Follows the same precedence rule as the palette override in
- * `@minigames/tokens`: a field that is PRESENT and VALID wins; anything else —
- * absent, malformed, the wrong type — is not an override and the built-in
- * stands. Per field rather than all-or-nothing, so a server that grows a new
- * constant does not blank the ones this build already understood.
+ * THE DISTINCTION THAT MATTERS IS ABSENT VERSUS UNREADABLE, and it used to be
+ * missing. An ABSENT challenge is fine and falls back to the built-ins: nothing
+ * is being contradicted, and the constants below are the same numbers the server
+ * would have sent. A challenge that is PRESENT and cannot be read is a different
+ * thing entirely — the round would then play by different physics than the one
+ * being scored, so every drop lands somewhere the server did not put it, and the
+ * player watches a block settle on the tower and is told they missed.
+ *
+ * So a field that is absent takes the built-in, and a field that is present and
+ * invalid fails the whole challenge. That keeps the useful half of the old
+ * per-field rule — a server that grows a new constant does not blank the ones
+ * this build already understood — while refusing the case that silently changes
+ * the game. `precisionSweep` refuses for the same reason and is stricter still,
+ * because its challenge carries a value with no sane built-in at all.
  *
  * Typed `unknown` in and validated here rather than trusted, because this is
  * the boundary where JSON off the wire becomes numbers the game does maths
  * with, and it is the only place that check can be made once.
  */
-export function stackPhysics(challenge: unknown): StackPhysics {
-  if (typeof challenge !== "object" || challenge === null) return STACK_DEFAULTS;
+export function stackPhysics(challenge: unknown): StackPhysics | null {
+  // No challenge at all: the built-ins are the same numbers the server holds.
+  if (challenge === undefined || challenge === null) return STACK_DEFAULTS;
+  // Something was sent and it is not a challenge. Not the same as sending
+  // nothing, and not something to guess at.
+  if (typeof challenge !== "object") return null;
+
   const c = challenge as Record<string, unknown>;
+  let unreadable = false;
   const pick = (key: keyof StackPhysics): number => {
     const v = c[key];
-    return isPositiveInt(v) ? Math.floor(v) : STACK_DEFAULTS[key];
+    if (v === undefined) return STACK_DEFAULTS[key];
+    if (!isPositiveInt(v)) {
+      unreadable = true;
+      return STACK_DEFAULTS[key];
+    }
+    return Math.floor(v);
   };
   const physics: StackPhysics = {
     trackWidth: pick("trackWidth"),
@@ -98,12 +119,12 @@ export function stackPhysics(challenge: unknown): StackPhysics {
     periodStepMs: pick("periodStepMs"),
     maxDrops: pick("maxDrops"),
   };
+  if (unreadable) return null;
   // A base wider than the track has no sweep at all and would freeze the block
-  // dead centre, which reads as a broken game rather than a hard one.
-  if (physics.baseWidth > physics.trackWidth) {
-    physics.baseWidth = STACK_DEFAULTS.baseWidth;
-    physics.trackWidth = STACK_DEFAULTS.trackWidth;
-  }
+  // dead centre. Contradictory rather than merely odd, and it cannot be repaired
+  // by substituting one of the two: whichever is kept, the round no longer
+  // matches the one the server is scoring.
+  if (physics.baseWidth > physics.trackWidth) return null;
   return physics;
 }
 

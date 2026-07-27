@@ -8,10 +8,11 @@ import (
 	"testing"
 )
 
-// updateGolden regenerates the fixture instead of checking it:
+// updateGolden regenerates the fixtures instead of checking them. Shared by
+// every golden test in this package, so one flag rewrites them all:
 //
 //	go test ./internal/game -run Golden -update
-var updateGolden = flag.Bool("update", false, "rewrite the stack golden fixture")
+var updateGolden = flag.Bool("update", false, "rewrite the golden fixtures")
 
 // goldenPath is read by BOTH suites. The Go side generates and verifies it; the
 // TypeScript mirror (packages/player-core/src/games/stack.test.ts) reads the
@@ -67,7 +68,7 @@ func buildStackGolden(t *testing.T) stackGolden {
 		{1, 2, 3},
 		{StackDurationMs - 1},
 	} {
-		score, err := ScoreStack(drops, StackDurationMs)
+		score, err := ScoreStack(drops, StackDurationMs, nil)
 		if err != nil {
 			t.Fatalf("golden round %v rejected: %v", drops, err)
 		}

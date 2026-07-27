@@ -78,7 +78,7 @@ func TestScoreStackCountsAPerfectRun(t *testing.T) {
 		spawnedAt = at
 	}
 
-	got, err := ScoreStack(drops, StackDurationMs)
+	got, err := ScoreStack(drops, StackDurationMs, nil)
 	if err != nil {
 		t.Fatalf("perfect run rejected: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestScoreStackStopsAtTheFirstMiss(t *testing.T) {
 	first := perfectDrop(0, StackTrackWidth/2, StackBaseWidth, 0)
 	drops := []int{first, first + 1, first + 400, first + 800}
 
-	got, err := ScoreStack(drops, StackDurationMs)
+	got, err := ScoreStack(drops, StackDurationMs, nil)
 	if err != nil {
 		t.Fatalf("a miss is an outcome, not an error: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestScoreStackTrimsTheTowerOnAnImperfectDrop(t *testing.T) {
 	newWidth := overlapRight - overlapLeft
 
 	second := perfectDrop(at, (overlapLeft+overlapRight)/2, newWidth, 1)
-	got, err := ScoreStack([]int{at, second}, StackDurationMs)
+	got, err := ScoreStack([]int{at, second}, StackDurationMs, nil)
 	if err != nil {
 		t.Fatalf("trimmed run rejected: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestScoreStackRejectsMalformedEvents(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if _, err := ScoreStack(c.drops, StackDurationMs); err == nil {
+			if _, err := ScoreStack(c.drops, StackDurationMs, nil); err == nil {
 				t.Fatalf("%v was accepted, want a rejection", c.drops)
 			}
 		})
@@ -161,14 +161,14 @@ func TestScoreStackRejectsMalformedEvents(t *testing.T) {
 	for i := range tooMany {
 		tooMany[i] = i + 1
 	}
-	if _, err := ScoreStack(tooMany, StackDurationMs); err == nil {
+	if _, err := ScoreStack(tooMany, StackDurationMs, nil); err == nil {
 		t.Fatal("a submission longer than StackMaxDrops was accepted")
 	}
 }
 
 func TestScoreStackScoresAnEmptyRoundZero(t *testing.T) {
 	// A player who never drops anything is not cheating, they just did nothing.
-	got, err := ScoreStack(nil, StackDurationMs)
+	got, err := ScoreStack(nil, StackDurationMs, nil)
 	if err != nil {
 		t.Fatalf("an empty round is an outcome, not an error: %v", err)
 	}

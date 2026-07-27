@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -394,35 +395,163 @@ func TestSubmitScoreRejectsImpossibleEvents(t *testing.T) {
 }
 
 // A server-scored game must still hand the client the physics it has to render
-// the round with — without the challenge there is nothing to simulate.
+// the round with — without the challenge there is nothing to simulate. The
+// assertion is on the SESSION rather than on the Definition: the definition only
+// proves the game CAN mint one, and a challenge that was minted and not stored
+// is exactly the bug this column was added to prevent.
 func TestStartSessionCarriesTheChallengeForAServerScoredGame(t *testing.T) {
 	store := newMemStore()
 	svc := newTestService(store)
 	ctx := context.Background()
 
-	_, def, err := svc.StartSession(ctx, game.SlugStack)
+	sess, def, err := svc.StartSession(ctx, game.SlugStack)
 	if err != nil {
 		t.Fatalf("StartSession: %v", err)
 	}
 	if def.Challenge == nil {
-		t.Fatal("stack session carries no challenge")
+		t.Fatal("stack definition mints no challenge")
 	}
-	ch, ok := def.Challenge().(game.StackChallenge)
-	if !ok {
-		t.Fatalf("challenge is %T, want game.StackChallenge", def.Challenge())
+	if sess.Challenge == "" {
+		t.Fatal("stack session stored no challenge; a Scorer would have nothing to replay against")
+	}
+	var ch game.StackChallenge
+	if err := json.Unmarshal([]byte(sess.Challenge), &ch); err != nil {
+		t.Fatalf("stored challenge is not readable JSON: %v (%q)", err, sess.Challenge)
 	}
 	if ch.TrackWidth != game.StackTrackWidth || ch.BaseWidth != game.StackBaseWidth {
 		t.Fatalf("challenge geometry %+v does not match the catalog's constants", ch)
 	}
 
+	// It must survive the round trip through storage, not merely be returned:
+	// submit reads the session back rather than reusing the one we hold.
+	stored, err := store.Sessions().Get(ctx, sess.Token)
+	if err != nil {
+		t.Fatalf("re-read session: %v", err)
+	}
+	if stored.Challenge != sess.Challenge {
+		t.Fatalf("stored challenge %q does not match the issued one %q", stored.Challenge, sess.Challenge)
+	}
+
 	// And a client-scored game must not: an absent challenge is how the player
 	// app knows which of the two protocols a game speaks.
-	_, tapDef, err := svc.StartSession(ctx, game.SlugTapFast)
+	tapSess, tapDef, err := svc.StartSession(ctx, game.SlugTapFast)
 	if err != nil {
 		t.Fatalf("StartSession: %v", err)
 	}
 	if tapDef.Challenge != nil {
 		t.Fatal("tap-fast is client-scored and must carry no challenge")
+	}
+	if tapSess.Challenge != "" {
+		t.Fatalf("tap-fast session stored a challenge %q it has no use for", tapSess.Challenge)
+	}
+}
+
+// Precision Stop's phase is DRAWN, so its challenge is the one that cannot be
+// regenerated. This is the round trip that matters: play a round, submit the
+// moment of the stop, and check the server scored it from the phase it issued
+// rather than from a fresh draw or a default.
+func TestSubmitScoreReplaysPrecisionStopFromTheIssuedPhase(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugPrecisionStop)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	var ch game.PrecisionChallenge
+	if err := json.Unmarshal([]byte(sess.Challenge), &ch); err != nil {
+		t.Fatalf("precision session stored no readable challenge: %v (%q)", err, sess.Challenge)
+	}
+
+	// Work out, from the phase the server actually issued, the moment the marker
+	// is dead centre — then stop there. A server ignoring its own stored phase
+	// would score this as something other than a perfect round.
+	stopAt := 0
+	for ms := 0; ms <= ch.PeriodMs; ms++ {
+		if game.PrecisionMissDistance(game.PrecisionSweepPosition(ms, ch.PhaseMs, ch.PeriodMs)) == 0 {
+			stopAt = ms
+			break
+		}
+	}
+
+	res, err := svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugPrecisionStop,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		// Deliberately a LIE, and deliberately ignored: a server-scored game
+		// never reads the client's opinion of its own score.
+		Value:  99,
+		Events: []int{stopAt},
+	})
+	if err != nil {
+		t.Fatalf("SubmitScore: %v", err)
+	}
+	if res.Score.Value != 0 {
+		t.Fatalf("a stop computed from the issued phase should score 0, got %d (phase %d, stop %dms)",
+			res.Score.Value, ch.PhaseMs, stopAt)
+	}
+}
+
+// The client's reported distance is not read at all. Fabricating a perfect score
+// used to be a matter of posting a zero; now the events decide and a lie about
+// the value changes nothing.
+func TestSubmitScoreIgnoresAClaimedPrecisionDistance(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugPrecisionStop)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	var ch game.PrecisionChallenge
+	if err := json.Unmarshal([]byte(sess.Challenge), &ch); err != nil {
+		t.Fatalf("unmarshal challenge: %v", err)
+	}
+
+	// Stop at a quarter-sweep from the marker's own start, which is the far end
+	// of the track: the worst possible round.
+	stopAt := ch.PeriodMs / 4
+	want := game.PrecisionMissDistance(game.PrecisionSweepPosition(stopAt, ch.PhaseMs, ch.PeriodMs))
+
+	res, err := svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugPrecisionStop,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		Value:      0, // "I was perfect"
+		Events:     []int{stopAt},
+	})
+	if err != nil {
+		t.Fatalf("SubmitScore: %v", err)
+	}
+	if res.Score.Value != want {
+		t.Fatalf("score %d should be the replayed distance %d, not the claimed 0", res.Score.Value, want)
+	}
+}
+
+// A submission with no events is a player who never stopped the marker, and it
+// must record the worst legal distance rather than being rejected.
+func TestSubmitScorePrecisionStopTimeoutIsRecorded(t *testing.T) {
+	store := newMemStore()
+	svc := newTestService(store)
+	ctx := context.Background()
+
+	sess, _, err := svc.StartSession(ctx, game.SlugPrecisionStop)
+	if err != nil {
+		t.Fatalf("StartSession: %v", err)
+	}
+	res, err := svc.SubmitScore(ctx, SubmitInput{
+		GameSlug:   game.SlugPrecisionStop,
+		Token:      sess.Token,
+		PlayerName: "Po",
+		Events:     []int{},
+	})
+	if err != nil {
+		t.Fatalf("a timeout must be recorded, not rejected: %v", err)
+	}
+	if res.Score.Value != game.PrecisionTrackHalf {
+		t.Fatalf("a timeout should score %d, got %d", game.PrecisionTrackHalf, res.Score.Value)
 	}
 }
 

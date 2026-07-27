@@ -66,6 +66,10 @@ export const en = {
   "play.failed.title": "Something went wrong",
   "play.back": "Back",
   "play.startFailed": "Could not start the game.",
+  // Shown when a round arrives with physics this build cannot read. Shared by
+  // every server-scored game, because refusing to play is the same decision
+  // whichever game made it — see precisionSweep and stackPhysics.
+  "play.badChallenge": "This round could not be set up. Go back and try again.",
   "play.submitFailed": "Could not submit your score.",
   "play.playingAs": "Playing as {name}",
   "play.quit": "Quit",

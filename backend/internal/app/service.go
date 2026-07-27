@@ -6,9 +6,12 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"math/big"
 	"strconv"
 	"time"
 
@@ -91,10 +94,19 @@ func (s *Service) allSettings(ctx context.Context) []domain.Setting {
 // It returns the whole Definition rather than just its Game because a
 // server-scored game also has to hand the client the round's Challenge, and
 // which games have one is a property of the catalog, not of the session.
+//
+// The challenge is minted HERE rather than in the handler that serves it, because
+// it has to be stored: a Scorer replays the round against the challenge that was
+// actually issued, and a challenge carrying a random draw (Precision Stop's
+// marker phase) cannot be recovered any other way. See domain.Session.Challenge.
 func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domain.Session, game.Definition, error) {
 	def, ok := s.registry.Get(slug)
 	if !ok || !def.Game.Enabled {
 		return domain.Session{}, game.Definition{}, ErrGameUnavailable
+	}
+	challenge, err := challengeJSON(def)
+	if err != nil {
+		return domain.Session{}, game.Definition{}, err
 	}
 	ttl := time.Duration(s.settingInt(ctx, domain.SettingSessionTTLSeconds, 120)) * time.Second
 	now := s.now()
@@ -105,11 +117,47 @@ func (s *Service) StartSession(ctx context.Context, slug domain.GameSlug) (domai
 		GameSlug:  slug,
 		IssuedAt:  now,
 		ExpiresAt: now.Add(ttl),
+		Challenge: challenge,
 	}
 	if err := s.store.Sessions().Create(ctx, sess); err != nil {
 		return domain.Session{}, game.Definition{}, err
 	}
 	return sess, def, nil
+}
+
+// challengeJSON builds and serialises a round's challenge, or "" for a game that
+// needs none.
+//
+// This is the ACTION half of the split: game.Challenge is pure and takes its
+// randomness as a parameter, and this is the one place a real random source is
+// handed to it. crypto/rand rather than math/rand because the draw is what stops
+// a player predicting the sweep they are about to be scored against — a
+// predictable phase would hand back exactly the advantage moving the draw
+// server-side was meant to remove.
+func challengeJSON(def game.Definition) (string, error) {
+	if def.Challenge == nil {
+		return "", nil
+	}
+	raw, err := json.Marshal(def.Challenge(cryptoDraw))
+	if err != nil {
+		return "", fmt.Errorf("build challenge for %s: %w", def.Game.Slug, err)
+	}
+	return string(raw), nil
+}
+
+// cryptoDraw is a game.Draw over crypto/rand. It degrades to 0 rather than
+// failing a round if the system's entropy source errors — a fixed phase is a
+// weaker game, but refusing to issue sessions because of it would take the
+// storefront down for a condition that does not happen on a working machine.
+func cryptoDraw(n int) int {
+	if n <= 0 {
+		return 0
+	}
+	v, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
+	if err != nil {
+		return 0
+	}
+	return int(v.Int64())
 }
 
 // --- Score submission ------------------------------------------------------
@@ -179,7 +227,7 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 		MaxTapsPerSecond: s.settingInt(ctx, domain.SettingMaxTapsPerSecond, defaults.MaxTapsPerSecond),
 		MinReactionMs:    s.settingInt(ctx, domain.SettingMinReactionMs, defaults.MinReactionMs),
 	}
-	value, err := scoreOf(def, in, elapsedMs, limits)
+	value, err := scoreOf(def, in, sess, elapsedMs, limits)
 	if err != nil {
 		return SubmitResult{}, err
 	}
@@ -245,9 +293,15 @@ func (s *Service) SubmitScore(ctx context.Context, in SubmitInput) (SubmitResult
 // length rather than the wall-clock gap, because the events it replays are
 // offsets from the start of PLAY, and the session has been open since before
 // the countdown.
-func scoreOf(def game.Definition, in SubmitInput, elapsedMs int, limits game.Limits) (int, error) {
+//
+// The Scorer is also handed the session's stored challenge, which is the round
+// the player was actually given. Regenerating it here instead would work for
+// Stack and silently mis-score Precision Stop, whose phase is drawn per round —
+// so the rule is that a Scorer reads the challenge from the session or not at
+// all.
+func scoreOf(def game.Definition, in SubmitInput, sess domain.Session, elapsedMs int, limits game.Limits) (int, error) {
 	if def.Scorer != nil {
-		value, err := def.Scorer(in.Events, def.Game.DurationMs)
+		value, err := def.Scorer(in.Events, def.Game.DurationMs, []byte(sess.Challenge))
 		if err != nil {
 			return 0, fmt.Errorf("%w: %v", ErrScoreRejected, err)
 		}

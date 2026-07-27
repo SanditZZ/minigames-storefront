@@ -79,6 +79,11 @@ const StackMaxDrops = StackDurationMs / (StackMinPeriodMs / 4)
 // memorise. What the challenge is for is making the TUNING single-sourced. The
 // simulation is necessarily written twice (once to render, once to score), and
 // duplicating the constants as well is how the two would drift apart.
+//
+// Because it is constant, ScoreStack can and does ignore the stored challenge
+// and score from the package constants directly. Precision Stop cannot — its
+// phase is drawn per round — and that difference is why the challenge is stored
+// on the session rather than regenerated at submit time.
 type StackChallenge struct {
 	TrackWidth   int `json:"trackWidth"`
 	BaseWidth    int `json:"baseWidth"`
@@ -106,7 +111,9 @@ var Stack = Definition{
 	Scorer:    ScoreStack,
 }
 
-func stackChallenge() any {
+// stackChallenge ignores its Draw: see StackChallenge on why this game needs no
+// randomness beyond the player's own timing.
+func stackChallenge(Draw) any {
 	return StackChallenge{
 		TrackWidth:   StackTrackWidth,
 		BaseWidth:    StackBaseWidth,
@@ -204,7 +211,10 @@ func StackBlockCentre(phaseMs, width, periodMs int, fromLeft bool) int {
 // round, strictly increasing, and bounded in number. A MISS, by contrast, is
 // not an error at all — it is the ordinary way a round ends, and it scores the
 // blocks placed before it. Pure: no clock, no storage.
-func ScoreStack(drops []int, durationMs int) (int, error) {
+//
+// The stored challenge is ignored: this game's is a block of constants, so the
+// numbers in it are already the ones below. See StackChallenge.
+func ScoreStack(drops []int, durationMs int, _ []byte) (int, error) {
 	if durationMs <= 0 {
 		return 0, fmt.Errorf("round had no elapsed time")
 	}

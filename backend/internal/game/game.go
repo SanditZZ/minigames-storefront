@@ -27,13 +27,16 @@ import (
 //   - A Scorer, for a game the SERVER scores. The client reports what the
 //     player did — not what it was worth — and the server replays the round to
 //     compute the number itself. Nothing is being trusted and then checked;
-//     the client's opinion of its own score is never read.
+//     the client's opinion of its own score is never read. A Scorer replays
+//     against the CHALLENGE the session was issued with, which is why that
+//     challenge is stored rather than regenerated (see domain.Session).
 //
 // Scorer is the better answer wherever a game's rules can be replayed from its
-// inputs, and Stack is the first game written to it. Precision Stop is the
-// obvious next one: its stop time is a single event, and sending that instead
-// of a distance would make the one game in the catalog with no plausibility
-// check at all exactly checkable. See docs/potential-features.md.
+// inputs. Stack and Precision Stop are both written to it; Tap Fast and Reaction
+// Timer are not, because neither reports events the server could replay — a tap
+// count is not a timeline and a reaction is the elapsed time itself. Migrating
+// those two means the client sending every tap, which is a bigger change than it
+// sounds and is filed rather than assumed. See docs/potential-features.md.
 //
 // Both are optional and neither is required; a Definition with neither accepts
 // whatever it is told, which is a choice worth making out loud rather than by
@@ -42,11 +45,14 @@ type Definition struct {
 	Game      domain.Game
 	Validator Validator
 	// Challenge returns the round description the client needs in order to
-	// render a scored game — today the physics constants, so the tuning has one
-	// home rather than one per simulation. Nil for games that need none.
+	// render a scored game: the physics constants, so the tuning has one home
+	// rather than one per simulation, plus whatever the round draws at random.
+	// Nil for games that need none.
 	//
 	// It is called per session and its result is serialised straight to JSON,
-	// so it must return a value, never a pointer into shared state.
+	// so it must return a value, never a pointer into shared state. The result
+	// is STORED on the session, because a Scorer has to replay against the
+	// challenge that was actually issued rather than a fresh one.
 	Challenge Challenge
 	// Scorer computes the authoritative score from the events the client
 	// reported. When present it REPLACES the Validator path entirely: the
@@ -58,8 +64,20 @@ type Definition struct {
 // elapsedMs, given tunable limits, or an error explaining why it is rejected.
 type Validator func(value int, elapsedMs int, limits Limits) error
 
-// Challenge produces the per-round data a scored game's client needs.
-type Challenge func() any
+// Draw is a source of randomness, supplied by the caller so this package stays
+// pure: it returns a value in [0, n). The service passes a real one; a test
+// passes a fixed one and gets a reproducible challenge.
+//
+// Randomness is a parameter rather than a package-level rand precisely because
+// a Challenge that draws is the only impure thing a game would otherwise do,
+// and an impure Challenge would be untestable in the one place it matters —
+// whether the number it drew is inside the range the Scorer will accept.
+type Draw func(n int) int
+
+// Challenge produces the per-round data a scored game's client needs. Whatever
+// it draws from `draw` is part of the round and is stored with the session, so
+// the Scorer sees the same numbers the player played against.
+type Challenge func(draw Draw) any
 
 // Scorer replays a round from the events the client reported and returns the
 // score it earned, or an error if the events could not describe a real round.
@@ -70,10 +88,18 @@ type Challenge func() any
 // is the point at which this becomes a per-game type rather than []int; that
 // is a change to make when such a game arrives, not in anticipation of one.
 //
+// `challenge` is the raw JSON stored on the session, or nil for a game whose
+// scoring needs none. Raw rather than typed because the shape belongs to the
+// individual game and this signature must not know which game it is describing
+// — the same reason the client receives it as `unknown`. A Scorer that NEEDS a
+// challenge must reject an empty or malformed one rather than substituting a
+// default: a default would score the round by different numbers than the ones
+// the player watched, which is the exact failure the challenge exists to stop.
+//
 // The distinction the implementation must keep: an ERROR means the events could
 // not have come from a real round, and the submission is rejected. A low score
 // — including zero — is an ordinary outcome and must not be an error.
-type Scorer func(events []int, durationMs int) (int, error)
+type Scorer func(events []int, durationMs int, challenge []byte) (int, error)
 
 // Limits are runtime-tunable anti-cheat bounds, sourced from the Settings store
 // and passed in explicitly so this layer stays pure.

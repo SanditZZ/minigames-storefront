@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -53,9 +54,15 @@ func (s *Server) handleStartSession(w http.ResponseWriter, r *http.Request) {
 		writeAppError(w, localeOf(r), err)
 		return
 	}
+	// The challenge is echoed from the SESSION, not rebuilt here. It was minted
+	// and stored when the session was created precisely so the client and the
+	// scorer see the same round — rebuilding it would draw a second, different
+	// phase for Precision Stop and score the player against a sweep they never
+	// saw. json.RawMessage so the stored text lands as an object rather than as
+	// a JSON string containing JSON.
 	var challenge any
-	if def.Challenge != nil {
-		challenge = def.Challenge()
+	if sess.Challenge != "" {
+		challenge = json.RawMessage(sess.Challenge)
 	}
 	writeJSON(w, http.StatusCreated, startSessionResponse{
 		Token:      sess.Token,

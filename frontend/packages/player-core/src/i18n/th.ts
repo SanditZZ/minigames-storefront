@@ -60,6 +60,7 @@ export const th: Messages = {
   "play.failed.title": "เกิดข้อผิดพลาด",
   "play.back": "ย้อนกลับ",
   "play.startFailed": "เริ่มเกมไม่สำเร็จ",
+  "play.badChallenge": "เริ่มรอบนี้ไม่ได้ กลับไปแล้วลองอีกครั้ง",
   "play.submitFailed": "ส่งคะแนนไม่สำเร็จ",
   "play.playingAs": "กำลังเล่นในชื่อ {name}",
   "play.quit": "ออก",

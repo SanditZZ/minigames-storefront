@@ -4,7 +4,6 @@ import {
   MIN_WAIT_MS,
   isFalseStart,
   reactionScore,
-  reactionVerdict,
   waitDelayMs,
 } from "./reaction";
 
@@ -57,21 +56,5 @@ describe("isFalseStart", () => {
   it("is a false start only before the flip", () => {
     expect(isFalseStart(false)).toBe(true);
     expect(isFalseStart(true)).toBe(false);
-  });
-});
-
-describe("reactionVerdict", () => {
-  it("rates faster reactions more highly", () => {
-    expect(reactionVerdict(150)).toBe("Lightning");
-    expect(reactionVerdict(240)).toBe("Sharp");
-    expect(reactionVerdict(300)).toBe("Solid");
-    expect(reactionVerdict(450)).toBe("Steady");
-    expect(reactionVerdict(1200)).toBe("Sleepy");
-  });
-
-  it("always returns a label, including at the boundaries", () => {
-    for (const ms of [0, 199, 200, 259, 260, 349, 350, 499, 500, 3000]) {
-      expect(reactionVerdict(ms)).not.toBe("");
-    }
   });
 });

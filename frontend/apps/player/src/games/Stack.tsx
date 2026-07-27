@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type StackPhysics,
   type Tower,
   baseTower,
   dropBlock,
@@ -14,7 +15,7 @@ import { useT } from "../i18n";
 // NOTE: do not add `Stack` to this import. The UI kit exports a LAYOUT
 // primitive by that name, and this file's own export is the game — importing
 // both would shadow one silently. CenterStack is the one wanted here.
-import { CenterStack, Eyebrow, ProgressBar } from "../ui";
+import { CenterStack, Eyebrow, ProgressBar, StatusMessage } from "../ui";
 import type { MiniGame, PlayProps } from "./types";
 
 /** How the round ended, for the line above the tower. */
@@ -51,12 +52,40 @@ const SETTLE_MS = 700;
  * All the geometry lives in packages/player-core/src/games/stack.ts as pure
  * functions; this component only runs the clock and paints.
  */
-function StackPlay({ durationMs, challenge, onFinish }: PlayProps) {
+/**
+ * Reads the challenge and either starts the round or refuses it.
+ *
+ * The guard is a separate component from the round below because `physics` seeds
+ * `useState` initialisers and is closed over by the rAF loop: a null check inside
+ * StackRound would have to be threaded through every one of them, and an early
+ * return after those hooks is not allowed. Splitting keeps the round's hook order
+ * fixed and gives the refusal one place to live.
+ */
+function StackPlay(props: PlayProps) {
   const t = useT();
-  // The server's physics, or the built-ins if it sent none. Memoised because it
-  // is the identity the rAF loop closes over — re-deriving it per render would
-  // restart the round on every frame.
-  const physics = useMemo(() => stackPhysics(challenge), [challenge]);
+  // Memoised because it is the identity the rAF loop closes over — re-deriving it
+  // per render would restart the round on every frame.
+  const physics = useMemo(() => stackPhysics(props.challenge), [props.challenge]);
+
+  // A challenge that was SENT and cannot be read means the round would be played
+  // by different physics than the server is scoring: every drop would land
+  // somewhere it did not put it. Absent is fine and never reaches here —
+  // stackPhysics returns the built-ins for that case, which are the same numbers.
+  if (!physics) {
+    return (
+      <StatusMessage
+        tone="error"
+        icon="😕"
+        title={t("play.failed.title")}
+        detail={t("play.badChallenge")}
+      />
+    );
+  }
+  return <StackRound {...props} physics={physics} />;
+}
+
+function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: StackPhysics }) {
+  const t = useT();
 
   const [placed, setPlaced] = useState<Placed[]>([]);
   const [tower, setTower] = useState<Tower>(() => baseTower(physics));

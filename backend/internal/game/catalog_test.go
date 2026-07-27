@@ -74,28 +74,9 @@ func TestValidateReactionTimer_RejectsLongerThanTheSession(t *testing.T) {
 	}
 }
 
-func TestValidatePrecisionStop_AcceptsAPerfectStop(t *testing.T) {
-	// The point of the whole game: 0 is the goal, not an impossible value. A
-	// validator that rejected it would reject the best round anyone can play.
-	if err := validatePrecisionStop(0, 2000, DefaultLimits()); err != nil {
-		t.Fatalf("a perfect stop must be accepted, got %v", err)
-	}
-	if err := validatePrecisionStop(PrecisionTrackHalf, 2000, DefaultLimits()); err != nil {
-		t.Fatalf("stopping at the far end is the worst legal score, got %v", err)
-	}
-}
-
-func TestValidatePrecisionStop_RejectsOffTrackAndNoTime(t *testing.T) {
-	if err := validatePrecisionStop(PrecisionTrackHalf+1, 2000, DefaultLimits()); err == nil {
-		t.Fatal("a miss wider than the track should be rejected")
-	}
-	if err := validatePrecisionStop(-1, 2000, DefaultLimits()); err == nil {
-		t.Fatal("a negative distance should be rejected")
-	}
-	if err := validatePrecisionStop(10, 0, DefaultLimits()); err == nil {
-		t.Fatal("zero elapsed time should be rejected")
-	}
-}
+// Precision Stop's scoring tests live in precision_test.go: it no longer has a
+// validator to test, because the client no longer reports a distance for one to
+// check.
 
 func TestRegistry_EnabledFiltersDisabled(t *testing.T) {
 	r := DefaultRegistry()

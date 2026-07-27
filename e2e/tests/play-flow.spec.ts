@@ -162,8 +162,18 @@ test.describe("game catalog", () => {
    * that finishes on a pointer event mid-clock — and this is also the only game
    * whose score can legitimately be 0, the case the reveal meter was rewritten
    * for. Both are worth one pass through a real browser.
+   *
+   * It is also SERVER-SCORED, which is what the second half of this test is for.
+   * The component reports the millisecond it was stopped and never a distance;
+   * the sweep is simulated twice, once in Go to score and once in TypeScript to
+   * draw, and a golden fixture pins those two as pure functions. What the fixture
+   * cannot cover is the round-trip — that the stop time this component captures
+   * is the one the server replays, and that its clock starts where the server
+   * thinks it does. That is the same seam stack.spec.ts guards for Stack.
    */
-  test("Precision Stop ends the round on the player's own tap", async ({ page }) => {
+  test("Precision Stop ends the round on the player's own tap, and the server scores it", async ({
+    page,
+  }) => {
     await page.goto("/");
     await ui.gameCard(page, "Precision Stop").click();
 
@@ -174,11 +184,27 @@ test.describe("game catalog", () => {
     // The stop holds the track before handing off, so the player can see where
     // they landed — the one thing the score reveal can never show them, since
     // it reports a distance and not a place.
-    await expect(page.getByText(/off centre/)).toBeVisible();
+    const readout = page.getByText(/off centre/);
+    await expect(readout).toBeVisible();
     await expect(stop).toBeDisabled();
+
+    // What the CLIENT drew. It is never sent: the round reports a stop time and
+    // this number is read here only so it can be held against the one the server
+    // worked out independently.
+    const drawn = Number(/(\d+) off centre/.exec((await readout.innerText()).trim())?.[1]);
+    expect(Number.isNaN(drawn)).toBe(false);
 
     // The round is over the instant it is stopped: no waiting out the clock.
     await expect(ui.completeStage(page)).toBeVisible();
     await expect(page).toHaveURL(/\/result\/precision-stop\/[\w-]+/);
+    await expect(ui.playAgain(page)).toBeVisible();
+
+    // THE assertion. This number came back over HTTP from a replay of the stop
+    // time against the phase the server issued with the session; `drawn` came
+    // from the TypeScript sweep that painted the marker. A divergence between the
+    // two languages' integer arithmetic surfaces here as a player freezing the
+    // marker dead centre and being told they were eleven off.
+    const shown = Number((await page.locator(".tabular-nums").first().innerText()).trim());
+    expect(shown).toBe(drawn);
   });
 });

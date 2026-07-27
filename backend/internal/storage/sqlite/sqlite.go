@@ -34,6 +34,9 @@ var awardDescriptionThSQL string
 //go:embed migrations/007_claim_award_name_th.sql
 var claimAwardNameThSQL string
 
+//go:embed migrations/008_session_challenge.sql
+var sessionChallengeSQL string
+
 // Store implements storage.Store over a *sql.DB.
 type Store struct {
 	db       *sql.DB
@@ -97,6 +100,9 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	if err := s.addColumnIfMissing(ctx, "claims", "award_name_th", claimAwardNameThSQL); err != nil {
+		return err
+	}
+	if err := s.addColumnIfMissing(ctx, "sessions", "challenge", sessionChallengeSQL); err != nil {
 		return err
 	}
 	return nil

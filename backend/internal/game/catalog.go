@@ -92,69 +92,10 @@ func validateReactionTimer(value, elapsedMs int, limits Limits) error {
 	return nil
 }
 
-// SlugPrecisionStop is the timing game: a marker sweeps a track and the player
-// stops it as close to the centre as they can. The score is how far off centre
-// they landed, so LOWER is better — and, unlike a reaction time, a perfect
-// round scores exactly 0. That is the whole reason this game exists: 0 is the
-// GOAL here rather than an impossibility, which is the one case the reveal
-// meter used to assume away (see domain.Game.TargetScore).
-const SlugPrecisionStop domain.GameSlug = "precision-stop"
-
-// PrecisionTrackHalf is the virtual half-width of the track, and therefore the
-// worst possible score: stopping at either end is PrecisionTrackHalf off centre.
-//
-// It is a VIRTUAL unit, not pixels. The client normalises its rendered track to
-// this scale before reporting, so a phone and a kiosk screen produce comparable
-// scores and the server can bound-check a submission without knowing anything
-// about the display it came from.
-const PrecisionTrackHalf = 100
-
-// PrecisionTargetOff is the house benchmark: land within this of centre and the
-// reveal meter reads full. It is the threshold of the game's top starter prize
-// (see app.starterAwards), so "filled the tower" and "won the best prize" mean
-// the same thing to a player rather than two unrelated scales.
-const PrecisionTargetOff = 5
-
-// PrecisionStop is its catalog definition and anti-cheat validator.
-var PrecisionStop = Definition{
-	Game: domain.Game{
-		Slug:        SlugPrecisionStop,
-		Name:        "Precision Stop",
-		Description: "Stop the marker dead centre. The closer you land, the lower your score — and lowest wins!",
-		ScoreUnit:   "off",
-		Direction:   domain.LowerIsBetter,
-		DurationMs:  6000,
-		TargetScore: PrecisionTargetOff,
-		Enabled:     true,
-	},
-	Validator: validatePrecisionStop,
-}
-
-// validatePrecisionStop bounds-checks a reported miss distance.
-//
-// Bounds are honestly all the server can check here. The marker's speed is
-// fixed but its starting phase is drawn on the client, so there is no shared
-// secret to recompute the stop position from — unlike the tap rate, which has a
-// physiological ceiling, or a reaction, which has a physiological floor. Making
-// this game cheat-proof means sending the input events and scoring server-side
-// (the "server-authoritative scoring" item in docs/potential-features.md); until
-// then, saying so plainly beats a validator that looks stricter than it is.
-//
-// A score of 0 is explicitly LEGAL: it is a perfect stop, the outcome the game
-// is played for. Rejecting or nudging it would corrupt the exact result the
-// player is aiming at. Pure: no clock, no storage.
-func validatePrecisionStop(value, elapsedMs int, limits Limits) error {
-	if elapsedMs <= 0 {
-		return fmt.Errorf("round had no elapsed time")
-	}
-	if value < 0 {
-		return fmt.Errorf("distance from centre cannot be negative")
-	}
-	if value > PrecisionTrackHalf {
-		return fmt.Errorf("distance %d is off a track only %d wide either side of centre", value, PrecisionTrackHalf)
-	}
-	return nil
-}
+// Precision Stop lives in precision.go, and Stack in stack.go: a game the server
+// SCORES carries a simulation rather than a bounds check, and that is more code
+// than a catalog entry should hold. The two games left in this file are the ones
+// whose scores the client still reports for itself.
 
 // DefaultRegistry is the catalog the server boots with. Add new games here.
 func DefaultRegistry() *Registry {
