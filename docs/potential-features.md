@@ -683,19 +683,38 @@ and the score table grow.
   font/emoji rendering; deliberately deferred rather than half-done. Note the
   admin has the worse record of the two apps and is now reachable to the suite,
   which changes what a baseline would be worth without changing what it costs.
-- **Nothing warns at RUNTIME when a client and server simulation disagree.** Both
-  server-scored games are now pinned two ways — a golden fixture as pure
-  functions, and one browser assertion comparing what the client drew against the
-  score that came back (`stack.spec.ts`, and the Precision Stop case in
-  `play-flow.spec.ts`). Neither covers a real player on a real device, where the
-  failure would look like the tower saying 7 during play and the result screen
-  saying 6, and nothing would report it. A dev-only check in `RoundRunner`
-  comparing the client's own preview against `result.score.value` and logging a
-  mismatch would surface it during testing at roughly no cost, and would cover
-  every future Scorer game without another spec each. The obstacle is that
+- **Nothing warns at RUNTIME when a client and server simulation disagree, and
+  the browser assertion that does is worth more than it looks.** Both
+  server-scored games are pinned two ways — a golden fixture as pure functions, and
+  one browser assertion comparing what the client drew against the score that came
+  back (`stack.spec.ts`, and the Precision Stop case in `play-flow.spec.ts`).
+  **The fixture is strictly the weaker of the two, and now demonstrably so**: it
+  proved Stack's two simulations agreed as functions while the live game disagreed
+  anyway, because `handleDrop` judged a drop from the previous frame's centre and
+  reported a freshly-read timestamp. Identical arithmetic on different INPUTS is
+  invisible to a fixture by construction, and it was the browser test that caught
+  it — after a retry had been hiding it. Neither covers a real player on a real
+  device, where the failure looks like the tower saying 7 during play and the
+  result screen saying 6, and nothing reports it. A dev-only check in
+  `RoundRunner` comparing the client's own preview against `result.score.value`
+  and logging a mismatch would surface it at roughly no cost and cover every
+  future Scorer game without another spec each. The obstacle is that
   `RoundRunner` deliberately knows nothing about any game's maths, so the preview
   would have to be something a game OFFERS — an optional field on the report, or a
   `data-` attribute the runner reads — rather than something the runner computes.
+- **The two server-scored games disagree about WHICH moment a tap is.** Precision
+  Stop reports the last painted frame's elapsed time (`elapsedRef`, captured in the
+  same frame as the position it shows), so the score describes the marker exactly
+  where the player saw it. Stack reports a freshly-read `performance.now()` and
+  judges the drop at that instant, so client and server agree with each other but
+  both describe the block up to a frame — twenty-odd virtual units — PAST where the
+  player saw it, biased in the direction of travel. Neither is broken and the
+  scores are self-consistent either way; the asymmetry is that Stack's version is
+  systematically slightly late, which a player would experience as the block
+  landing further along than they aimed. Making Stack read the frame's elapsed time
+  the way Precision Stop does is a few lines and would make the two consistent. It
+  bites nobody today, which is why it is filed rather than folded into the fix that
+  found it.
 - **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
   `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
   `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —

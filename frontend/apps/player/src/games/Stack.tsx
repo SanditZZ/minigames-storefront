@@ -44,22 +44,23 @@ const SETTLE_MS = 700;
  * client never states one.
  *
  * The tower drawn on screen is therefore a PREVIEW of the server's answer, not
- * the answer. The two agree because both are driven by the same integer
- * arithmetic and pinned to a shared golden fixture; if they ever stopped
- * agreeing, the result screen would be right and this preview would be the
- * thing that was wrong.
+ * the answer. If the two ever stop agreeing, the result screen is right and this
+ * preview is the thing that is wrong.
+ *
+ * Keeping them in agreement takes TWO things, and the second was learned the hard
+ * way. Identical integer arithmetic, pinned to a shared golden fixture — and
+ * identical INPUTS, which the fixture cannot check because it only ever sees the
+ * pure functions. `handleDrop` judges a drop from the centre recomputed at the
+ * timestamp it reports, never from the last rendered frame; see the comment there
+ * for what went wrong while it did the latter.
  *
  * All the geometry lives in packages/player-core/src/games/stack.ts as pure
  * functions; this component only runs the clock and paints.
- */
-/**
- * Reads the challenge and either starts the round or refuses it.
  *
- * The guard is a separate component from the round below because `physics` seeds
- * `useState` initialisers and is closed over by the rAF loop: a null check inside
- * StackRound would have to be threaded through every one of them, and an early
- * return after those hooks is not allowed. Splitting keeps the round's hook order
- * fixed and gives the refusal one place to live.
+ * StackPlay is the guard and StackRound is the round. They are separate
+ * components because `physics` seeds `useState` initialisers and is closed over by
+ * the rAF loop: a null check inside StackRound would have to be threaded through
+ * every one of them, and an early return after those hooks is not allowed.
  */
 function StackPlay(props: PlayProps) {
   const t = useT();
@@ -101,7 +102,6 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
   const towerRef = useRef<Tower>(baseTower(physics));
   const spawnedAtRef = useRef(0);
   const startedAtRef = useRef(0);
-  const centreRef = useRef(0);
   const overRef = useRef(false);
 
   // Ends the round. The timings are NOT reported here — the settle beat below
@@ -141,7 +141,6 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
         placedCount % 2 === 0,
         physics,
       );
-      centreRef.current = centre;
       setBlockCentre(centre);
       setRemaining(Math.max(0, durationMs - elapsed));
 
@@ -173,7 +172,29 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
     const drops = dropsRef.current;
     if (drops.length > 0 && at <= drops[drops.length - 1]) return;
 
-    const outcome = dropBlock(towerRef.current, centreRef.current);
+    // The centre is RECOMPUTED at `at` rather than read from the last frame, and
+    // that is not a micro-optimisation — it is the difference between this preview
+    // and the score agreeing or not.
+    //
+    // `at` is what gets reported, and the server replays the sweep from it. The
+    // rAF loop's centre belongs to the previous FRAME, up to ~16ms earlier, which
+    // at this block's speed is twenty-odd virtual units of drift. While the tower
+    // is wide both positions still overlap it and the two simulations agree; once
+    // the tower has narrowed to a few tens of units the same drift flips a landing
+    // into a miss, and the player watches a block settle squarely on the tower and
+    // is told on the next screen that they missed it. The golden fixture cannot
+    // catch that — both sides' arithmetic is correct — because the divergence is in
+    // the INPUT, not the function. Judging from the timestamp that is actually
+    // reported is what makes the client's preview a prediction of the server's
+    // answer rather than an independent guess.
+    const centre = stackBlockCentre(
+      at - spawnedAtRef.current,
+      towerWidth(towerRef.current),
+      stackPeriodMs(drops.length, physics),
+      drops.length % 2 === 0,
+      physics,
+    );
+    const outcome = dropBlock(towerRef.current, centre);
     if (!outcome.tower) {
       // The missed block is still drawn where it fell, so the player can see
       // that they were short rather than merely being told the round is over.
@@ -190,7 +211,7 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
     setTower(outcome.tower);
     setPlaced((prev) => [...prev, { interval: outcome.tower!, perfect }]);
     setLastPerfect(perfect);
-  }, [durationMs, end]);
+  }, [durationMs, end, physics]);
 
   const blockInterval = useMemo<Tower>(() => {
     const width = towerWidth(tower);
