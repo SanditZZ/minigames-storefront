@@ -713,9 +713,12 @@ and the score table grow.
   when no emulator is attached. It says so, but a push from a machine without
   one still reports green — the same class of hole `SKIP_E2E` opens for the
   browser suite, and worth remembering before trusting a native change that was
-  only ever compiled. It skipped on every push of the session that built the
-  claim lifecycle — four ships, zero native runs — which is the shape the
-  problem actually takes: not one forgotten check, a standing one.
+  only ever compiled. Do not trust a count written here — **re-derive it**:
+  `grep -c 'E2E SKIPPED' ` over whatever ship logs still exist, or simply note
+  that no machine in use has had an emulator attached, so the honest number is
+  every push since the Maestro step was added. That is the shape the problem
+  actually takes: not one forgotten check, a standing one, and the count only
+  ever grows.
 
 ### Small cleanups
 

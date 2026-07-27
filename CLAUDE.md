@@ -53,6 +53,13 @@ ship flow before considering the change done — do not skip it:
 
 - **Never commit or push if tests or the build fail.** `main` must always stay
   green and deployable.
+- **Sweep `docs/potential-features.md` BEFORE running `ship.sh`, as part of the
+  change rather than after it.** Delete what the change shipped, correct what it
+  invalidated, and file the follow-ups it surfaced — the full rules are under
+  "Roadmap" below. This is listed here because it is a step of shipping and was
+  being treated as a separate habit further down the file: `ship.sh` cannot check
+  it, so the only thing standing between a stale roadmap and a green push is
+  remembering it at exactly this point.
 - **Always push to `main`.** Every applied change ends up on the remote.
 - **No `Co-Authored-By`** lines in commit messages.
 - Redeploy is part of shipping — the user expects the running apps to update after
@@ -277,13 +284,27 @@ quietly wrong.
 into `docs/potential-features.md` in the same change that raised it — without
 being asked.** A suggestion that exists only in a conversation is gone when the
 session ends, and the next session proposes it again from scratch as if it were
-new. This is the expected habit rather than a gate step: nothing fails a build
-over it, but a checkpoint that lists three ideas and commits none of them has
-left the doc less true than it found it.
+new. A checkpoint that lists three ideas and commits none of them has left the
+doc less true than it found it.
+
+**Write the entry BEFORE saying the suggestion out loud.** Not afterwards, and
+not "as part of the next change" — the file edit comes first, and the sentence in
+chat is then a report of something that already exists. That ordering is the
+whole mechanism: no build can see a suggestion that was only ever spoken, so
+nothing downstream will catch a missing entry, and an intention to write it later
+is indistinguishable from having written it by the time the session ends.
+
+**"Filed", "recorded" and "written into the doc" are claims about a file, so
+check the file before making one.** A grep costs nothing and the alternative is
+telling the user their roadmap contains something it does not — which is worse
+than never having filed it, because it stops them from noticing. This is not a
+hypothetical: a suggestion to fix an e2e helper race was reported as filed in one
+breath and had never been written in the other.
 
 The bar is the same as for any other entry — cite the file, and say when it will
 bite. Small mechanical fixes are the exception that proves it: if the follow-up
-is one line and the fix is obvious, do it instead of filing it.
+is one line and the fix is obvious, do it instead of filing it, and then say that
+is what happened rather than calling it filed.
 
 ## Icons come from icones.js.org — never emoji, never drawn here
 
