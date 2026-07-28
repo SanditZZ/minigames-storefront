@@ -50,7 +50,7 @@ export function Panel({
  * prize won, or the consolation when there isn't one. Both states share this
  * shape so the layout doesn't jump depending on the outcome.
  *
- * `imageUrl` upgrades the emoji to the actual prize photo. It is optional
+ * `imageUrl` upgrades the icon to the actual prize photo. It is optional
  * because only some of what this card shows is a prize with a picture — and
  * because an award can be deleted after the round, which loses the image while
  * the name survives as a snapshot. `icon` therefore stays required: it is the

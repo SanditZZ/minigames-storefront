@@ -96,7 +96,7 @@ export function GamePicker({
           <SelectCard
             key={game.slug}
             // Each game carries its own icon, so two cards are told apart at a
-            // glance instead of sharing one generic controller emoji.
+            // glance instead of sharing one generic gamepad.
             media={<Icon name={gameIcon(game.slug)} />}
             title={game.name}
             subtitle={game.description}
