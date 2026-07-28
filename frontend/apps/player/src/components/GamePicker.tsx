@@ -70,7 +70,7 @@ export function GamePicker({
             disabled={refreshing}
             onClick={onRefresh}
           >
-            <Icon name="rotate-cw" className={refreshing ? "animate-spin" : undefined} />
+            <Icon name="arrow-clockwise" className={refreshing ? "animate-spin" : undefined} />
           </IconButton>
         }
       />

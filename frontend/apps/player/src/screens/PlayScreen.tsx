@@ -26,7 +26,7 @@ export function PlayScreen({ game, loading, playerName, onComplete, onCancel }: 
   if (!game) {
     return (
       <StatusMessage
-        icon="search"
+        icon="magnifying-glass"
         title={t("play.notFound.title")}
         detail={t("play.notFound.detail")}
         action={{ label: t("play.notFound.action"), onClick: onCancel }}

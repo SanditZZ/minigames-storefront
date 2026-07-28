@@ -104,7 +104,7 @@ reuse verbatim and what has to be written a second time.
 
 ```
 packages/api-client    typed HTTP client + wire types
-packages/icons         Lucide geometry as shape objects; IconName is derived from it
+packages/icons         Phosphor fill paths as data; IconName is derived from it
 packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
                        plus the runtime-override precedence rule (override.ts)
 packages/image-core    crop-and-zoom geometry: cover scale, pan clamp, export map
@@ -307,13 +307,16 @@ bite. Small mechanical fixes are the exception that proves it: if the follow-up
 is one line and the fix is obvious, do it instead of filing it, and then say that
 is what happened rather than calling it filed.
 
-## Icons come from Lucide — never emoji, never drawn here
+## Icons come from Phosphor (fill) — never emoji, never drawn here
 
 Every icon in either app is transcribed from
-[Lucide](https://icones.js.org/collection/lucide) into `packages/icons`, which
-holds geometry as **shape objects rather than SVG markup** so a React Native
-client can draw the same table with `react-native-svg`. Each app's
-`src/ui/Icon.tsx` is the per-platform half; a package may not import React.
+[Phosphor's fill weight](https://icones.js.org/collection/ph) into
+`packages/icons`, which holds geometry as **`d` strings rather than SVG markup**
+so a React Native client can draw the same table with `react-native-svg`. Each
+app's `src/ui/Icon.tsx` is the per-platform half; a package may not import React.
+**One set and one weight** — a second weight reads as two icon languages the
+same way a second set does, so the table is fill only and the keys drop the
+redundant `-fill` suffix.
 
 **Emoji are not icons** (the platform picks the artwork, the palette cannot
 reach them, and their screen-reader names are somebody else's), and **nothing in

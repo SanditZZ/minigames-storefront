@@ -89,6 +89,6 @@ function TapFastPlay({ durationMs, scoreUnit, onFinish }: PlayProps) {
 
 export const TapFast: MiniGame = {
   slug: "tap-fast",
-  icon: "pointer",
+  icon: "hand-tap",
   Play: TapFastPlay,
 };

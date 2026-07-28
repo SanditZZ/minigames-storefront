@@ -82,7 +82,7 @@ function StackPlay(props: PlayProps) {
     return (
       <StatusMessage
         tone="error"
-        icon="frown"
+        icon="smiley-sad"
         title={t("play.failed.title")}
         detail={t("play.badChallenge")}
       />
@@ -352,6 +352,6 @@ function StackRound({ durationMs, onFinish, physics }: PlayProps & { physics: St
 
 export const Stack: MiniGame = {
   slug: "stack",
-  icon: "blocks",
+  icon: "stack",
   Play: StackPlay,
 };

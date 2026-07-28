@@ -159,7 +159,7 @@ function PrecisionStopPlay({ durationMs, challenge, onFinish }: PlayProps) {
     return (
       <StatusMessage
         tone="error"
-        icon="frown"
+        icon="smiley-sad"
         title={t("play.failed.title")}
         detail={t("play.badChallenge")}
       />

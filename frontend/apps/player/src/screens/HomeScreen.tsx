@@ -41,7 +41,7 @@ export function HomeScreen({
     return (
       <StatusMessage
         tone="error"
-        icon="wifi-off"
+        icon="wifi-slash"
         title={t("home.unreachable.title")}
         detail={error}
         action={{ label: t("home.unreachable.action"), onClick: onRetry }}

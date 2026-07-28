@@ -59,7 +59,7 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           // Saying so is better than showing a prize with no way to collect it
           // and letting the player discover that at the counter.
           <HighlightCard
-            icon="party-popper"
+            icon="confetti"
             imageUrl={result.award!.imageUrl}
             eyebrow={t("result.won")}
             // The award's own name and blurb are admin free text and are shown
@@ -70,7 +70,7 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           />
         ) : (
           <HighlightCard
-            icon="dumbbell"
+            icon="barbell"
             tone="muted"
             title={t("result.noPrize.title")}
             body={t("result.noPrize.body")}

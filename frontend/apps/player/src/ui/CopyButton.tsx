@@ -12,8 +12,8 @@ type State = "idle" | "copied" | "failed";
 
 const labels: Record<State, { icon: IconName; textKey: MessageKey }> = {
   idle: { icon: "clipboard", textKey: "copy.idle" },
-  copied: { icon: "check", textKey: "copy.copied" },
-  failed: { icon: "triangle-alert", textKey: "copy.failed" },
+  copied: { icon: "check-circle", textKey: "copy.copied" },
+  failed: { icon: "warning", textKey: "copy.failed" },
 };
 
 /**

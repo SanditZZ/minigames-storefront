@@ -28,7 +28,7 @@ game has. Two things a new game must do rather than may:
   re-derives them.
 - **Name an icon from `packages/icons`.** `MiniGame.icon` is typed `IconName`,
   so a game either picks a mark that exists in the table or does not compile.
-  Adding a Lucide icon to the table first is part of adding the game.
+  Adding a Phosphor fill icon to the table first is part of adding the game.
 
 A third thing a new game **may** do, and the reason to weigh it before writing
 one: **declare a `Scorer` instead of a `Validator`** and let the server compute
@@ -416,8 +416,8 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   rotation) and the render as a pure `draw(state) → canvas` function, so the same
   description can be re-rendered at export resolution without a second code path.
   Worth scoping the sticker set to store branding to keep moderation trivial.
-- **The icon table is transcribed by hand and nothing checks it against Lucide.**
-  `packages/icons/src/data.ts` was copied out of `lucide-static` v1.27.0;
+- **The icon table is transcribed by hand and nothing checks it against Phosphor.**
+  `packages/icons/src/data.ts` was copied out of `@phosphor-icons/core` v2.1.1;
   `data.test.ts` catches an empty entry, a `d` that lost its head, and two names
   drawing the same shape, but none of those notice a path transcribed *slightly*
   wrong or an upstream redraw. The shape of the fix is already in the repo —
@@ -428,21 +428,23 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   offline, is the version that could join the gate. It bites when someone adds an
   icon in a hurry, which is every icon after the first batch.
 - **The player's icons have no size or colour system, only per-call classes.**
-  Every emoji carried its own colour and scaled with `font-size`; a stroke icon
-  inherits `currentColor`, so each call site now picks one — `text-ink/30` on
-  `StatusMessage`, `text-ink/40` on `PrizeImage` and `HighlightCard`, full `ink`
-  on the completion flag and the reveal's bell. Those five values were chosen one
-  at a time while converting, not designed together, and nothing stops the sixth
-  from being `text-ink/35`. If a third app-level slot wants an icon, promote the
-  choices to a `tone` prop on `Icon` rather than adding another literal.
+  Every emoji carried its own colour; an `Icon` fills with `currentColor`, so
+  each call site now picks one — `text-ink/30` on `StatusMessage`, `text-ink/40`
+  on `PrizeImage` and `HighlightCard`, full `ink` on the completion flag and the
+  reveal's bell. Those values were chosen one at a time while converting, not
+  designed together, and nothing stops the next from being `text-ink/35`. Fill
+  raised the stakes slightly over the stroke set this replaced: a solid mark at
+  40% reads as a heavier block than an outline at 40% did, so the opacities were
+  inherited rather than re-judged. If a third app-level slot wants an icon,
+  promote the choices to a `tone` prop on `Icon` rather than adding another
+  literal.
 - **`mobile/admin` has no icons at all, and its `Icon.tsx` is unwritten.** The
   native admin renders none today, which is why the sweep did not touch it. The
-  table is deliberately ready for it — shape objects rather than markup, so
-  `react-native-svg`'s `<Path>`/`<Circle>`/`<Line>`/`<Rect>` map one-to-one — but
-  the twenty-line renderer still has to be written the first time a native screen
-  wants a mark. Write it from `apps/*/src/ui/Icon.tsx`; the only real differences
-  are `<Svg>` for `<svg>` and `size` in points instead of `1em`, since RN has no
-  font-relative units.
+  table is deliberately ready for it — `d` strings rather than markup, so every
+  row is one `react-native-svg` `<Path>` — but the renderer still has to be
+  written the first time a native screen wants a mark. Write it from
+  `apps/*/src/ui/Icon.tsx`; the only real differences are `<Svg>` for `<svg>` and
+  `size` in points instead of `1em`, since RN has no font-relative units.
 - **Sound and haptics** for the reveal — the animation beats are already there to
   hang them on (`navigator.vibrate` on the puck landing, a bell on a record).
 - **Accessibility** — larger tap targets and screen-reader labels. Reduced

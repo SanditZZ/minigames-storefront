@@ -95,7 +95,7 @@ export function ResultScreen({
   if (!game || failed) {
     return (
       <StatusMessage
-        icon="search"
+        icon="magnifying-glass"
         title={t("result.notFound.title")}
         detail={t("result.notFound.detail")}
         action={{ label: t("result.notFound.action"), onClick: onPickAnother }}

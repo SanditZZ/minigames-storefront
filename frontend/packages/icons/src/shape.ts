@@ -1,48 +1,43 @@
-// DATA layer: what one icon is made of, and the stroke conventions every icon
-// in the table shares.
+// DATA layer: what one icon is, and the one coordinate space they all share.
 //
-// An icon is a LIST OF SHAPES, not a string of SVG markup. That is the whole
+// An icon is a LIST OF PATHS, not a string of SVG markup. That is the whole
 // reason this is a package rather than a folder of `.svg` files or a component
 // with `dangerouslySetInnerHTML`: markup is a web thing, and React Native draws
-// with `react-native-svg` components instead. A `{ tag: "circle", cx, cy, r }`
-// object renders as `<circle>` on the web and `<Circle>` on a phone from the
-// same row, so the phone client inherits the icon set rather than re-tracing it.
-//
-// The tags are exactly the four Lucide uses across the icons in ./data — any
-// import that needs a fifth adds it here first, which is deliberate: the union
-// is what makes an app's renderer provably exhaustive.
+// with `react-native-svg` components instead. A `d` string renders as `<path>`
+// on the web and `<Path>` on a phone from the same row, so a native client
+// inherits the icon set rather than re-tracing it.
 
-export type IconShape =
-  | { tag: "path"; d: string }
-  | { tag: "circle"; cx: number; cy: number; r: number }
-  | { tag: "line"; x1: number; y1: number; x2: number; y2: number }
-  | {
-      tag: "rect";
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      rx?: number;
-      ry?: number;
-    };
+/**
+ * The paths that make up one icon, in draw order.
+ *
+ * Paths only — no circles, rects or lines. That is not a simplification of
+ * Phosphor's fill weight, it is what the fill weight IS: a solid icon is
+ * authored as flattened outlines, so every icon in ./data is one or two `d`
+ * strings and nothing else. Should a future addition need another primitive,
+ * this type widens to a union and both apps' renderers gain a branch; until one
+ * does, a union would be four cases where the data only ever takes one.
+ */
+export type IconPaths = readonly string[];
 
 /**
  * The coordinate space every icon in the table is drawn on.
  *
  * Shared, not per-icon: a mixed grid is what makes two icons beside each other
  * look like they came from different sets, which is the thing choosing one set
- * was meant to prevent.
+ * was meant to prevent. Phosphor draws on 256; Lucide, which this replaced,
+ * drew on 24 — so this constant is exactly the kind of value that must not be
+ * spelled out at a call site.
  */
-export const ICON_VIEWBOX = "0 0 24 24";
+export const ICON_VIEWBOX = "0 0 256 256";
 
 /**
- * Lucide's stroke geometry. These are the values the shapes were drawn for —
- * the paths are open outlines with no fill, so rendering them filled, or at a
- * weight they were not designed at, does not degrade gracefully. A renderer
- * applies all four or draws something that is not the icon.
+ * How a filled icon paints: solid `currentColor`, no stroke at all.
+ *
+ * Worth stating rather than leaving implicit in each renderer, because it is
+ * the property that decides whether the set looks like itself. Phosphor's fill
+ * paths are closed outlines with the negative space cut out of them — stroking
+ * one outlines the hole as well, and filling a stroke-authored set (Lucide's,
+ * say) turns an open outline into a blob. A set is drawn for exactly one of
+ * these two treatments and does not survive the other.
  */
-export const ICON_STROKE = {
-  width: 2,
-  linecap: "round",
-  linejoin: "round",
-} as const;
+export const ICON_FILL = "currentColor";

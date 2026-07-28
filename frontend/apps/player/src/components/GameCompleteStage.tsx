@@ -39,7 +39,7 @@ export function GameCompleteStage({ pending, onContinue }: { pending: boolean; o
       <div className="relative grid place-items-center">
         <HaloBox>
           <div className="animate-bob text-7xl text-ink">
-            <Icon name="flag" />
+            <Icon name="flag-checkered" />
           </div>
         </HaloBox>
         <Confetti />

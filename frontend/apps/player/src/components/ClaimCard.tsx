@@ -47,7 +47,7 @@ export function ClaimCard({ view, imageUrl }: { view: ClaimView; imageUrl?: stri
           forever, whereas a missing photo costs them nothing. */}
       <PrizeImage
         src={imageUrl}
-        fallback={copy.redeemable ? "party-popper" : "ticket"}
+        fallback={copy.redeemable ? "confetti" : "ticket"}
         size="lg"
         muted={!copy.redeemable}
         className="mx-auto"

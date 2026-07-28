@@ -105,6 +105,6 @@ function ReactionTimerPlay({ durationMs, onFinish }: PlayProps) {
 
 export const ReactionTimer: MiniGame = {
   slug: "reaction-timer",
-  icon: "zap",
+  icon: "lightning",
   Play: ReactionTimerPlay,
 };

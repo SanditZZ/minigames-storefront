@@ -26,10 +26,10 @@ export interface Tier {
 }
 
 export const TIERS: Tier[] = [
-  { from: 0, labelKey: "reveal.tier.warmingUp", iconKey: "sprout" },
+  { from: 0, labelKey: "reveal.tier.warmingUp", iconKey: "plant" },
   { from: 0.2, labelKey: "reveal.tier.notBad", iconKey: "thumbs-up" },
-  { from: 0.4, labelKey: "reveal.tier.sharp", iconKey: "zap" },
-  { from: 0.6, labelKey: "reveal.tier.onFire", iconKey: "flame" },
+  { from: 0.4, labelKey: "reveal.tier.sharp", iconKey: "lightning" },
+  { from: 0.6, labelKey: "reveal.tier.onFire", iconKey: "fire" },
   { from: 0.8, labelKey: "reveal.tier.superstar", iconKey: "star" },
   { from: 0.97, labelKey: "reveal.tier.recordBreaker", iconKey: "crown" },
 ];

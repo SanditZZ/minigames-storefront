@@ -21,7 +21,7 @@ export function getMiniGame(slug: string): MiniGame | undefined {
 }
 
 /** Icon shown for a backend game this build cannot render yet. */
-const UNKNOWN_ICON: IconName = "gamepad-2";
+const UNKNOWN_ICON: IconName = "game-controller";
 
 /**
  * The icon to show for a slug.

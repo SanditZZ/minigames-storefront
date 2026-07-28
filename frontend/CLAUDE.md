@@ -146,13 +146,18 @@ The generator borrows Chromium from `e2e/node_modules` because this box has no
 `rsvg-convert` and ImageMagick's fallback SVG renderer mangles the glyph's arcs.
 It is a dev tool only — no app build and no CI job runs it.
 
-## Icons: Lucide, as data — emoji are not icons
+## Icons: Phosphor fill, as data — emoji are not icons
 
-**The set is [Lucide](https://icones.js.org/collection/lucide), and it is the
-only one.** Every icon in either app is transcribed from it into
-`packages/icons`; nothing in this repo draws, traces, or invents one. A mark
-Lucide does not have is a prompt to choose a different mark, not a second set —
-mixing sets is what makes an interface look assembled rather than designed.
+**The set is [Phosphor](https://icones.js.org/collection/ph) and the weight is
+`fill`.** Every icon in either app is transcribed from it into `packages/icons`;
+nothing in this repo draws, traces, or invents one. A mark Phosphor does not have
+is a prompt to choose a different mark, not a second set — mixing sets is what
+makes an interface look assembled rather than designed.
+
+**The weight is part of the choice.** Phosphor ships six (thin → fill) and this
+project uses exactly one, because two weights on one screen read as two icon
+languages — the same failure as two sets, arriving by a smaller door. Table keys
+are Phosphor's names with `-fill` dropped, since every row is fill.
 
 **No emoji in either app's UI.** Not in buttons, empty states, badges, list
 rows, or a string in a dictionary. Why this is a rule and not a preference:
@@ -174,14 +179,20 @@ rows, or a string in a dictionary. Why this is a rule and not a preference:
 ### The shape of the system
 
 Geometry is **data**, drawn by each app — the same split as the colour tokens,
-and for the same reason. `packages/icons` holds every icon as a list of shape
-objects (`{ tag: "path", d }`, `{ tag: "circle", cx, cy, r }`, …), not as SVG
-markup, because markup is a web thing: React Native draws with
-`react-native-svg` components instead, so a `<svg>` string could not have
-followed these icons onto a phone. Each app's `src/ui/Icon.tsx` is the twenty
-lines that turn a shape list into markup. They are near-identical **on purpose**
-— a package may not import React, and each app already owns its own `Button`,
-`Card` and `Layout` on that same principle.
+and for the same reason. `packages/icons` holds every icon as a list of `d`
+strings, not as SVG markup, because markup is a web thing: React Native draws
+with `react-native-svg` components instead, so a `<svg>` string could not have
+followed these icons onto a phone. Each app's `src/ui/Icon.tsx` is the handful
+of lines that turn a path list into markup. They are near-identical **on
+purpose** — a package may not import React, and each app already owns its own
+`Button`, `Card` and `Layout` on that same principle.
+
+Paths only, no other primitives: that is not a simplification but what a fill
+weight *is*, since a solid icon is authored as flattened outlines. Fill also
+decides the renderer — `fill="currentColor"` and **no stroke at all**. Phosphor's
+paths cut their negative space out of a closed outline, so stroking one would
+draw a line around the holes too; a set is drawn for one of the two treatments
+and does not survive the other.
 
 - **`IconName` is a union derived from the table**, so `icon="giftt"` fails
   `npm run typecheck` instead of rendering an empty box nobody notices. Every
