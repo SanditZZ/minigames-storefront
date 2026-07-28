@@ -18,12 +18,28 @@ export function Badge({ tone = "neutral", children }: { tone?: "on" | "off" | "n
   );
 }
 
-/** The one error banner. Rendering nothing for an empty message keeps call
- *  sites free of `{error && …}` noise. */
-export function Alert({ message }: { message?: string }) {
+/**
+ * The one banner. Rendering nothing for an empty message keeps call sites free
+ * of `{error && …}` noise.
+ *
+ * Two tones, and the difference is whether the operator is BLOCKED. An `error`
+ * sits beside a disabled Save — something must change before this can proceed.
+ * A `warning` sits beside a live one: the app has an opinion, the operator may
+ * overrule it, and the save goes through either way. Giving them the same red
+ * would teach an operator to read past both.
+ *
+ * `role` follows the tone rather than being fixed at "alert": a screen reader
+ * interrupting for advice the operator is free to ignore is the audible version
+ * of the same mistake.
+ */
+export function Alert({ message, tone = "error" }: { message?: string; tone?: "error" | "warning" }) {
   if (!message) return null;
+  const tones = {
+    error: "bg-red-50 text-red-700",
+    warning: "bg-brand-3/40 text-ink",
+  } as const;
   return (
-    <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+    <p role={tone === "error" ? "alert" : "status"} className={`rounded-lg px-3 py-2 text-sm ${tones[tone]}`}>
       {message}
     </p>
   );

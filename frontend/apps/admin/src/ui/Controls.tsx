@@ -230,7 +230,15 @@ export function NumberInput({
       {/* The suffix sits INSIDE the field's box rather than after it, so "ms"
           reads as part of the value instead of as loose text the eye has to
           associate. `pr-*` on the input reserves room for it; the span is
-          pointer-transparent so a tap near the unit still focuses the field. */}
+          pointer-transparent so a tap near the unit still focuses the field.
+
+          The reserved room is FIXED and the unit is not: score units come from
+          the server already translated (`internal/game/i18n.go`), so the widest
+          suffix this was sized against is not the widest one a Thai storefront
+          renders. The span therefore clips rather than overflowing — a unit that
+          outgrows its gutter loses its tail, which is recoverable, instead of
+          printing itself over the digits, which is not. Measuring the suffix and
+          padding to it is the honest fix and needs a layout effect. */}
       <div className="relative min-w-0 flex-1">
         <input
           type="number"
@@ -255,11 +263,11 @@ export function NumberInput({
           // on but focus has not.
           onWheel={(e) => e.currentTarget.blur()}
           className={`${control} appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-            suffix ? "pr-12" : ""
+            suffix ? "pr-16" : ""
           }`}
         />
         {suffix != null && (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-ink/50">
+          <span className="pointer-events-none absolute inset-y-0 right-3 flex max-w-13 items-center overflow-hidden text-ellipsis whitespace-nowrap text-sm text-ink/50">
             {suffix}
           </span>
         )}

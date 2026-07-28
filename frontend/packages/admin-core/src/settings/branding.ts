@@ -16,7 +16,12 @@
 
 import type { Setting } from "@minigames/api-client";
 import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
-import { COLOR_SETTING_KEYS, isHexColor, type ColorName } from "@minigames/tokens";
+import {
+  COLOR_SETTING_KEYS,
+  isHexColor,
+  resolvePalette,
+  type ColorName,
+} from "@minigames/tokens";
 import { settingValue } from "./map";
 
 /** Palette entries in a fixed order, so the form and its tests agree. */
@@ -103,6 +108,25 @@ export function brandingChanges(draft: BrandingDraft, saved: BrandingDraft): Bra
  */
 export function invalidBrandingColors(draft: BrandingDraft): ColorName[] {
   return BRANDING_COLOR_NAMES.filter((n) => draft[n] !== "" && !isHexColor(draft[n]));
+}
+
+/**
+ * The palette the player would actually see if this draft were saved.
+ *
+ * It goes through `resolvePalette` rather than reading the draft directly, so
+ * the form previews colour with the SAME precedence rule the app renders with —
+ * blank and malformed both fall back to the token. Re-deriving that here would
+ * be a second definition of "override", and the two would disagree the first
+ * time either changed.
+ *
+ * What it is for: contrast. `lowContrastPairs` needs five resolved colours, and
+ * a draft is five strings that may each be a colour, a blank, or a hex someone
+ * is halfway through typing.
+ */
+export function draftPalette(draft: BrandingDraft): Record<ColorName, string> {
+  return resolvePalette(
+    Object.fromEntries(BRANDING_COLOR_NAMES.map((n) => [COLOR_SETTING_KEYS[n], draft[n]])),
+  );
 }
 
 /** True when the draft differs from what is stored. */

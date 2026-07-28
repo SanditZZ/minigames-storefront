@@ -57,9 +57,15 @@ Consequences worth knowing before touching either side:
 - **Opacity utilities lag on old browsers.** `text-ink/70` compiles to a
   `color-mix()` over the variable behind an `@supports` guard, with a baked hex
   fallback, so a browser without `color-mix` re-colours the solid shades only.
-- **Nothing checks contrast.** The rules in the table above are what the tokens
-  were chosen to satisfy; an operator can set five colours that violate all of
-  them. See `docs/potential-features.md`.
+- **Contrast is checked, and only warned about.** `lowContrastPairs`
+  (`packages/tokens/src/contrast.ts`) measures WCAG AA over exactly the pairs
+  rules 2 and 4 name — `ink` on each of `brand`…`brand-4`, and `ink` on white —
+  against the RESOLVED palette, and `StoreBranding.tsx` shows the worst failure
+  beside a Save that stays enabled. It stays a warning deliberately: a venue's
+  real brand colour is not negotiable with a validator, and blocking the save
+  would move the palette into SQLite by hand with nobody warned at all. The
+  forbidden pairings (white on a pastel) are not measured — a ratio for one
+  would read as permission.
 
 React Native has no stylesheet — styles are plain JS objects — so a palette that
 only exists as CSS cannot follow these apps onto a phone. Holding the values in

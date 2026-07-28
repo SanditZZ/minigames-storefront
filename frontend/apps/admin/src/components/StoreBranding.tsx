@@ -5,11 +5,18 @@ import {
   BRANDING_COLOR_NAMES,
   brandingChanges,
   brandingDirty,
+  draftPalette,
   invalidBrandingColors,
   readBranding,
   type BrandingDraft,
 } from "@minigames/admin-core";
-import { COLOR_SETTING_KEYS, PALETTE } from "@minigames/tokens";
+import {
+  COLOR_SETTING_KEYS,
+  CONTRAST_AA_NORMAL,
+  lowContrastPairs,
+  PALETTE,
+  surfaceName,
+} from "@minigames/tokens";
 import { ImageField } from "./ImageField";
 import { Alert, Button, Card, ColorInput, Field, Input, PanelHeader, Stack } from "../ui";
 
@@ -49,6 +56,12 @@ export function StoreBranding({
 
   const dirty = brandingDirty(draft, saved);
   const invalid = invalidBrandingColors(draft);
+
+  // Legibility, checked against the palette the PLAYER would get — resolved, so
+  // a cleared field is measured as the token that will actually render there
+  // rather than as a blank. Advisory on purpose: see the note beside the banner.
+  const illegible = useMemo(() => lowContrastPairs(draftPalette(draft)), [draft]);
+  const worst = illegible[0];
 
   async function save() {
     setBusy(true);
@@ -137,6 +150,25 @@ export function StoreBranding({
             message={`Not a colour: ${invalid
               .map((n) => `${PALETTE[n].name} “${draft[n]}”`)
               .join(", ")}. Use a hex value like #ff9a86, or clear it to use the default.`}
+          />
+        )}
+        {/* A WARNING beside a live Save, never a block. A venue's real brand
+            colour is not negotiable with a validator, and refusing the save
+            would get the palette written into SQLite by hand instead — the same
+            illegible store, with nobody warned. Only the worst pair is named:
+            one unreadable ink fails every surface at once, and five rows of the
+            same news is how a banner gets skimmed. */}
+        {worst && (
+          <Alert
+            tone="warning"
+            message={
+              `Hard to read: ${PALETTE[worst.text].name} text on ${surfaceName(worst.on)} is ` +
+              `${worst.ratio.toFixed(1)}:1, under the ${CONTRAST_AA_NORMAL}:1 minimum` +
+              (illegible.length > 1
+                ? ` — and ${illegible.length - 1} other pair${illegible.length > 2 ? "s" : ""} fail too`
+                : "") +
+              `. You can still save — check it on a phone before you do.`
+            }
           />
         )}
 

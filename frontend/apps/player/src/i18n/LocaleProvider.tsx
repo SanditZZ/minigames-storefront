@@ -21,6 +21,7 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from "r
 import type { ApiClient } from "@minigames/api-client";
 import {
   DEFAULT_LOCALE,
+  parseLang,
   pickLocale,
   translator,
   type Locale,
@@ -53,6 +54,30 @@ const LocaleContext = createContext<LocaleContextValue>({
 function deviceLanguages(): readonly string[] {
   if (typeof navigator === "undefined") return [];
   return navigator.languages ?? (navigator.language ? [navigator.language] : []);
+}
+
+/**
+ * Claims the document's language BEFORE React mounts.
+ *
+ * `index.html` ships `lang="en"` because a served document has to say
+ * something, and it is the one string in this app that cannot follow the
+ * device: it is written at build time, and this app has no server render to
+ * decide it per request. Left to the provider's effect, a Thai device would
+ * therefore spend its first frame declared as English — long enough for a
+ * screen reader to start in the wrong voice and for the first paint to break
+ * Thai lines on spaces that are not there.
+ *
+ * Called from `main.tsx` on the same synchronous turn as `createRoot`, so the
+ * attribute is right before anything is painted. It re-derives the locale from
+ * the URL rather than taking the router's answer because the router does not
+ * exist yet — the same pure `parseLang`/`pickLocale` pair the provider uses, so
+ * the two cannot disagree.
+ */
+export function claimDocumentLang(): void {
+  document.documentElement.lang = pickLocale(
+    parseLang(window.location.search),
+    deviceLanguages(),
+  );
 }
 
 /**

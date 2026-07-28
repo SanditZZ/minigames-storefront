@@ -226,31 +226,26 @@ with their hands currently cannot win a prize at all.
   readback of the exported blob's dimensions. The latter is cheap and worth
   doing: it would catch an export that does not match the preview, which is the
   bug class the geometry was extracted to prevent.
-- **Nothing checks that a chosen palette is legible.** `frontend/CLAUDE.md`
-  states the contrast rules the tokens were picked to satisfy — ink on light
-  surfaces, *never* white text on the pastels — and an operator can set all five
-  colours to anything that parses as hex. Cream text on a cream background is two
-  saves away, and the only feedback is the admin repainting itself the same way.
-  The fix is a pure contrast-ratio check next to `isHexColor`
-  (`packages/tokens/src/override.ts`): compute WCAG contrast for the pairs the
-  rules actually name — `ink` on each of `brand`…`brand-4`, and `ink` on white —
-  and warn in `StoreBranding.tsx` below 4.5:1. Worth doing as a warning rather
-  than a block: a venue's real brand colour is not negotiable with a validator,
-  and refusing to save it would just get the palette set by hand in SQLite. This
-  bites the first time a store picks its own colours, which is the feature's
-  entire purpose.
+- **The contrast warning is advisory, and nothing measures the store that
+  ignores it.** `lowContrastPairs` (`packages/tokens/src/contrast.ts`) flags an
+  illegible palette in `StoreBranding.tsx` beside a Save that stays enabled — on
+  purpose, since a venue's brand colour is not negotiable with a validator. The
+  consequence is that a store CAN be running an unreadable palette and nothing
+  downstream knows: the player app never re-checks what it was handed, and no
+  admin view lists "stores currently below AA". Only worth building when there
+  is more than one store.
 - **The palette arrives after the first paint.** `usePublicSettings` fetches on
   mount, so a player sees the built-in tokens for one request and then the
   store's colours — a visible flash on a cold load, worst on the landing screen
   where the whole background is a `from-brand-4 to-brand-3` gradient. Options,
   cheapest first: cache the last-known palette in `localStorage` and apply it
-  synchronously before the fetch resolves (an app-layer concern, next to
-  `useRouter`); or have `serve-prod.sh` bake the current palette into the
-  bundle's `theme.css` at deploy time, which reintroduces the drift the
-  read-time override was chosen to avoid. It bites on every cold load, but is
-  invisible on the kiosk phones that never reload — which is why it is filed
-  rather than fixed. `index.html`'s hardcoded `lang="en"` has the same shape and
-  the same one-frame cost, and wants fixing in the same change.
+  synchronously before the fetch resolves — `claimDocumentLang` in
+  `apps/player/src/i18n/` is now the worked example of that shape, a pure
+  decision applied from `main.tsx` on the same turn as `createRoot`; or have
+  `serve-prod.sh` bake the current palette into the bundle's `theme.css` at
+  deploy time, which reintroduces the drift the read-time override was chosen to
+  avoid. It bites on every cold load, but is invisible on the kiosk phones that
+  never reload — which is why it is filed rather than fixed.
 - **Only the landing screen knows the store's identity.** `usePublicSettings` is
   called once, in `App.tsx`, and the identity is passed down to `HomeScreen`
   alone; `ResultScreen` and `PlayScreen` never receive it. That is correct today
@@ -297,15 +292,20 @@ with their hands currently cannot win a prize at all.
   version is a few assertions there — hold `+`, check the value climbed by more
   than one; clear the field, check nothing was submitted as 0. It bites when
   someone refactors the timer cleanup, which is the fiddliest part and the one
-  with no coverage at all.
-- **The `NumberInput` suffix reserves a fixed `pr-12`.** Room for "ms" or "taps",
-  not for a long unit — and the units come from the server already translated
-  (`internal/game/i18n.go`), so the value this was sized against is not the value
-  a Thai storefront renders. A long suffix will sit on top of the digits rather
-  than beside them. The honest fix is measuring the suffix and padding to it,
-  which needs a layout effect; the cheap one is a `max-w` plus `truncate` on the
-  span so it clips instead of overlapping. Worth doing before the admin is
-  translated, which is the entry two sections down.
+  with no coverage at all. **The branding form's contrast warning has the same
+  gap for the same reason**: `lowContrastPairs` is unit-tested, but that the
+  banner appears as a colour is typed — and that Save stays ENABLED underneath
+  it — is wiring no pure test reaches, and "stays enabled" is the part a future
+  tidy-up is most likely to reverse.
+- **The `NumberInput` suffix gutter is fixed, so a long unit clips.** The
+  reserved room and the span's `max-w` are two constants in
+  `apps/admin/src/ui/Controls.tsx` that have to agree, and the units come from
+  the server already translated (`internal/game/i18n.go`) — so the widest suffix
+  they were sized against is not the widest one a Thai storefront renders. It no
+  longer overlaps the digits, which was the unrecoverable failure; it truncates
+  instead, which is merely bad. The honest fix is measuring the rendered suffix
+  and padding to it, which needs a layout effect and is the only version that
+  cannot be out-grown.
 
 ### What the bilingual player app does not cover
 

@@ -14,4 +14,4 @@ export {
   type MessageKey,
   type Translator,
 } from "@minigames/player-core";
-export { LocaleProvider, useApi, useLocale, useT } from "./LocaleProvider";
+export { claimDocumentLang, LocaleProvider, useApi, useLocale, useT } from "./LocaleProvider";

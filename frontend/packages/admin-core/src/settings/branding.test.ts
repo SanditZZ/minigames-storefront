@@ -4,6 +4,7 @@ import { COLOR_SETTING_KEYS } from "@minigames/tokens";
 import {
   brandingChanges,
   brandingDirty,
+  draftPalette,
   invalidBrandingColors,
   readBranding,
   type BrandingDraft,
@@ -103,5 +104,17 @@ describe("invalidBrandingColors", () => {
   // default" look like a typo.
   it("does not flag an empty field", () => {
     expect(invalidBrandingColors(blank)).toEqual([]);
+  });
+});
+
+describe("draftPalette", () => {
+  it("previews with the app's own precedence rule, not the raw draft", () => {
+    const palette = draftPalette({ ...blank, brand: "#123456", ink: "#ff" });
+
+    expect(palette.brand).toBe("#123456");
+    // Half-typed and blank both mean "the token stands" — the same answer the
+    // player's renderer gives, which is the point of routing through it.
+    expect(palette.ink).toBe("#4a2b20");
+    expect(palette["brand-4"]).toBe("#fff0be");
   });
 });
