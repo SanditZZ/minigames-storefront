@@ -687,6 +687,18 @@ and the score table grow.
   and the fallback differ, so the two strings stop covering for each other
   everywhere at once. It bites whenever the identity's plumbing is refactored,
   which is every one of the three features queued behind it.
+- **A retried branding test reports the wrong failure.** Every test in
+  `e2e/tests/admin-branding.spec.ts` writes a setting and uses "Save went
+  disabled" as its proof the write landed — correct, and it means a test whose
+  FIRST attempt saved and then failed later leaves the value already stored, so
+  the retry fills the same string, Save never enables, and the run dies on
+  `locator.click: Timeout` at the rename instead of on the assertion that
+  actually broke. Observed while making the settings-cache test fail on purpose:
+  the real error was in attempt 1 and attempt 2 blamed a button. The fix is a
+  helper that treats "already this value" as a satisfied write rather than a
+  click to wait on, which is a change to what `saveBranding` means and so is
+  filed rather than slipped in. It bites whenever one of these tests fails, i.e.
+  exactly when the diagnosis matters.
 - **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
   `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
   `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —

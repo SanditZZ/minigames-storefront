@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { admin, openAdmin, rootVar } from "../helpers/admin";
+import { coldContext } from "../helpers/cold";
 import { ui } from "../helpers/round";
 import { WEB_URL } from "../stack";
 
@@ -69,7 +70,7 @@ test.describe("store branding", () => {
     await expect(page.getByText("Fun Store")).toBeVisible();
   });
 
-  test("a returning player sees the store before the settings arrive", async ({ page }) => {
+  test("a returning player sees the store before the settings arrive", async ({ browser, page }) => {
     // The store's identity used to land one request after the first paint: the
     // palette repainted, the wordmark changed from "Fun Store" to the shop's own
     // name, and the cover banner APPEARED — shoving the game list down a third of
@@ -81,6 +82,11 @@ test.describe("store branding", () => {
     // an assertion can run, and polling for it is a race. Cutting the endpoint
     // off is the same claim from the other side: whatever the page renders with
     // no settings request in flight can only have come from the remembered copy.
+    //
+    // In a SECOND context, not a reload of this one. See helpers/cold.ts: a
+    // reload is served from Chromium's memory cache, which `page.route` never
+    // sees, so the first version of this test passed against a build with the
+    // cache removed.
     const renamed = "Cached Coffee";
 
     await openAdmin(page, "/settings");
@@ -92,16 +98,31 @@ test.describe("store branding", () => {
     await page.goto("/");
     await expect(page.getByText(renamed)).toBeVisible();
 
-    await page.route("**/settings/public", (route) => route.abort());
-    await page.reload();
-    await expect(page.getByText(renamed)).toBeVisible();
-    // And the fallback never got its turn, which is the part that distinguishes
-    // a cache from a slow fetch: a failed request must not erase a good copy.
-    await expect(page.getByText("Fun Store")).toBeHidden();
+    const cold = await coldContext(browser, page);
+    const returning = await cold.newPage();
+    let blocked = 0;
+    // A regex, unanchored, and both details were paid for. A glob
+    // (`**/settings/public`) matches nothing here, and an anchored regex misses
+    // too: every player fetch carries the language as a query
+    // (`?lang=en` — see apiFor), so the URL does not END with the path. Either
+    // mistake fails SILENTLY, the handler simply never running while the request
+    // goes through, which is how this test twice passed against a build with the
+    // cache removed. The counter below is what turned that into a failure.
+    await returning.route(/\/settings\/public/, (route) => {
+      blocked++;
+      return route.abort();
+    });
 
-    // The admin reads the same endpoint for its own palette, so the block has to
-    // come off before the restore navigates there.
-    await page.unroute("**/settings/public");
+    await returning.goto("/");
+    await expect(returning.getByText(renamed)).toBeVisible();
+    // And the fallback never got its turn, which is the part that distinguishes
+    // a remembered copy from a merely fast one: a failed request must not erase
+    // a good copy.
+    await expect(returning.getByText("Fun Store")).toBeHidden();
+    // The whole test rests on this: a block that did not happen would leave
+    // every assertion above passing for the ordinary reason.
+    expect(blocked).toBeGreaterThan(0);
+    await cold.close();
 
     await openAdmin(page, "/settings");
     await admin.storeName(page).fill("Fun Store");
