@@ -53,6 +53,16 @@ export interface MotionToken {
 export const MOTION = {
   "pop-in": { durationMs: 420, easing: "back", iterations: 1, fill: "both", keyframes: "pop-in" },
   "rise-in": { durationMs: 500, easing: "out", iterations: 1, fill: "both", keyframes: "rise-in" },
+  // The same arrival with the fade taken out — identical duration and easing on
+  // purpose, so the two read as one motion language rather than two.
+  //
+  // It exists for the claim card, and the reason is not aesthetic: a QR at
+  // partial opacity over cream has too little contrast for a camera to decode,
+  // so the whole entrance was a window in which the one graphic on screen that
+  // a scanner is meant to read could not be read. Opacity cannot be opted out
+  // of from below — a child cannot escape an ancestor's — so the exemption has
+  // to be the ancestor's animation, which is this.
+  "rise-solid": { durationMs: 500, easing: "out", iterations: 1, fill: "both", keyframes: "rise-solid" },
   halo: { durationMs: 1800, easing: "ease-out", iterations: "infinite", fill: "none", keyframes: "halo" },
   bob: { durationMs: 2400, easing: "ease-in-out", iterations: "infinite", fill: "none", keyframes: "bob" },
   confetti: { durationMs: 1600, easing: "inOut", iterations: 1, fill: "forwards", keyframes: "confetti" },

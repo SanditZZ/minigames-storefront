@@ -124,6 +124,9 @@ function SettingRow({
         <Badge tone="neutral">{setting.type}</Badge>
       </div>
       {setting.description && <p className="mt-1 text-sm text-ink/60">{setting.description}</p>}
+      {CAVEATS[setting.key] && (
+        <p className="mt-1 text-sm font-medium text-ink/70">{CAVEATS[setting.key]}</p>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <div className={duration ? "basis-full" : "min-w-0 flex-1"}>
           <ValueInput settingKey={setting.key} type={setting.type} value={value} onChange={setValue} />
@@ -138,6 +141,29 @@ function SettingRow({
     </Card>
   );
 }
+
+/**
+ * Extra prose for settings whose effect is narrower than their name suggests,
+ * shown under the description the backend serves.
+ *
+ * It lives HERE rather than in the seeded `description` for a reason worth
+ * knowing before adding to it: settings are seeded only when absent (see
+ * `Seed` in backend/internal/app/seed.go), so editing a seed description never
+ * reaches a database that already has the row. Every store running today would
+ * keep the old text. Client-side copy reaches all of them on the next deploy.
+ *
+ * Keyed exactly as the backend stores the setting, same as DURATION_SETTINGS.
+ * English only, like the rest of this app.
+ */
+const CAVEATS: Record<string, string> = {
+  // The one knob in this panel that looks retroactive and is not. `issueClaim`
+  // reads it once and stamps the deadline into `claims.expires_at`, which is the
+  // right storage model — a claim's deadline should not move under the person
+  // holding it — but an admin shortening the window would otherwise expect every
+  // outstanding prize to lapse sooner, and none of them will.
+  claim_ttl_hours:
+    "Applies to prizes won from now on. Claims already issued keep the deadline they were given when they were won.",
+};
 
 /**
  * Renders the right control for a setting value.

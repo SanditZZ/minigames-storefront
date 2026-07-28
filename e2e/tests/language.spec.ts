@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { horizontalOverflow, NARROW_VIEWPORT } from "../helpers/layout";
 import { ui } from "../helpers/round";
 
 /**
@@ -81,5 +82,46 @@ test.describe("Thai", () => {
     // By heading rather than by text: the countdown echoes the same name as its
     // eyebrow, so a loose match resolves to two elements.
     await expect(page.getByRole("heading", { name: THAI_GAME })).toBeVisible();
+  });
+});
+
+/**
+ * Thai on the narrowest screen the project supports.
+ *
+ * Its own describe block because `test.use` sets the viewport for a whole
+ * block, and every other spec wants the default Pixel 7 width (412px) — which
+ * is wide enough that none of them would notice this class of failure.
+ *
+ * Thai is where it bites first. There are no spaces between words, so `truncate`
+ * cuts mid-word rather than shortening, and the dictionary keeps strings that
+ * land in a fixed slot short ON PURPOSE (see the header comment in th.ts). That
+ * is a convention with nothing enforcing it, and this is the check that turns it
+ * into one — including for the strings nobody reviewed, since a store name is
+ * admin free text translated nowhere.
+ */
+test.describe("Thai at 320px", () => {
+  test.use({ viewport: NARROW_VIEWPORT });
+
+  test("the landing screen fits the narrowest supported screen", async ({ page }) => {
+    await page.goto("/?lang=th");
+    await expect(ui.gameCard(page, THAI_GAME)).toBeVisible();
+
+    const { documentPx, worst } = await horizontalOverflow(page);
+    expect(documentPx, `document scrolls ${documentPx}px sideways; widest: ${worst}`).toBe(0);
+    expect(worst, "an element extends past the right edge").toBe("");
+  });
+
+  test("a round in progress fits it too", async ({ page }) => {
+    // The play screen rather than the result screen, deliberately: it is
+    // reachable without spending a round's unskippable ending, and it carries
+    // the two longest fixed-slot strings in the app — the game's own name from
+    // the API beside the client's quit control.
+    await page.goto("/?lang=th");
+    await ui.gameCard(page, THAI_GAME).click();
+    await expect(page.getByRole("button", { name: "ออก" })).toBeVisible();
+
+    const { documentPx, worst } = await horizontalOverflow(page);
+    expect(documentPx, `document scrolls ${documentPx}px sideways; widest: ${worst}`).toBe(0);
+    expect(worst, "an element extends past the right edge").toBe("");
   });
 });

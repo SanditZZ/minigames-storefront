@@ -34,6 +34,20 @@
   }
 }
 
+/* rise-in without the fade — the same travel and the same timing token, for a
+   subtree that must stay legible to a CAMERA while it arrives. See the
+   rise-solid entry in packages/tokens/src/motion.ts. The translate stays: a
+   scanner reads a sharp frame at any point of a 14px CSS slide, whereas 40%
+   opacity over cream is a symbol it cannot see at all. */
+@keyframes rise-solid {
+  0% {
+    transform: translateY(14px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
 /* Expanding ring behind the "game complete" badge. */
 @keyframes halo {
   0% {

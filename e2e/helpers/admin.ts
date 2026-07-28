@@ -208,3 +208,24 @@ export const awards = {
 export function oneAward(game: string, query: string): string {
   return `/awards?game=${game}&q=${encodeURIComponent(query)}`;
 }
+
+/**
+ * Opens one prize's edit form, narrowed by the panel's own filters.
+ *
+ * Lives here rather than in a spec because two specs now want it — the Thai
+ * copy tests and the form-control tests — and the second one would otherwise
+ * have re-derived the same filter-then-click sequence.
+ *
+ * The `toHaveCount(1)` is an assertion about the FILTER, not a locator trick.
+ * It used to be load-bearing for the click (every row's Edit button had the
+ * same accessible name, so narrowing to one row was the only way to click a
+ * known prize); the buttons now name their prize, so a second row would no
+ * longer make the click ambiguous. It stays because a filter that stopped
+ * narrowing is worth failing on.
+ */
+export async function openAwardForm(page: Page, game: string, name: string): Promise<void> {
+  await openAdmin(page, oneAward(game, name));
+  await expect(awards.editOnly(page)).toHaveCount(1);
+  await awards.editOnly(page).click();
+  await expect(awards.save(page)).toBeVisible();
+}

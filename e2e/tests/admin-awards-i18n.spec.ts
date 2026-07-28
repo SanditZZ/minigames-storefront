@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { awards, oneAward, openAdmin } from "../helpers/admin";
+import { awards, oneAward, openAdmin, openAwardForm } from "../helpers/admin";
 import { playRound, revealScore, ui } from "../helpers/round";
 
 /**
@@ -65,20 +65,6 @@ const TAP_PRIZES = [
  */
 const prize = (page: Page, name: string) => page.getByText(name, { exact: true });
 
-/** Opens one game's copy of a prize, narrowed by the panel's own filters. */
-async function openThePrize(page: Page, game: string, name = PRIZE): Promise<void> {
-  await openAdmin(page, oneAward(game, name));
-  // Exactly one row survives the filter. This used to be load-bearing for the
-  // LOCATOR — every row's Edit button had the same accessible name, so narrowing
-  // to one row was the only way to click a known prize — and it is now an
-  // assertion about the FILTER only: the buttons name their prize
-  // (`Edit ${a.name}`), so a second row would no longer make the click ambiguous.
-  // If this resolves to two, the filter broke.
-  await expect(awards.editOnly(page)).toHaveCount(1);
-  await awards.editOnly(page).click();
-  await expect(awards.nameTh(page)).toBeVisible();
-}
-
 async function setThaiText(
   page: Page,
   game: string,
@@ -86,7 +72,10 @@ async function setThaiText(
   description: string,
   prizeName = PRIZE,
 ): Promise<void> {
-  await openThePrize(page, game, prizeName);
+  // The open-and-narrow sequence is shared with admin-forms.spec.ts, so it
+  // lives in helpers/admin.ts rather than here.
+  await openAwardForm(page, game, prizeName);
+  await expect(awards.nameTh(page)).toBeVisible();
   await awards.nameTh(page).fill(name);
   await awards.descriptionTh(page).fill(description);
   await awards.save(page).click();

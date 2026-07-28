@@ -109,13 +109,6 @@ with their hands currently cannot win a prize at all.
   have owners — and note `@minigames/qr-core` would need extending first: it
   encodes version 1 only (ten alphanumeric characters), and its header comment
   names the three extension points a longer payload needs.
-- **The QR is not scannable during the result card's entrance.** The card fades in
-  over roughly 600ms (`animate-rise-in`), and a symbol at partial opacity over
-  cream has too little contrast to decode — measured while writing
-  `e2e/tests/claim-qr.spec.ts`, which polls for exactly this reason. A customer
-  who holds their phone out the instant the score lands gets one failed scan and
-  then a working one. The fix, if it is ever worth making, is to exempt the QR
-  from the fade rather than to shorten it.
 - **A claim has no owner.** Anyone holding the code can redeem it, which is the
   same trust model as a paper voucher and was the deliberate scope (this is a
   portfolio piece — no real prizes). If prizes ever have value, the gap to close
@@ -273,21 +266,13 @@ with their hands currently cannot win a prize at all.
   accepting it — the wrongness is visible on the landing screen the first time
   they look. It bites exactly once per store that had a logo before this
   shipped, which today is however many of them uploaded a wide one.
-- **`NumberInput` has no browser test, and its stepper is the part that needs
-  one.** `packages/admin-core/src/settings/number.ts` is unit-tested — parsing,
-  clamping, snapping, the step bounds — but the component in
-  `apps/admin/src/ui/Controls.tsx` is not, and everything interesting about it is
-  behaviour a pure test cannot reach: press-and-hold repeating on a timer, the
-  draft string that keeps a cleared field from becoming 0, the wheel handler that
-  blurs. `admin-awards-i18n.spec.ts` already opens an award form, so the cheapest
-  version is a few assertions there — hold `+`, check the value climbed by more
-  than one; clear the field, check nothing was submitted as 0. It bites when
-  someone refactors the timer cleanup, which is the fiddliest part and the one
-  with no coverage at all. **The branding form's contrast warning has the same
-  gap for the same reason**: `lowContrastPairs` is unit-tested, but that the
-  warning alert appears as a colour is typed — and that Save stays ENABLED
-  underneath it — is wiring no pure test reaches, and "stays enabled" is a
-  tidy-up is most likely to reverse.
+- **`NumberInput`'s wheel handler is still untested.** The stepper's repeat and
+  the cleared-field draft are covered now (`admin-forms.spec.ts`), but the
+  `onWheel` that BLURS the field is not: it exists so a focused number input
+  cannot absorb a page scroll, and asserting it needs a wheel event over a
+  focused input plus a check that the page scrolled and the value did not.
+  Cheap to add to the same spec; left out because a wheel is not an input a
+  phone has, and this admin is used on one as often as not.
 - **The `NumberInput` suffix gutter is fixed, so a long unit clips.** The
   reserved room and the span's `max-w` are two constants in
   `apps/admin/src/ui/Controls.tsx` that have to agree, and the units come from
@@ -344,16 +329,13 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   client-side, the settings endpoint serving a flat map rather than resolved
   prose. Worth noting the asymmetry deliberately: awards resolve server-side and
   the store's identity would not.
-- **Nothing tests Thai at 320px.** Thai has no spaces between words, so
-  `truncate` cuts mid-word instead of shortening; the dictionary keeps every
-  string that lands in a fixed slot short *on purpose* (see the header comment in
-  `th.ts`), but that is a convention, not a check. A Playwright pass at 320px
-  asserting no horizontal overflow would make it one — the suite runs at Pixel 7
-  width (412px) for every spec, so this wants a narrower
-  `test.use({ viewport })` block rather than a new project. Cheap, and it is the
-  check that would catch the Thai store name an operator types into
-  `StoreBranding`: admin free text is translated nowhere, so the longest string
-  on the landing header is the one nobody reviewed.
+- **The 320px check covers two screens, and the app has more than two.** The
+  narrow-viewport block in `language.spec.ts` measures the landing screen and a
+  round in progress; the RESULT screen — the one carrying a claim code, a prize
+  name and a leaderboard, i.e. the most crowded row in the app — is not measured,
+  because reaching it costs a full round's unskippable ending. The same is true
+  of the admin, which nothing checks at any width. Extend `horizontalOverflow`
+  (`e2e/helpers/layout.ts`) to those rather than writing a second measurement.
 
 ### The rest of the admin
 
@@ -443,10 +425,12 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   replaced the native spinners) are done. What is left is a sweep rather than a
   known offender: nothing has audited either app against the 44px rule, so the
   next failure will be found by measuring, not by remembering.
-- **Pin the player's own leaderboard row.** `Leaderboard` shows the top ten; a
-  player ranked #23 sees ten strangers and no sign of themselves. Their row
-  belongs below an ellipsis when they fall outside the visible window (the rank
-  is already known — `result.rank`).
+- **A pinned leaderboard row has no browser coverage.** `boardRows`
+  (`player-core/src/board/rows.ts`) is unit-tested, but no spec has ever seen the
+  pinned row on screen: every E2E round lands on a nearly empty board and is
+  therefore inside the top ten, which is exactly the case `boardRows` returns
+  unchanged. Reaching the interesting case needs eleven scores in one game, so
+  the honest version seeds them through the API rather than by playing.
 - **Move the name prompt off the landing screen.** The name field sits between
   the prize showcase and the game list (`GamePicker.tsx`), so a kiosk phone pops
   a keyboard at the exact moment the customer has just been sold on a prize and
@@ -560,12 +544,13 @@ Concrete, near-term items, roughly ordered by how soon they will bite.
   show a prize with no code. A `cmd/backfill-claims` following the
   `cmd/migrate-ids` rules (dry-run default, `-apply`, timestamped backup,
   `-revert`) would close it. Until then the gap is silent.
-- **A claim that fails to write is invisible to the player.** `app.issueClaim`
-  logs and returns nil rather than failing the submission — deliberate, since
-  the score is committed and the stock already spent by that point (see its
-  comment), but the player sees a win with no code and no explanation. The
-  counter-side repair path is the backfill script above; the player-side one is
-  copy on the result screen that admits it.
+- **A claim that failed to write leaves the COUNTER with nothing to go on.** The
+  player's side of this is built — a win with no claim renders the prize with
+  `result.noClaimNote` explaining it (`ResultSummary`) — but the staff member
+  they then walk up to has no record at all: `issueClaim` logged and returned
+  nil, so there is no row to look up and no way to distinguish this player from
+  someone inventing a prize. The backfill script above is the repair path; until
+  it exists the note tells the player to go and be disbelieved.
 
 ### Admin lists at scale
 
@@ -584,14 +569,15 @@ and the score table grow.
   an admin actually arrives with: "this customer says they won a coffee on
   Tuesday." `GET /api/v1/admin/claims` answers the counter's version of that by
   code; the scores panel still cannot answer it by person or by date.
-- **Changing the claim TTL does not move existing claims.** `app.issueClaim`
-  reads `claim_ttl_hours` once and stamps the result into `claims.expires_at`
-  (the `claim.TTL(...)` call in `service.go`), so the setting only governs claims
-  issued afterwards. That is the right storage model — a claim's deadline should
-  not move under the person holding it — but `SettingsPanel` renders every
-  setting the same generic way, so an admin shortening the window sees a knob
-  that looks retroactive and is not. The fix is copy on that setting, not a
-  change to the data.
+- **Setting copy is compiled in, so the panel and the database disagree about
+  what a knob does.** `CAVEATS` in `SettingsPanel.tsx` explains the one setting
+  whose effect is narrower than its name (`claim_ttl_hours` governs claims issued
+  afterwards, never existing ones) — client-side, because seeded `description`
+  rows are only written when absent and editing a seed never reaches a database
+  that already has it. That is the right call for one caveat and the wrong shape
+  for five: an operator now reads two sentences from two sources under one key,
+  one editable in the admin and one only by deploying. It pairs with the strings
+  panel below — whatever migrates the dictionaries should take these too.
 - **`redeemed_at` records when, never who — and an undo records nothing at all.**
   The claims table has no actor column (`003_claims.sql`), and the admin API is
   one shared secret with no identities behind it, so "who handed this prize
@@ -652,7 +638,12 @@ and the score table grow.
 - **Visual regression.** Every layout bug this repo has written down was purely
   visual — collapsed tier labels, a bell overlapping text, halo rings crossing a
   caption, a number field collapsed to a sliver with Save landing on top of a
-  dropdown — and none of them is catchable by a DOM assertion. Playwright's
+  dropdown — and almost none of them is catchable by a DOM assertion. *Almost*:
+  `horizontalOverflow` (`e2e/helpers/layout.ts`) catches the one sub-class that
+  is measurable without a picture, an element extending past the viewport, and
+  it names the offender. Overlap, collapse and colour are still invisible to it —
+  two elements can sit exactly on top of each other with neither out of bounds.
+  Playwright's
   `toHaveScreenshot()` would, but it needs a pinned container image for stable
   font rendering; deliberately deferred rather than half-done. **The icons made
   this cheaper without anyone aiming at it**: every mark on screen is now inline

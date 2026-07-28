@@ -45,7 +45,13 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
         </div>
       </AppearIn>
 
-      <AppearIn delayMs={140} className="w-full flex justify-center">
+      {/* `riseSolid` when there is a claim, because this card carries the QR and
+          a camera cannot decode a symbol at partial opacity over cream. A player
+          who holds their phone out the instant the score lands used to get one
+          failed scan and then a working one; the entrance is unchanged in every
+          other respect, including its length. The two prize-less states keep the
+          ordinary fade — nothing in them is machine-read. */}
+      <AppearIn variant={result.claim ? "riseSolid" : "rise"} delayMs={140} className="w-full flex justify-center">
         {result.claim ? (
           // The image comes from the live award, the name from the claim's
           // snapshot inside ClaimCard — see the note there on why only one of

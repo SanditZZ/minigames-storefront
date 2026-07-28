@@ -76,11 +76,30 @@ export function ScoreRow({
       }`}
       aria-current={highlighted ? "true" : undefined}
     >
-      <span className="w-6 shrink-0 text-center font-bold tabular-nums">{rank}</span>
+      {/* `min-w-6` rather than `w-6`: the column has to stay wide enough to keep
+          every rank aligned, and a pinned row is where three digits finally
+          show up — a #128 in a fixed 24px slot overflows its own cell. */}
+      <span className="min-w-6 shrink-0 text-center font-bold tabular-nums">{rank}</span>
       <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
       <span className="shrink-0 whitespace-nowrap font-bold tabular-nums">
         {value} {unit}
       </span>
+    </li>
+  );
+}
+
+/**
+ * The elision between a leaderboard's visible window and a row pinned below it.
+ *
+ * `aria-hidden` because it carries no information a screen reader needs: the
+ * jump from rank 10 to rank 23 is already spoken by the two rank numbers on
+ * either side of it, and "horizontal ellipsis" is not a useful thing to hear
+ * in the middle of a table. Sighted readers get the same fact from the shape.
+ */
+export function ScoreGapRow() {
+  return (
+    <li className="px-3 text-center text-sm font-bold leading-none text-ink/25" aria-hidden>
+      ···
     </li>
   );
 }

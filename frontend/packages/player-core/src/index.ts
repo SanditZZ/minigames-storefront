@@ -12,6 +12,7 @@
 // `useRouter.ts` in the first place: the grammar of a location is shared, and
 // only the thing that pushes it onto history is per-platform.
 
+export * from "./board/rows";
 export * from "./brand";
 export * from "./claims/present";
 export * from "./i18n";

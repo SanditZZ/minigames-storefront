@@ -140,7 +140,14 @@ export function ResultScreen({
         onPlayAgain={onPlayAgain}
         onPickAnother={onPickAnother}
       />
-      <Leaderboard scores={scores} unit={game.scoreUnit} highlightId={result.score.id} />
+      {/* The board is the top ten; `own` is what stops a player ranked #23 from
+          reading ten strangers and no sign of themselves. Both halves come from
+          the submission that is already on this screen — no extra request. */}
+      <Leaderboard
+        scores={scores}
+        unit={game.scoreUnit}
+        own={{ entry: result.score, rank: result.rank }}
+      />
     </Stack>
   );
 }
