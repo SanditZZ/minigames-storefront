@@ -212,6 +212,32 @@ that rewriting `awards.id` must carry `scores.award_id` with it — the migratio
 does this in the same transaction; anything new that references an entity id
 must be added to that carry list too.
 
+### Data-repair scripts live in `cmd/`, and they all follow those rules
+
+`migrate-ids` is the pattern, not the exception. Every script that touches
+persisted data is dry-run by default, takes `-apply` to commit, writes a
+timestamped JSON backup before the first write, and offers `-revert <file>`.
+Stop the stack before applying any of them.
+
+- `cmd/migrate-ids` — UUID → nanoid entity ids (above).
+- `cmd/backfill-claims` — issues the claims that winning rounds should have
+  earned. Two ways a win ends up without one: the round predates the claims
+  table, or `issueClaim` failed at submit time and logged rather than failing
+  the submission.
+
+**A repair script reconstructs through the production calculation, never its
+own copy of it.** `backfill-claims` builds each row with `claim.Issue`, so a
+backfilled claim cannot disagree with an issued one — including about the
+awkward part, that `Issue` starts the redemption window at the ROUND's time, so
+backfilling a round older than the TTL correctly produces an already-expired
+claim. Writing a friendlier rule into the script would have made the two paths
+disagree about what a claim is.
+
+**A repair's undo must not erase a real transaction.** `-revert` deletes only
+rows still holding `redeemed_at IS NULL`: once a prize has been handed to a
+person, that row is a record of something that happened, not the script's
+output. Any future repair script that deletes rows inherits this rule.
+
 ## Admin access
 
 The admin API is guarded by a shared secret (`APP_ADMIN_TOKEN`), defaulting to

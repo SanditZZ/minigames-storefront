@@ -548,18 +548,25 @@ Concrete, near-term items, roughly ordered by how soon they will bite.
   `Service.awardByID` still degrades a deleted award to "no prize" — as it does
   for any win issued before claims existed. Soft-delete/archive is the complete
   answer, and it pairs with the audit-trail item below.
-- **Backfill claims for wins that predate them.** Rounds already in
-  `.prod/minigames.db` carry an `award_id` but no claim, so their result URLs
-  show a prize with no code. A `cmd/backfill-claims` following the
-  `cmd/migrate-ids` rules (dry-run default, `-apply`, timestamped backup,
-  `-revert`) would close it. Until then the gap is silent.
-- **A claim that failed to write leaves the COUNTER with nothing to go on.** The
-  player's side of this is built — a win with no claim renders the prize with
-  `result.noClaimNote` explaining it (`ResultSummary`) — but the staff member
-  they then walk up to has no record at all: `issueClaim` logged and returned
-  nil, so there is no row to look up and no way to distinguish this player from
-  someone inventing a prize. The backfill script above is the repair path; until
-  it exists the note tells the player to go and be disbelieved.
+- **Nothing NOTICES a win with no claim; the repair is manual.**
+  `cmd/backfill-claims` closes the hole once someone runs it, and the player's
+  side is built — a win with no claim renders the prize with
+  `result.noClaimNote` (`ResultSummary`) — but nothing between those two ever
+  raises its hand. `issueClaim` logs and returns nil, and a log line in
+  `.prod/logs/api.log` is not a signal anybody watches, so the interval between
+  a failed write and someone thinking to run the script is unbounded. In that
+  window the counter still has no row to look up and no way to tell this player
+  from someone inventing a prize. The cheap version is a `-check` mode that
+  exits non-zero when any win lacks a claim, run from cron or from `ship.sh`;
+  the real version is the metric in the observability entry above.
+- **A win whose award was deleted can never be given a claim.** `partitionWins`
+  (`cmd/backfill-claims`) sets those rounds aside and reports them rather than
+  writing a row, because `award_name` is a snapshot and a deleted award leaves
+  no name to snapshot — inventing one would put a lie in the one column designed
+  to outlive the award. So a prize deleted before its claim was backfilled is
+  unrecoverable, permanently. Soft-delete/archive is the fix and it is the same
+  fix the entry below wants; this is a second, sharper reason for it, because
+  here the data loss is already irreversible rather than merely confusing.
 
 ### Admin lists at scale
 
