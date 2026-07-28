@@ -98,7 +98,7 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
   if (!mini) {
     return (
       <StatusMessage
-        icon="🧩"
+        icon="puzzle"
         title={t("play.unsupported.title")}
         detail={t("play.unsupported.detail")}
         action={{ label: t("play.back"), onClick: onCancel }}
@@ -112,7 +112,7 @@ export function RoundRunner({ game, playerName, onComplete, onCancel }: Props) {
     return (
       <StatusMessage
         tone="error"
-        icon="😕"
+        icon="frown"
         title={t("play.failed.title")}
         detail={error}
         action={{ label: t("play.back"), onClick: onCancel }}

@@ -1,7 +1,7 @@
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { isNewRecord } from "@minigames/player-core";
 import { useT } from "../i18n";
-import { AppearIn, Badge, Button, HighlightCard, Stack, Stat } from "../ui";
+import { AppearIn, Badge, Button, HighlightCard, Icon, Stack, Stat } from "../ui";
 import { ClaimCard } from "./ClaimCard";
 
 interface Props {
@@ -29,7 +29,17 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
         <Stat value={result.score.value} label={game.scoreUnit} />
         <div className="mt-3 flex items-center justify-center gap-2">
           <Badge tone={record ? "brand" : "muted"}>
-            {record ? t("result.topScore") : t("result.rank", { rank: result.rank })}
+            {/* The trophy used to live inside the translated string. It sits
+                beside it now: a dictionary holds words, and an emoji wedged
+                into one is a mark the store's palette cannot repaint. */}
+            {record ? (
+              <span className="inline-flex items-center gap-1">
+                <Icon name="trophy" />
+                {t("result.topScore")}
+              </span>
+            ) : (
+              t("result.rank", { rank: result.rank })
+            )}
           </Badge>
           <Badge tone="muted">{result.score.playerName}</Badge>
         </div>
@@ -49,7 +59,7 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           // Saying so is better than showing a prize with no way to collect it
           // and letting the player discover that at the counter.
           <HighlightCard
-            icon="🎉"
+            icon="party-popper"
             imageUrl={result.award!.imageUrl}
             eyebrow={t("result.won")}
             // The award's own name and blurb are admin free text and are shown
@@ -60,7 +70,7 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
           />
         ) : (
           <HighlightCard
-            icon="💪"
+            icon="dumbbell"
             tone="muted"
             title={t("result.noPrize.title")}
             body={t("result.noPrize.body")}

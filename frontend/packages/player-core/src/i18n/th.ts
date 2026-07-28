@@ -34,7 +34,7 @@ export const th: Messages = {
   "brand.tagline": "ขอบคุณที่แวะมาอุดหนุน — มาลองเสี่ยงโชคกัน!",
 
   // --- Landing screen ----------------------------------------------------
-  "home.title": "เล่นเลย ลุ้นรางวัล 🎁",
+  "home.title": "เล่นเลย ลุ้นรางวัล",
   "home.loading": "กำลังโหลดเกม…",
   "home.unreachable.title": "เชื่อมต่อกับเกมไม่ได้",
   "home.unreachable.action": "ลองอีกครั้ง",
@@ -96,7 +96,7 @@ export const th: Messages = {
   "result.notFound.title": "ไม่พบผลการเล่น",
   "result.notFound.detail": "ลิงก์คะแนนนี้อาจหมดอายุหรือพิมพ์ผิด",
   "result.notFound.action": "ไปเล่นเกม",
-  "result.topScore": "🏆 คะแนนสูงสุด",
+  "result.topScore": "คะแนนสูงสุด",
   "result.rank": "อันดับที่ {rank}",
   "result.playAgain": "เล่นอีกครั้ง",
   "result.pickAnother": "เลือกเกมอื่น",

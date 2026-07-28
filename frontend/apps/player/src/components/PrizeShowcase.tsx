@@ -30,7 +30,7 @@ export function PrizeShowcase({ prizes }: { prizes: ShowcasePrize[] }) {
             {/* The admin-set image when there is one, a gift otherwise — the
                 same primitive the result screen uses, so a prize looks like
                 itself on both sides of a round. */}
-            <PrizeImage src={p.imageUrl} fallback="🎁" />
+            <PrizeImage src={p.imageUrl} fallback="gift" />
 
             {/* min-w-0 so a long prize name truncates instead of pushing the
                 sold-out badge off a 320px screen. */}

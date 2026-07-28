@@ -1,0 +1,12 @@
+{
+  "name": "@minigames/icons",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Icon geometry as data: Lucide shapes as plain TS objects. No React, no DOM, no SVG markup — each app renders the same table with its own platform's primitives.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

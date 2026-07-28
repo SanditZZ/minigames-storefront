@@ -1,4 +1,6 @@
+import type { IconName } from "@minigames/icons";
 import type { ReactNode } from "react";
+import { Icon } from "./Icon";
 import { PrizeImage } from "./PrizeImage";
 
 type Tone = "solid" | "muted" | "accent";
@@ -64,7 +66,7 @@ export function HighlightCard({
   tone = "solid",
   className = "",
 }: {
-  icon: string;
+  icon: IconName;
   imageUrl?: string;
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -79,8 +81,8 @@ export function HighlightCard({
       {imageUrl ? (
         <PrizeImage src={imageUrl} fallback={icon} size="lg" className="mx-auto" />
       ) : (
-        <div className="text-4xl" aria-hidden>
-          {icon}
+        <div className="text-4xl text-ink/40">
+          <Icon name={icon} />
         </div>
       )}
       {eyebrow != null && (

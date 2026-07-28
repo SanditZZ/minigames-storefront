@@ -1,7 +1,7 @@
 import { COMPLETE_BEAT_MS, holdMs } from "@minigames/player-core";
 import { useT } from "../i18n";
 import { useHold, usePrefersReducedMotion } from "../reveal/useAnimationProgress";
-import { Confetti, Eyebrow, HaloBox } from "../ui";
+import { Confetti, Eyebrow, HaloBox, Icon } from "../ui";
 
 /**
  * The beat between finishing a round and learning how you did.
@@ -38,8 +38,8 @@ export function GameCompleteStage({ pending, onContinue }: { pending: boolean; o
     >
       <div className="relative grid place-items-center">
         <HaloBox>
-          <div className="animate-bob text-7xl" aria-hidden>
-            🏁
+          <div className="animate-bob text-7xl text-ink">
+            <Icon name="flag" />
           </div>
         </HaloBox>
         <Confetti />

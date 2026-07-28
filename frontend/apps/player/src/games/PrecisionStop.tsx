@@ -159,7 +159,7 @@ function PrecisionStopPlay({ durationMs, challenge, onFinish }: PlayProps) {
     return (
       <StatusMessage
         tone="error"
-        icon="😕"
+        icon="frown"
         title={t("play.failed.title")}
         detail={t("play.badChallenge")}
       />
@@ -252,6 +252,6 @@ function PrecisionStopPlay({ durationMs, challenge, onFinish }: PlayProps) {
 
 export const PrecisionStop: MiniGame = {
   slug: "precision-stop",
-  icon: "🎯",
+  icon: "target",
   Play: PrecisionStopPlay,
 };

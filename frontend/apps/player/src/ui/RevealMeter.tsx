@@ -1,5 +1,6 @@
 import type { Tier } from "@minigames/player-core";
 import { useT } from "../i18n";
+import { Icon } from "./Icon";
 
 interface Props {
   /** Current puck height, 0–100 (% of the tower). */
@@ -38,7 +39,7 @@ export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
             bellLit ? "bg-brand animate-flash" : "bg-white"
           }`}
         >
-          🔔
+          <Icon name="bell" />
         </div>
 
         <div className="relative h-full overflow-hidden rounded-2xl bg-white/70 ring-1 ring-ink/10">
@@ -76,7 +77,7 @@ export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
               style={{ bottom: `${tier.from * 100}%` }}
             >
               <span className={`h-px w-3 shrink-0 ${active ? "bg-brand" : "bg-ink/20"}`} />
-              <span className="shrink-0 text-base">{tier.icon}</span>
+              <Icon name={tier.iconKey} className="shrink-0 text-base" />
               {/* `truncate` on a Thai label cuts mid-word, since Thai has no
                   spaces — which is why the rung names in the dictionary are
                   kept short rather than translated phrase for phrase. */}

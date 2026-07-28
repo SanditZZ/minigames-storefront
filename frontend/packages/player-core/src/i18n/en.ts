@@ -32,7 +32,7 @@ export const en = {
   "brand.tagline": "Thanks for shopping with us — try your luck!",
 
   // --- Landing screen ----------------------------------------------------
-  "home.title": "Play & Win 🎁",
+  "home.title": "Play & Win",
   "home.loading": "Loading games…",
   "home.unreachable.title": "Can’t reach the games",
   "home.unreachable.action": "Try again",
@@ -105,7 +105,7 @@ export const en = {
   "result.notFound.title": "Result not found",
   "result.notFound.detail": "This score link may have expired or been mistyped.",
   "result.notFound.action": "Play a game",
-  "result.topScore": "🏆 Top score",
+  "result.topScore": "Top score",
   "result.rank": "Rank #{rank}",
   "result.playAgain": "Play again",
   "result.pickAnother": "Pick another game",

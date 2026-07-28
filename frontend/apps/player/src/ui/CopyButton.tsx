@@ -1,17 +1,19 @@
+import type { IconName } from "@minigames/icons";
 import { useEffect, useState } from "react";
 import { copyText } from "../clipboard/copy";
 import { useT, type MessageKey } from "../i18n";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
 
 /** How long the button admits to having copied before reverting. */
 const CONFIRM_MS = 1800;
 
 type State = "idle" | "copied" | "failed";
 
-const labels: Record<State, { icon: string; textKey: MessageKey }> = {
-  idle: { icon: "📋", textKey: "copy.idle" },
-  copied: { icon: "✅", textKey: "copy.copied" },
-  failed: { icon: "⚠️", textKey: "copy.failed" },
+const labels: Record<State, { icon: IconName; textKey: MessageKey }> = {
+  idle: { icon: "clipboard", textKey: "copy.idle" },
+  copied: { icon: "check", textKey: "copy.copied" },
+  failed: { icon: "triangle-alert", textKey: "copy.failed" },
 };
 
 /**
@@ -47,7 +49,7 @@ export function CopyButton({ value, label }: { value: string; label?: string }) 
 
   return (
     <Button variant="quiet" size="sm" onClick={handleCopy} aria-label={t("copy.aria", { label: noun })}>
-      <span aria-hidden>{icon}</span>
+      <Icon name={icon} />
       <span className="ml-1.5">{t(textKey)}</span>
       {/* The visual label changes under the pointer; a screen reader gets the
           outcome announced instead of silently re-reading the button. */}

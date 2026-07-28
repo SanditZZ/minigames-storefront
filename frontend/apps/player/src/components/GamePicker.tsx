@@ -2,7 +2,7 @@ import type { Game } from "@minigames/api-client";
 import { MAX_NAME_LENGTH, type ShowcasePrize, type StoreIdentity } from "@minigames/player-core";
 import { gameIcon, getMiniGame } from "../games/registry";
 import { useT, type Locale } from "../i18n";
-import { IconButton, PageHeader, SelectCard, Stack, TextField } from "../ui";
+import { Icon, IconButton, PageHeader, SelectCard, Stack, TextField } from "../ui";
 import { LanguageToggle } from "./LanguageToggle";
 import { PrizeShowcase } from "./PrizeShowcase";
 
@@ -53,7 +53,12 @@ export function GamePicker({
       <PageHeader
         brand={identity.name}
         logoUrl={identity.logoUrl}
-        title={t("home.title")}
+        title={
+          <span className="inline-flex items-center gap-2">
+            {t("home.title")}
+            <Icon name="gift" />
+          </span>
+        }
         subtitle={identity.tagline}
         // The store's identity, prizes and games are all admin-editable while
         // this screen sits open on a till-side phone that nobody reloads. This
@@ -65,9 +70,7 @@ export function GamePicker({
             disabled={refreshing}
             onClick={onRefresh}
           >
-            <span aria-hidden className={refreshing ? "inline-block animate-spin" : undefined}>
-              ↻
-            </span>
+            <Icon name="rotate-cw" className={refreshing ? "animate-spin" : undefined} />
           </IconButton>
         }
       />
@@ -94,7 +97,7 @@ export function GamePicker({
             key={game.slug}
             // Each game carries its own icon, so two cards are told apart at a
             // glance instead of sharing one generic controller emoji.
-            media={gameIcon(game.slug)}
+            media={<Icon name={gameIcon(game.slug)} />}
             title={game.name}
             subtitle={game.description}
             action={getMiniGame(game.slug) ? t("home.play") : t("home.soon")}

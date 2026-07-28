@@ -104,6 +104,7 @@ reuse verbatim and what has to be written a second time.
 
 ```
 packages/api-client    typed HTTP client + wire types
+packages/icons         Lucide geometry as shape objects; IconName is derived from it
 packages/tokens        palette + motion timings as TS; generates apps/*/src/theme.css
                        plus the runtime-override precedence rule (override.ts)
 packages/image-core    crop-and-zoom geometry: cover scale, pan clamp, export map
@@ -306,16 +307,23 @@ bite. Small mechanical fixes are the exception that proves it: if the follow-up
 is one line and the fix is obvious, do it instead of filing it, and then say that
 is what happened rather than calling it filed.
 
-## Icons come from icones.js.org — never emoji, never drawn here
+## Icons come from Lucide — never emoji, never drawn here
 
-Every icon in either app is an SVG copied from <https://icones.js.org/>, from one
-chosen set. **Emoji are not icons** (the platform picks the artwork, the palette
-cannot reach them, and their screen-reader names are somebody else's), and
-**nothing in this repo authors icon path data** — inventing a shape that already
-exists in a set is wasted work twice over. The full rules, and the one exception
-(`scripts/icons/`, which packages the product's own mark into launcher/PWA/favicon
-assets), are in `frontend/CLAUDE.md`. The apps still carry emoji from before this
-rule; replacing them is an entry in `docs/potential-features.md`.
+Every icon in either app is transcribed from
+[Lucide](https://icones.js.org/collection/lucide) into `packages/icons`, which
+holds geometry as **shape objects rather than SVG markup** so a React Native
+client can draw the same table with `react-native-svg`. Each app's
+`src/ui/Icon.tsx` is the per-platform half; a package may not import React.
+
+**Emoji are not icons** (the platform picks the artwork, the palette cannot
+reach them, and their screen-reader names are somebody else's), and **nothing in
+this repo authors icon path data** — inventing a shape that already exists in a
+set is wasted work twice over. `IconName` is derived from the table, so a name
+that is not in it fails `npm run typecheck` rather than rendering an empty box:
+that is what keeps a new game from adding a glyph the way every game used to.
+The full rules, and the one exception (`scripts/icons/`, which packages the
+product's own mark into launcher/PWA/favicon assets), are in
+`frontend/CLAUDE.md`.
 
 ## Related
 

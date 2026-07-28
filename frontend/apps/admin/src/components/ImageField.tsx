@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { ApiClient } from "@minigames/api-client";
 import type { Size } from "@minigames/image-core";
 import { PhotoEditor } from "./PhotoEditor";
-import { Alert, Button, Field, Input } from "../ui";
+import { Alert, Button, Field, Icon, Input } from "../ui";
 
 /**
  * An image, as an operator deals with one: a preview, an upload button, and the
@@ -69,9 +69,7 @@ export function ImageField({
           {value ? (
             <img src={value} alt="" className="h-full w-full object-contain" />
           ) : (
-            <span aria-hidden className="text-2xl text-ink/40">
-              🖼️
-            </span>
+            <Icon name="image" className="text-2xl text-ink/40" />
           )}
         </span>
 

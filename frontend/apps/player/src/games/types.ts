@@ -1,3 +1,4 @@
+import type { IconName } from "@minigames/icons";
 import type { ComponentType } from "react";
 
 /**
@@ -51,12 +52,18 @@ export interface PlayProps {
 export interface MiniGame {
   slug: string;
   /**
-   * The emoji that stands for this game in the picker.
+   * The icon that stands for this game in the picker, named from
+   * `@minigames/icons`.
+   *
+   * Typed as `IconName` rather than `string` on purpose: this field is how the
+   * emoji debt used to grow — every new game added one more glyph, so the
+   * clean-up got longer than it started. A name that is not in the table now
+   * fails `npm run typecheck`, which means a new game cannot reintroduce one.
    *
    * Identity here is an ICON only — deliberately not a colour. Every game
    * inherits the one shared palette (see frontend/CLAUDE.md), so per-game
    * theming is not a knob this interface offers.
    */
-  icon: string;
+  icon: IconName;
   Play: ComponentType<PlayProps>;
 }

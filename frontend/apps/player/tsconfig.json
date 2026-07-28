@@ -3,10 +3,22 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@minigames/tokens": ["../../packages/tokens/src"],
-      "@minigames/api-client": ["../../packages/api-client/src"],
-      "@minigames/player-core": ["../../packages/player-core/src"]
+      "@minigames/tokens": [
+        "../../packages/tokens/src"
+      ],
+      "@minigames/api-client": [
+        "../../packages/api-client/src"
+      ],
+      "@minigames/player-core": [
+        "../../packages/player-core/src"
+      ],
+      "@minigames/icons": [
+        "../../packages/icons/src"
+      ]
     }
   },
-  "include": ["src", "vite.config.ts"]
+  "include": [
+    "src",
+    "vite.config.ts"
+  ]
 }

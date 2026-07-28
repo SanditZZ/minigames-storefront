@@ -20,7 +20,7 @@ export function SelectCard({
   subtitle?: ReactNode;
   /** Trailing label, e.g. "Play" or "Soon". */
   action: ReactNode;
-  /** Optional leading emoji/icon. */
+  /** Optional leading icon. */
   media?: ReactNode;
   disabled?: boolean;
   onClick: () => void;

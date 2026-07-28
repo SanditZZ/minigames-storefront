@@ -1,5 +1,7 @@
+import type { IconName } from "@minigames/icons";
 import type { ReactNode } from "react";
 import { Button } from "./Button";
+import { Icon } from "./Icon";
 import { CenterStack } from "./Layout";
 
 /** Centred spinner + optional label, for loading/transitional states. */
@@ -13,13 +15,13 @@ export function Spinner({ label }: { label?: string }) {
 }
 
 /**
- * The one full-screen message state: an emoji, a line of copy, and an optional
+ * The one full-screen message state: an icon, a line of copy, and an optional
  * action. Errors, empty states, and "not found" all render through this so a
  * dead end never looks unstyled.
  *
  * It is always a live region, because every one of these replaces something the
  * player was waiting on — usually a `Spinner`, whose own region disappears with
- * it. Without one, a failed submit was announced as nothing at all: the emoji is
+ * it. Without one, a failed submit was announced as nothing at all: the icon is
  * `aria-hidden` and the copy is ordinary text, so a screen reader user sat on a
  * silent screen.
  *
@@ -35,7 +37,7 @@ export function StatusMessage({
   action,
   tone = "info",
 }: {
-  icon?: string;
+  icon?: IconName;
   title: string;
   detail?: string;
   action?: { label: string; onClick: () => void };
@@ -49,11 +51,11 @@ export function StatusMessage({
   return (
     <CenterStack>
       {icon && (
-        <div className="text-5xl" aria-hidden>
-          {icon}
+        <div className="text-5xl text-ink/30">
+          <Icon name={icon} />
         </div>
       )}
-      {/* The region wraps the copy only — not the emoji (hidden anyway) and not
+      {/* The region wraps the copy only — not the icon (hidden anyway) and not
           the action, whose label is read as a button when focus reaches it. */}
       <div className="max-w-sm text-center" {...live}>
         <p className="text-lg font-bold text-ink">{title}</p>

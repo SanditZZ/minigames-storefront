@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The player app's DATA and CALCULATION layers: route shapes, reveal maths, prize merging, game scoring. No React, no DOM — so a native client runs the identical logic.",
+  "description": "The player app's DATA and CALCULATION layers: route shapes, reveal maths, prize merging, game scoring. No React, no DOM \u2014 so a native client runs the identical logic.",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@minigames/api-client": "*"
+    "@minigames/api-client": "*",
+    "@minigames/icons": "*"
   }
 }

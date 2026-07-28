@@ -151,7 +151,7 @@ function PlayerApp({ router }: { router: Router }) {
 
       {route.name === "notFound" && (
         <StatusMessage
-          icon="🧭"
+          icon="compass"
           title={t("app.notFound.title")}
           detail={t("app.notFound.detail")}
           action={{ label: t("app.notFound.action"), onClick: goHome }}

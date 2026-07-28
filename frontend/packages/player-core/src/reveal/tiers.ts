@@ -9,22 +9,29 @@
 // business (../i18n). Keeping the prose out is also what lets this table double
 // as an identity — `labelKey` is a stable React key and a stable equality check
 // for "same rung", neither of which survives the text being translated.
+//
+// `iconKey` is the same arrangement for the mark beside the label, and for the
+// same reason: a rung used to carry an emoji, which is a rendered GLYPH sitting
+// in a package that must not hold anything platform-specific. A name from
+// `@minigames/icons` is data — the web app draws it as `<svg>`, a phone would
+// draw it with `react-native-svg`, and this table does not have to know which.
 
+import type { IconName } from "@minigames/icons";
 import type { MessageKey } from "../i18n";
 
 export interface Tier {
   from: number;
   labelKey: MessageKey;
-  icon: string;
+  iconKey: IconName;
 }
 
 export const TIERS: Tier[] = [
-  { from: 0, labelKey: "reveal.tier.warmingUp", icon: "🌱" },
-  { from: 0.2, labelKey: "reveal.tier.notBad", icon: "👍" },
-  { from: 0.4, labelKey: "reveal.tier.sharp", icon: "⚡" },
-  { from: 0.6, labelKey: "reveal.tier.onFire", icon: "🔥" },
-  { from: 0.8, labelKey: "reveal.tier.superstar", icon: "🌟" },
-  { from: 0.97, labelKey: "reveal.tier.recordBreaker", icon: "👑" },
+  { from: 0, labelKey: "reveal.tier.warmingUp", iconKey: "sprout" },
+  { from: 0.2, labelKey: "reveal.tier.notBad", iconKey: "thumbs-up" },
+  { from: 0.4, labelKey: "reveal.tier.sharp", iconKey: "zap" },
+  { from: 0.6, labelKey: "reveal.tier.onFire", iconKey: "flame" },
+  { from: 0.8, labelKey: "reveal.tier.superstar", iconKey: "star" },
+  { from: 0.97, labelKey: "reveal.tier.recordBreaker", iconKey: "crown" },
 ];
 
 // REVEAL_DURATION_MS used to live here. It moved to ./pacing, next to the

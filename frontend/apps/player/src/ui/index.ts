@@ -6,6 +6,7 @@ export { Card, Eyebrow, HighlightCard, Panel } from "./Card";
 export { CopyButton } from "./CopyButton";
 export { Countdown } from "./Countdown";
 export { EmptyNote, Spinner, StatusMessage } from "./Feedback";
+export { Icon } from "./Icon";
 export { GameStage } from "./GameStage";
 export { CenterStack, HeaderRow, Screen, Stack } from "./Layout";
 export { PageHeader } from "./PageHeader";

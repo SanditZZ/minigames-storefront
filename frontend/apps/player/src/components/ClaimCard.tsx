@@ -42,12 +42,12 @@ export function ClaimCard({ view, imageUrl }: { view: ClaimView; imageUrl?: stri
   return (
     <Card tone={copy.redeemable ? "solid" : "muted"} className="w-full max-w-sm text-center">
       {/* Unlike `awardName`, the image is NOT snapshotted — it is read from the
-          award as it exists now, so deleting the prize drops back to the emoji.
+          award as it exists now, so deleting the prize drops back to the icon.
           That asymmetry is deliberate: what the player won has to stay true
           forever, whereas a missing photo costs them nothing. */}
       <PrizeImage
         src={imageUrl}
-        fallback={copy.redeemable ? "🎉" : "🎟️"}
+        fallback={copy.redeemable ? "party-popper" : "ticket"}
         size="lg"
         muted={!copy.redeemable}
         className="mx-auto"

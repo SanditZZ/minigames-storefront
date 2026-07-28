@@ -1,3 +1,6 @@
+import type { IconName } from "@minigames/icons";
+import { Icon } from "./Icon";
+
 /**
  * A prize's picture, in a box that is the same size whether or not there is one.
  *
@@ -10,7 +13,7 @@
  * - **`alt=""`.** The prize name is always rendered next to this, so a screen
  *   reader announcing the file as well would just say the name twice. The image
  *   is decoration on top of text that already carries the meaning.
- * - **Emoji fallback**, never an empty box or a broken-image glyph.
+ * - **Icon fallback**, never an empty box or a broken-image glyph.
  *
  * `muted` is for a prize that can no longer be collected (a redeemed or expired
  * claim): the photo stays — it is still what was won — but stops competing with
@@ -25,8 +28,8 @@ export function PrizeImage({
 }: {
   /** The admin-set URL. Empty or absent renders `fallback`. */
   src?: string;
-  /** Emoji shown when there is no image. */
-  fallback: string;
+  /** Icon shown when there is no image. */
+  fallback: IconName;
   /** `sm` for list rows, `lg` for the one prize a screen is about. */
   size?: "sm" | "lg";
   muted?: boolean;
@@ -44,7 +47,7 @@ export function PrizeImage({
       {src ? (
         <img src={src} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span aria-hidden>{fallback}</span>
+        <Icon name={fallback} className="text-ink/40" />
       )}
     </span>
   );

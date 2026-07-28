@@ -1,3 +1,4 @@
+import type { IconName } from "@minigames/icons";
 import type { MiniGame } from "./types";
 import { PrecisionStop } from "./PrecisionStop";
 import { ReactionTimer } from "./ReactionTimer";
@@ -20,7 +21,7 @@ export function getMiniGame(slug: string): MiniGame | undefined {
 }
 
 /** Icon shown for a backend game this build cannot render yet. */
-const UNKNOWN_ICON = "🎮";
+const UNKNOWN_ICON: IconName = "gamepad-2";
 
 /**
  * The icon to show for a slug.
@@ -29,6 +30,6 @@ const UNKNOWN_ICON = "🎮";
  * this client cannot play (rendered disabled) so a version mismatch is visible
  * during a rollout instead of silently hiding content.
  */
-export function gameIcon(slug: string): string {
+export function gameIcon(slug: string): IconName {
   return bySlug.get(slug)?.icon ?? UNKNOWN_ICON;
 }
