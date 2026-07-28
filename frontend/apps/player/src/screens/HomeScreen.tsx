@@ -1,5 +1,4 @@
 import type { Game } from "@minigames/api-client";
-import type { StoreIdentity } from "@minigames/player-core";
 import { GamePicker } from "../components/GamePicker";
 import { useT, type Locale } from "../i18n";
 import { usePrizes } from "../state/usePrizes";
@@ -7,7 +6,6 @@ import { Spinner, StatusMessage } from "../ui";
 
 interface Props {
   games: Game[] | null;
-  identity: StoreIdentity;
   error: string;
   playerName: string;
   onNameChange: (name: string) => void;
@@ -21,7 +19,6 @@ interface Props {
 /** Route: "/" — choose a game. */
 export function HomeScreen({
   games,
-  identity,
   error,
   playerName,
   onNameChange,
@@ -53,7 +50,6 @@ export function HomeScreen({
   return (
     <GamePicker
       games={games}
-      identity={identity}
       prizes={prizes}
       playerName={playerName}
       onNameChange={onNameChange}

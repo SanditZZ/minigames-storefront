@@ -234,10 +234,16 @@ with their hands currently cannot win a prize at all.
   downstream knows: the player app never re-checks what it was handed, and no
   admin view lists "stores currently below AA". Only worth building when there
   is more than one store.
-- **The palette arrives after the first paint.** `usePublicSettings` fetches on
-  mount, so a player sees the built-in tokens for one request and then the
-  store's colours — a visible flash on a cold load, worst on the landing screen
-  where the whole background is a `from-brand-4 to-brand-3` gradient. Options,
+- **The palette arrives after the first paint, and so does the store's name.**
+  `usePublicSettings` fetches on mount, so a player sees the built-in tokens for
+  one request and then the store's colours — a visible flash on a cold load,
+  worst on the landing screen where the whole background is a
+  `from-brand-4 to-brand-3` gradient. The identity now flashes on the same
+  schedule and on one more screen: `StoreMark` on the result screen renders
+  `defaultIdentity`'s "Fun Store" until the settings land, and a result URL
+  opened cold by someone who has never visited the storefront is exactly the
+  case with no warm cache to hide it. One fix covers both — they come from one
+  request. Options,
   cheapest first: cache the last-known palette in `localStorage` and apply it
   synchronously before the fetch resolves — `claimDocumentLang` in
   `apps/player/src/i18n/` is now the worked example of that shape, a pure
@@ -246,15 +252,6 @@ with their hands currently cannot win a prize at all.
   deploy time, which reintroduces the drift the read-time override was chosen to
   avoid. It bites on every cold load, but is invisible on the kiosk phones that
   never reload — which is why it is filed rather than fixed.
-- **Only the landing screen knows the store's identity.** `usePublicSettings` is
-  called once, in `App.tsx`, and the identity is passed down to `HomeScreen`
-  alone; `ResultScreen` and `PlayScreen` never receive it. That is correct today
-  — they display no branding — but it is exactly the wrong shape for the next
-  three things that want it: the shareable score card (**Share score photo**,
-  below) renders the store name onto an image, the store logo will want to sit on
-  more than one screen, and a banner (next entry) will want the result screen
-  too. Lifting it into a context, or resolving it once in `App` and passing it
-  everywhere, is a small change now and a tangled one afterwards.
 - **A square logo and a full-width cover banner — two images, two shapes, two
   jobs.** The store has one image today (`store_logo_url`, rendered by
   `PageHeader` as `max-h-12 w-auto object-contain`), and it has to be both the
@@ -272,10 +269,11 @@ with their hands currently cannot win a prize at all.
     full app width above the header, in the shape people already understand from
     a social profile cover (roughly 3:1). New public setting alongside
     `STORE_LOGO_KEY` in `packages/api-client/src/settings-keys.ts`, a second
-    upload slot in `StoreBranding.tsx`, and a new `ui/` primitive rather than
-    markup inside `GamePicker` — it will want to appear on the result screen
-    too, which is the "only the landing screen knows the store's identity"
-    problem above arriving for the third time.
+    upload slot in `StoreBranding.tsx`, and a new `ui/` primitive beside
+    `StoreMark` rather than markup inside `GamePicker` — reaching it from a
+    second screen costs nothing now that the identity is a context
+    (`state/StoreProvider.tsx`), but a banner drawn inline in the picker would
+    have to be extracted again the first time the result screen wanted one.
   - **Two constraints worth deciding before building.** The banner sits at the
     very top, so it either replaces or sits above the `from-brand-4 to-brand-3`
     gradient that every screen shares — decide which, because "both" is how a
@@ -402,9 +400,8 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   fallback `defaultIdentity(t)` returns, or every shared card will say "Fun
   Store" whatever the shop is called — and, since that fallback is translated,
   will say something different depending on the language it was shared in. The
-  result screen does not fetch settings today (see "Only the landing screen knows
-  the store's identity" above), so this needs the identity lifted or refetched
-  there. Render the card to a `<canvas>` from the same palette tokens, then hand
+  identity is already on the result screen (`useStoreIdentity`), so this is a
+  read rather than a fetch. Render the card to a `<canvas>` from the same palette tokens, then hand
   the blob to the Web Share API (`navigator.share({ files })`) with a download
   fallback on desktop. The screen already has everything the card needs — score,
   unit, rank, prize, player name — and the URL is permanent, so the image can
@@ -680,6 +677,19 @@ and the score table grow.
   `RoundRunner` deliberately knows nothing about any game's maths, so the preview
   would have to be something a game OFFERS — an optional field on the report, or a
   `data-` attribute the runner reads — rather than something the runner computes.
+- **Nothing proves the store's name on the RESULT screen came from the server.**
+  `result-url.spec.ts` asserts the mark renders in a cold context, and
+  `admin-branding.spec.ts` asserts a rename reaches the player — but only on the
+  landing screen. The two do not meet, and they cannot catch each other, because
+  the seeded `store_name` and the client's `brand.name` fallback are both the
+  string "Fun Store": a `ResultScreen` that hard-coded the fallback, or a
+  `StoreProvider` that never fetched, passes both. Closing it honestly costs a
+  round inside the branding spec (rename → play → read the result screen), which
+  is the price the "every E2E round costs a fixed, unskippable ending" entry
+  below is about. Cheaper alternative worth weighing first: make the seeded name
+  and the fallback differ, so the two strings stop covering for each other
+  everywhere at once. It bites whenever the identity's plumbing is refactored,
+  which is every one of the three features queued behind it.
 - **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
   `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
   `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —

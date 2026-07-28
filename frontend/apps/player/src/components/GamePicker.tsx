@@ -1,15 +1,14 @@
 import type { Game } from "@minigames/api-client";
-import { MAX_NAME_LENGTH, type ShowcasePrize, type StoreIdentity } from "@minigames/player-core";
+import { MAX_NAME_LENGTH, type ShowcasePrize } from "@minigames/player-core";
 import { gameIcon, getMiniGame } from "../games/registry";
 import { useT, type Locale } from "../i18n";
+import { useStoreIdentity } from "../state/StoreProvider";
 import { Icon, IconButton, PageHeader, SelectCard, Stack, TextField } from "../ui";
 import { LanguageToggle } from "./LanguageToggle";
 import { PrizeShowcase } from "./PrizeShowcase";
 
 interface Props {
   games: Game[];
-  /** Store name and tagline, already resolved against their fallbacks. */
-  identity: StoreIdentity;
   prizes: ShowcasePrize[];
   playerName: string;
   onNameChange: (name: string) => void;
@@ -28,7 +27,6 @@ interface Props {
  */
 export function GamePicker({
   games,
-  identity,
   prizes,
   playerName,
   onNameChange,
@@ -38,6 +36,10 @@ export function GamePicker({
   refreshing,
 }: Props) {
   const t = useT();
+  // Read rather than received: the store's identity is ambient app state, the
+  // same as the translator beside it. `refreshing` stays a prop because the
+  // reload it reports is the CATALOG's as well — one gesture, owned by App.
+  const identity = useStoreIdentity();
 
   return (
     <Stack gap="lg" className="flex-1">

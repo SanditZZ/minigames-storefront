@@ -6,7 +6,8 @@ import { ScoreReveal } from "../components/ScoreReveal";
 import { useApi, useT } from "../i18n";
 import { benchmarkFor, bestScore, isNewRecord } from "@minigames/player-core";
 import { takeResult } from "../state/resultCache";
-import { Spinner, Stack, StatusMessage } from "../ui";
+import { useStoreIdentity } from "../state/StoreProvider";
+import { Spinner, Stack, StatusMessage, StoreMark } from "../ui";
 
 interface Props {
   game: Game | null;
@@ -40,6 +41,7 @@ export function ResultScreen({
   // Language-aware, like every other fetch in this app: the score unit printed
   // beside each leaderboard row arrives with the board.
   const api = useApi();
+  const identity = useStoreIdentity();
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [scores, setScores] = useState<ScoreEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -124,6 +126,14 @@ export function ResultScreen({
 
   return (
     <Stack gap="lg" className="flex-1 items-center">
+      {/* The store, small, above its own result. This URL is the one thing a
+          player shares, and until now it was the only screen that could arrive
+          in a stranger's hands without saying whose storefront it came from.
+          Deliberately a credit and not a hero: the score is the subject here,
+          so this is `sm` and the landing screen keeps the full PageHeader.
+          The reveal is left untouched — it returns above, so this renders only
+          once the score has settled and there is something to be credited for. */}
+      <StoreMark name={identity.name} logoUrl={identity.logoUrl} size="sm" />
       <ResultSummary
         game={game}
         result={result}

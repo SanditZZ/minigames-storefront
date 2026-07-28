@@ -36,6 +36,19 @@ test.describe("result URL", () => {
     await expect(ui.playAgain(shared)).toBeVisible();
     expect(await shownScore(shared)).toBe(score);
     await expect(shared.getByText("Shared").first()).toBeVisible();
+    // And the storefront it came from. This is the assertion the identity lift
+    // exists for: the settings are fetched once at the top of the app rather
+    // than by the landing screen, so a result URL opened cold — no hand-off, no
+    // storage, never having seen the picker — still credits the store.
+    //
+    // What this pins is that the mark RENDERS here, and no more: the seeded
+    // store_name (app.seed) and the client's fallback (brand.name) spell "Fun
+    // Store" identically, so a provider that never fetched would pass this too.
+    // The fetch itself is pinned next door — admin-branding.spec.ts renames the
+    // store and watches the new name reach the player. Two cheap assertions in
+    // the places that already do the work, rather than one expensive spec that
+    // renames a store and then plays a round to see it.
+    await expect(shared.getByText("Fun Store")).toBeVisible();
 
     await context.close();
   });

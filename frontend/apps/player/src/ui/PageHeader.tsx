@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
+import { StoreMark } from "./StoreMark";
 
 /**
- * The landing hero: brand wordmark, headline, and supporting line. Kept as a
- * component so the store's identity is presented identically wherever it
- * appears, and so a logo can later replace the wordmark in one edit.
+ * The landing hero: the store's mark, a headline, and a supporting line.
+ *
+ * The mark itself is StoreMark, which the result screen also renders — this
+ * header is the hero arrangement around it, not the only place a store is
+ * named.
  *
  * `action` is an optional control beside the hero (the settings refresh, today).
  * It is laid out as a three-part row — spacer, hero, action — rather than an
@@ -20,11 +23,7 @@ export function PageHeader({
   action,
 }: {
   brand?: string;
-  /**
-   * The store's logo, shown INSTEAD of the wordmark. `brand` is still required
-   * alongside it — it becomes the image's alt text, so the store is named for a
-   * screen reader and for anyone whose logo fails to load.
-   */
+  /** The store's logo, shown INSTEAD of the wordmark — see StoreMark. */
   logoUrl?: string;
   title: ReactNode;
   subtitle?: ReactNode;
@@ -32,20 +31,7 @@ export function PageHeader({
 }) {
   const hero = (
     <div className="min-w-0 flex-1 text-center">
-      {logoUrl ? (
-        // Height-capped, width-free: a logo is any aspect ratio, and bounding
-        // the height is what keeps a wide wordmark and a square badge from
-        // pushing the headline down the screen by different amounts.
-        <img
-          src={logoUrl}
-          alt={brand ?? ""}
-          className="mx-auto max-h-12 w-auto max-w-full object-contain"
-        />
-      ) : (
-        brand && (
-          <p className="truncate text-xs font-black uppercase tracking-[0.3em] text-ink/50">{brand}</p>
-        )
-      )}
+      {(logoUrl || brand) && <StoreMark name={brand ?? ""} logoUrl={logoUrl} />}
       <h1 className="mt-1 text-3xl font-black leading-tight text-ink">{title}</h1>
       {subtitle != null && <p className="mt-1 text-ink/70">{subtitle}</p>}
     </div>
