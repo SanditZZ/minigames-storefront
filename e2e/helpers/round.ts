@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from "@playwright/test";
+import { endOfRoundMs } from "../../frontend/packages/player-core/src/reveal/pacing";
 
 /** Named locators for the player flow, so a markup change is fixed in one file. */
 export const ui = {
@@ -93,12 +94,28 @@ export async function revealScore(page: Page): Promise<void> {
 }
 
 /**
- * The full unskippable stretch, mirrored from COMPLETE_BEAT_MS +
- * REVEAL_DURATION_MS in @minigames/player-core (1600 + 2200). The e2e package
- * sits outside the frontend workspace on purpose, so it cannot import them;
- * a test asserts a floor comfortably below this rather than the exact value.
+ * The full unskippable stretch between the last tap and the settled result,
+ * taken from the app's own pacing rather than restated.
+ *
+ * This used to be the literal 3800, with a comment explaining that the e2e
+ * package sits outside the frontend workspace and therefore could not import
+ * COMPLETE_BEAT_MS + REVEAL_DURATION_MS. The workspace is not the obstacle it
+ * was made out to be: `import` takes a path, and a relative one crosses a
+ * package boundary that only npm's linking cares about. Playwright transpiles
+ * the imported .ts the same way it transpiles this file.
+ *
+ * What makes it SAFE to reach across is the package rule itself — pacing.ts
+ * lives in `packages/`, so it may not import React, touch `window`, or reach the
+ * network (see frontend/CLAUDE.md). Pure data and pure functions are importable
+ * from anywhere, including a Node-side test runner. Nothing under `apps/` could
+ * be borrowed this way, and nothing here should try.
+ *
+ * `endOfRoundMs` rather than re-adding the two beats: the sum is a calculation
+ * the app already owns, and a second `+` here would be a smaller copy of the
+ * same mistake. `false` because the suite does not emulate reduced motion — the
+ * one input allowed to collapse the beats to zero.
  */
-export const END_OF_ROUND_MS = 3800;
+export const END_OF_ROUND_MS = endOfRoundMs(false);
 
 /** Reads the big score number off the settled result screen. */
 export async function shownScore(page: Page): Promise<number> {

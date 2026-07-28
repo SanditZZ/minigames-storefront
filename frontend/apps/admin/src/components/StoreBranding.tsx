@@ -105,6 +105,13 @@ export function StoreBranding({
           palette — saving one opts this store out of future palette changes for that colour.
         </p>
 
+        {/* The two placeholders are the PLAYER's fallback strings (`brand.name`
+            and `brand.tagline` in player-core's dictionaries), not the values a
+            fresh database is seeded with — a placeholder should show what an
+            empty field will actually render, and an empty setting is what the
+            client falls back on. Do not "correct" them to the seed; the two are
+            deliberately different strings, for the reason written beside
+            `domain.DefaultStoreName`. English only, like the rest of this app. */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Store name">
             <Input

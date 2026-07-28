@@ -48,7 +48,9 @@ test.describe("play flow", () => {
 
     // The floor is what makes this a real assertion: a working skip would land
     // here in well under a second. It sits comfortably below END_OF_ROUND_MS so
-    // timer jitter cannot fail it.
+    // timer jitter cannot fail it — and the slack no longer hides drift, since
+    // END_OF_ROUND_MS is now derived from the app's own beats rather than
+    // restated. Shortening a beat moves this floor with it.
     expect(Date.now() - startedAt).toBeGreaterThan(END_OF_ROUND_MS - 800);
   });
 

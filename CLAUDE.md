@@ -85,6 +85,16 @@ ship flow before considering the change done — do not skip it:
   the config, because only one app can be `baseURL` and a spec has to be able to
   reach the other one without restating its address.
 
+  **Being outside the workspace stops npm from linking `@minigames/*`; it does
+  not forbid a relative import**, and where a value has a source in the frontend
+  the suite imports it rather than copying it (`END_OF_ROUND_MS` in
+  `helpers/round.ts` takes the app's own `endOfRoundMs`). The import may only
+  reach into `packages/`, and the package boundary is what makes that safe: a
+  module that may not import React, touch `window`, or reach the network is
+  importable from a Node test runner by construction. Nothing under `apps/` is,
+  and a spec that needs something from there wants a `data-` attribute or a real
+  assertion instead.
+
 When adding a game or a screen, add the pure logic to a calculation module and
 test it in vitest; add one E2E assertion only if it changes the player's path
 through the app.

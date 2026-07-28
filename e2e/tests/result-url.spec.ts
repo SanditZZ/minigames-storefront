@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { playRound, revealScore, shownScore, ui } from "../helpers/round";
+import { BUNDLED_STORE_NAME, SEEDED_STORE_NAME } from "../stack";
 
 test.describe("result URL", () => {
   test("survives a reload and skips the reveal the second time", async ({ page }) => {
@@ -41,14 +42,13 @@ test.describe("result URL", () => {
     // than by the landing screen, so a result URL opened cold — no hand-off, no
     // storage, never having seen the picker — still credits the store.
     //
-    // What this pins is that the mark RENDERS here, and no more: the seeded
-    // store_name (app.seed) and the client's fallback (brand.name) spell "Fun
-    // Store" identically, so a provider that never fetched would pass this too.
-    // The fetch itself is pinned next door — admin-branding.spec.ts renames the
-    // store and watches the new name reach the player. Two cheap assertions in
-    // the places that already do the work, rather than one expensive spec that
-    // renames a store and then plays a round to see it.
-    await expect(shared.getByText("Fun Store")).toBeVisible();
+    // The pair of assertions is what makes it proof rather than decoration. The
+    // seeded name can only have arrived over HTTP, and the bundled fallback is
+    // what a ResultScreen that hard-coded its own identity — or a StoreProvider
+    // that never fetched — would render instead. They used to be the same
+    // string, and this test passed either way.
+    await expect(shared.getByText(SEEDED_STORE_NAME)).toBeVisible();
+    await expect(shared.getByText(BUNDLED_STORE_NAME)).toBeHidden();
 
     await context.close();
   });

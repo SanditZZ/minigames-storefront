@@ -234,13 +234,24 @@ const (
 	SettingColorInk    = "color_ink"
 )
 
-// Default storefront identity, used when the settings rows are absent and as
-// the seed values. The player client carries the same two strings so a store
-// whose API is unreachable still renders a name rather than a blank header;
-// keep the two in step (frontend/packages/player-core/src/brand.ts).
+// The storefront identity a fresh database is SEEDED with — placeholder prose
+// an operator is expected to replace from the branding form.
+//
+// These deliberately DIFFER from the client's own fallback strings
+// (`brand.name` / `brand.tagline` in frontend/packages/player-core/src/i18n),
+// and that is load-bearing rather than incidental. The client falls back per
+// field when the settings are absent or unreachable, so while the two sides
+// spelled the same words no test could tell a name that arrived over HTTP from
+// one compiled into the bundle: a StoreProvider that never fetched, or a screen
+// that hard-coded the fallback, rendered "Fun Store" and passed. Keeping them
+// distinct is what makes `result-url.spec.ts` — a result URL opened in a cold
+// context, having never seen the landing screen — proof that the fetch happened.
+//
+// So: do not "tidy" these back into step with the dictionary. If the seed ever
+// needs to change, change it to something the fallback still does not say.
 const (
-	DefaultStoreName    = "Fun Store"
-	DefaultStoreTagline = "Thanks for shopping with us — try your luck!"
+	DefaultStoreName    = "Sunny Mart"
+	DefaultStoreTagline = "Every visit comes with a game — have a go!"
 )
 
 // DefaultClaimTTLHours is the fallback claim window: seven days, long enough

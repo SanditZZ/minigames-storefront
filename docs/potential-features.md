@@ -473,8 +473,14 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   - The landing screen fetches prizes **once per game** (`state/usePrizes.ts`),
     all identical for everyone — re-derive the count from the registry rather
     than trusting a number written here. The cost grows with the catalog, so
-    every new game makes the landing page slower for everyone. The obvious first
-    thing to batch or cache.
+    every new game makes the landing page slower for everyone. **The decision is
+    to batch this server-side rather than cache it client-side**: one endpoint
+    returning every game's public awards, so the landing screen makes one request
+    whatever the catalog holds. A cache would still pay per game on the first
+    visit, which is the visit that matters. It costs a wire type, an
+    `api-client` method and a rewrite of `usePrizes`; the showcase's merge
+    (`mergePrizes`) is already pure and moves either way. Do it before the next
+    game lands, not after.
   - `state/usePublicSettings.ts` fetches `GET /api/v1/settings/public` on mount
     and again on every refresh-button press. It does *not* grow with the catalog
     — one request whose response is the same handful of bytes for every player in
@@ -674,38 +680,12 @@ and the score table grow.
   `RoundRunner` deliberately knows nothing about any game's maths, so the preview
   would have to be something a game OFFERS — an optional field on the report, or a
   `data-` attribute the runner reads — rather than something the runner computes.
-- **Nothing proves the store's name on the RESULT screen came from the server.**
-  `result-url.spec.ts` asserts the mark renders in a cold context, and
-  `admin-branding.spec.ts` asserts a rename reaches the player — but only on the
-  landing screen. The two do not meet, and they cannot catch each other, because
-  the seeded `store_name` and the client's `brand.name` fallback are both the
-  string "Fun Store": a `ResultScreen` that hard-coded the fallback, or a
-  `StoreProvider` that never fetched, passes both. Closing it honestly costs a
-  round inside the branding spec (rename → play → read the result screen), which
-  is the price the "every E2E round costs a fixed, unskippable ending" entry
-  below is about. Cheaper alternative worth weighing first: make the seeded name
-  and the fallback differ, so the two strings stop covering for each other
-  everywhere at once. It bites whenever the identity's plumbing is refactored,
-  which is every one of the three features queued behind it.
-- **A retried branding test reports the wrong failure.** Every test in
-  `e2e/tests/admin-branding.spec.ts` writes a setting and uses "Save went
-  disabled" as its proof the write landed — correct, and it means a test whose
-  FIRST attempt saved and then failed later leaves the value already stored, so
-  the retry fills the same string, Save never enables, and the run dies on
-  `locator.click: Timeout` at the rename instead of on the assertion that
-  actually broke. Observed while making the settings-cache test fail on purpose:
-  the real error was in attempt 1 and attempt 2 blamed a button. The fix is a
-  helper that treats "already this value" as a satisfied write rather than a
-  click to wait on, which is a change to what `saveBranding` means and so is
-  filed rather than slipped in. It bites whenever one of these tests fails, i.e.
-  exactly when the diagnosis matters.
-- **The end-of-round duration is written down twice.** `COMPLETE_BEAT_MS` and
-  `REVEAL_DURATION_MS` live in `packages/player-core/src/reveal/pacing.ts`, and
-  `END_OF_ROUND_MS` in `e2e/helpers/round.ts` restates their sum as a literal —
-  the e2e package sits outside the frontend workspace on purpose, so it cannot
-  import them. The floor has 800ms of slack, so drift degrades the assertion
-  quietly rather than failing it. A generated constants file, or reading the
-  values off the page, would close it.
+- **The admin's own forms are still verified one field at a time.** The branding
+  form is now written through `writeBranding` (`e2e/helpers/admin.ts`), which
+  makes a retry idempotent — but the awards form is not dirty-gated at all
+  (`AwardForm.tsx` disables Save only while busy), so the two admin forms have
+  different save semantics and a spec has to know which it is driving. Worth
+  reconciling if a third form appears, not before.
 - **Every E2E round costs a fixed, unskippable ending.** Do not trust a number
   written here — **re-derive it**: `grep -c 'playRound(' e2e/tests/*.spec.ts`,
   plus the specs that reach the same sequence by a different route because their

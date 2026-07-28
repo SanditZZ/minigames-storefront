@@ -1,8 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { admin, openAdmin, rootVar } from "../helpers/admin";
+import {
+  admin,
+  openAdmin,
+  resetBrandingColours,
+  rootVar,
+  writeBranding,
+} from "../helpers/admin";
 import { coldContext } from "../helpers/cold";
 import { ui } from "../helpers/round";
-import { WEB_URL } from "../stack";
+import { BUNDLED_STORE_NAME, SEEDED_STORE_NAME, WEB_URL } from "../stack";
 
 /**
  * Store branding, from the operator's form to the player's screen.
@@ -33,6 +39,10 @@ import { WEB_URL } from "../stack";
  * override reverts to the token" is a claim the tokens doc makes explicitly,
  * and the mechanism (remove the property, let the cascade fall back to the
  * compiled @theme block) is exactly as browser-only as setting it.
+ *
+ * Every write here goes through `writeBranding` rather than fill-click-assert,
+ * so that a RETRY of a test that already saved reports the assertion that broke
+ * instead of a timeout on a button with nothing left to do. See the helper.
  */
 
 /** Nothing near the warm palette, so a stale value cannot pass by accident. */
@@ -43,37 +53,36 @@ test.describe("store branding", () => {
     const renamed = "Tailnet Coffee";
 
     await page.goto("/");
-    await expect(page.getByText("Fun Store")).toBeVisible();
+    await expect(page.getByText(SEEDED_STORE_NAME)).toBeVisible();
 
     await openAdmin(page, "/settings");
-    await admin.storeName(page).fill(renamed);
-    await admin.saveBranding(page).click();
-    // The form re-reads what was stored, so Save going quiet is the app's own
-    // signal that the write landed — not a fixed wait.
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeName(page), renamed);
 
     await page.goto("/");
     await expect(page.getByText(renamed)).toBeVisible();
     // The seeded name is gone rather than merely joined, which is what tells a
     // fallback apart from a value: `storeIdentity` falls back PER FIELD, so a
     // half-working rename shows both.
-    await expect(page.getByText("Fun Store")).toBeHidden();
+    await expect(page.getByText(SEEDED_STORE_NAME)).toBeHidden();
+    // And the bundle's own fallback never appears either. It is a DIFFERENT
+    // string from the seed on purpose (see stack.ts), so this distinguishes "the
+    // rename was fetched" from "the settings request failed and the client fell
+    // back", which spelling both the same way used to hide.
+    await expect(page.getByText(BUNDLED_STORE_NAME)).toBeHidden();
 
     // Restore, and confirm the restore itself reached the player — an
     // un-asserted cleanup that silently failed would poison the whole suite.
     await openAdmin(page, "/settings");
-    await admin.storeName(page).fill("Fun Store");
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeName(page), SEEDED_STORE_NAME);
 
     await page.goto("/");
-    await expect(page.getByText("Fun Store")).toBeVisible();
+    await expect(page.getByText(SEEDED_STORE_NAME)).toBeVisible();
   });
 
   test("a returning player sees the store before the settings arrive", async ({ browser, page }) => {
     // The store's identity used to land one request after the first paint: the
-    // palette repainted, the wordmark changed from "Fun Store" to the shop's own
-    // name, and the cover banner APPEARED — shoving the game list down a third of
+    // palette repainted, the wordmark changed from the bundled fallback to the
+    // shop's own name, and the cover banner APPEARED — shoving the game list down a third of
     // the viewport under a thumb already reaching for it. The player now starts
     // from the copy the last visit left in `localStorage`
     // (`state/settingsCache.ts`, decoded by `player-core/src/settings/cache.ts`).
@@ -90,9 +99,7 @@ test.describe("store branding", () => {
     const renamed = "Cached Coffee";
 
     await openAdmin(page, "/settings");
-    await admin.storeName(page).fill(renamed);
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeName(page), renamed);
 
     // The visit that fills the copy.
     await page.goto("/");
@@ -117,20 +124,20 @@ test.describe("store branding", () => {
     await expect(returning.getByText(renamed)).toBeVisible();
     // And the fallback never got its turn, which is the part that distinguishes
     // a remembered copy from a merely fast one: a failed request must not erase
-    // a good copy.
-    await expect(returning.getByText("Fun Store")).toBeHidden();
+    // a good copy. This is the assertion the two names being one string blunted
+    // most — with the request aborted, the bundled fallback is the ONLY other
+    // thing this header could have said.
+    await expect(returning.getByText(BUNDLED_STORE_NAME)).toBeHidden();
     // The whole test rests on this: a block that did not happen would leave
     // every assertion above passing for the ordinary reason.
     expect(blocked).toBeGreaterThan(0);
     await cold.close();
 
     await openAdmin(page, "/settings");
-    await admin.storeName(page).fill("Fun Store");
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeName(page), SEEDED_STORE_NAME);
 
     await page.goto("/");
-    await expect(page.getByText("Fun Store")).toBeVisible();
+    await expect(page.getByText(SEEDED_STORE_NAME)).toBeVisible();
   });
 
   test("a chosen colour reaches both apps, and clearing it gives the token back", async ({ page }) => {
@@ -143,9 +150,7 @@ test.describe("store branding", () => {
     const token = await rootVar(page, "--color-brand");
     expect(token).not.toBe(TEAL);
 
-    await admin.colorHex(page, "Coral").fill(TEAL);
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.colorHex(page, "Coral"), TEAL);
 
     // The admin wears the store's colours itself, which is the whole argument
     // for choosing one here: an operator sees the result instead of guessing.
@@ -164,9 +169,7 @@ test.describe("store branding", () => {
     // the old value back — which is what lets the cascade fall through to the
     // compiled @theme block with nothing needing to know what it said.
     await openAdmin(page, "/settings");
-    await admin.resetColours(page).click();
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await resetBrandingColours(page);
 
     await expect.poll(() => rootVar(page, "--color-brand")).toBe(token);
 
@@ -188,9 +191,7 @@ test.describe("store branding", () => {
     await expect(ui.banner(page, cover)).toBeHidden();
 
     await openAdmin(page, "/settings");
-    await admin.storeBanner(page).fill(cover);
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeBanner(page), cover);
 
     await page.goto("/");
     await expect(ui.banner(page, cover)).toBeVisible();
@@ -200,9 +201,7 @@ test.describe("store branding", () => {
     // that has not configured one should look finished — and "" reaching an
     // <img src> instead of being read as absent is the way that breaks.
     await openAdmin(page, "/settings");
-    await admin.storeBanner(page).fill("");
-    await admin.saveBranding(page).click();
-    await expect(admin.saveBranding(page)).toBeDisabled();
+    await writeBranding(page, admin.storeBanner(page), "");
 
     await page.goto("/");
     await expect(ui.banner(page, cover)).toBeHidden();

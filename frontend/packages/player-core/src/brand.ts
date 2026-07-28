@@ -53,6 +53,12 @@ export interface StoreIdentity {
  * name has not chosen an English one, so a Thai storefront with an unreachable
  * API should read as a Thai storefront. The moment a name IS configured it
  * wins in every language — an operator's own words are never translated.
+ *
+ * These strings deliberately differ from what the backend SEEDS a fresh
+ * database with (`domain.DefaultStoreName`). While both sides said "Fun Store",
+ * a provider that never fetched was indistinguishable from one that did, and
+ * every browser assertion about the store's identity passed either way. Keep
+ * them apart — the reasoning is written out beside the seed.
  */
 export function defaultIdentity(t: Translator): StoreIdentity {
   return {

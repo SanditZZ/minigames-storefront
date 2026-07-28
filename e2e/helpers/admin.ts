@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { ADMIN_TOKEN, ADMIN_URL } from "../stack";
 
 /**
@@ -95,6 +95,66 @@ export async function openAdmin(page: Page, path = "/"): Promise<void> {
   }
 
   await expect(admin.tokenField(page)).toBeHidden();
+}
+
+/**
+ * Puts a value in one branding field and makes sure it is what the backend now
+ * holds — including when it already held it.
+ *
+ * Every branding test uses "Save went disabled" as its proof the write landed,
+ * which is the right signal: the form re-reads what was stored, so a quiet Save
+ * means the draft and the database agree. What it does not survive is a RETRY.
+ * A test whose first attempt saved and then failed further down leaves the value
+ * stored, so on attempt two the field already reads that string, Save never
+ * enables, and the run dies on `locator.click: Timeout` at a line that is not
+ * the one that broke. The real error was in attempt 1; attempt 2 blames a
+ * button. (Observed while making the settings-cache test fail on purpose.)
+ *
+ * So "already this value" is a satisfied write, not a click to wait on. The
+ * decision is read off the Save button AFTER filling rather than by comparing
+ * the field's prior contents to the target, because the button is the form's own
+ * answer to the same question: it is enabled precisely when the draft and the
+ * stored settings disagree, including for the cases a string comparison here
+ * would get wrong — a colour cleared to "" DELETES its row rather than storing a
+ * blank, so "empty field" and "no setting" are the same state to the form and
+ * two different states to a test that tried to work it out itself.
+ *
+ * The disabled assertion also rules out a half-finished save, for free and not
+ * by accident: while the request is in flight the button reads "Saving…", so the
+ * `/Save branding/` locator matches nothing and the expectation waits rather
+ * than passing on the busy state.
+ */
+export async function writeBranding(page: Page, field: Locator, value: string): Promise<void> {
+  await field.fill(value);
+
+  const save = admin.saveBranding(page);
+  if (await save.isEnabled()) await save.click();
+
+  await expect(save).toBeDisabled();
+  // The point of the whole helper: whichever branch ran, this is what the
+  // backend has. Asserted rather than assumed, since the skip branch is exactly
+  // the one that performs no write at all.
+  await expect(field).toHaveValue(value);
+}
+
+/**
+ * Clears every palette override, tolerating a palette that is already clear.
+ *
+ * Same hazard as `writeBranding` and the same rule: "Reset colours to default"
+ * disables itself when all five fields are already empty, so a retried colour
+ * test would hang on a button that has nothing left to do.
+ */
+export async function resetBrandingColours(page: Page): Promise<void> {
+  const reset = admin.resetColours(page);
+  if (await reset.isEnabled()) {
+    await reset.click();
+
+    const save = admin.saveBranding(page);
+    if (await save.isEnabled()) await save.click();
+    await expect(save).toBeDisabled();
+  }
+
+  await expect(reset).toBeDisabled();
 }
 
 /**
