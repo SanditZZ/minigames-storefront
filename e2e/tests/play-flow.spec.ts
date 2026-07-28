@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { countRequests, PER_GAME_PRIZES } from "../helpers/network";
 import {
   CLAIM_CODE_PATTERN,
   END_OF_ROUND_MS,
@@ -135,15 +136,27 @@ test.describe("game catalog", () => {
   });
 
   test("the landing screen advertises prizes before a game is chosen", async ({ page }) => {
+    // Attached before the navigation, or it reads zero for the wrong reason.
+    const perGamePrizeReads = countRequests(page, PER_GAME_PRIZES);
+
     await page.goto("/");
 
     await expect(page.getByText("Today's prizes")).toBeVisible();
     // Seeded starter awards. `exact` matters: the prize blurb also contains the
     // words "free coffee", so a loose match resolves to two elements.
     await expect(page.getByText("Free Coffee", { exact: true })).toBeVisible();
-    // Both games seed the same three prizes, so the merge must show three
-    // rather than six.
+    // EVERY game seeds the same ladder (app.starterAwards), so the merge shows
+    // one row per distinct prize NAME however many games there are — do not
+    // read this 3 as "three games".
     await expect(page.getByRole("listitem")).toHaveCount(3);
+
+    // The showcase is one batched request, not one per game. Asserted as a zero
+    // rather than a count: this screen used to loop over the catalog, so the
+    // cost of the first thing every customer sees grew with every game added.
+    expect(
+      perGamePrizeReads(),
+      "the landing screen asked for prizes per game; it must use the batched read",
+    ).toBe(0);
   });
 
   test("Reaction Timer counts in, then withholds the signal until it flips", async ({ page }) => {

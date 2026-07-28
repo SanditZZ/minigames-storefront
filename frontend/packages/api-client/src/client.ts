@@ -4,6 +4,7 @@ import type {
   ClaimStatus,
   ClaimView,
   Game,
+  GamePrizes,
   HighScores,
   Prize,
   PublicSettings,
@@ -98,8 +99,18 @@ export function createClient(opts: ClientOptions) {
     /** Re-reads a finished round so /result/:slug/:id works on reload or share. */
     scoreResult: (slug: string, scoreId: string) =>
       request<SubmitResult>(`/api/v1/games/${slug}/scores/${scoreId}`),
-    /** Prizes on offer for a game, for the landing screen's showcase. Public. */
+    /** Prizes on offer for ONE game. Public. */
     gamePrizes: (slug: string) => request<Prize[]>(`/api/v1/games/${slug}/awards`),
+    /**
+     * Every enabled game's prizes in one request — what the landing screen's
+     * showcase reads, because it advertises the whole catalog before the player
+     * has chosen a game.
+     *
+     * Not a convenience wrapper over `gamePrizes`: the server answers this from
+     * a single reading of the awards table, so the cost stops growing with the
+     * catalog. Calling `gamePrizes` in a loop is the thing this replaced.
+     */
+    allPrizes: () => request<GamePrizes[]>("/api/v1/awards"),
     /**
      * The allowlisted settings an unauthenticated client may read — today the
      * store's name and tagline. Deliberately a flat key→value map rather than

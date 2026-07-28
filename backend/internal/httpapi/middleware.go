@@ -33,7 +33,13 @@ func corsMiddleware(allowed []string) middleware {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Vary", "Origin")
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token")
+				// If-None-Match is listed so a client can make a conditional GET
+				// explicitly. The browser's own cache revalidation does not need
+				// it — that happens below CORS and adds the header itself.
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Admin-Token, If-None-Match")
+				// Without this a cross-origin caller cannot READ the tag it would
+				// have to echo back; the header is not on the CORS-safelist.
+				w.Header().Set("Access-Control-Expose-Headers", "ETag")
 			}
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)

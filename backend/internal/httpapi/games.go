@@ -168,6 +168,24 @@ func (s *Server) handlePrizes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, prizes)
 }
 
+// handleAllPrizes serves every enabled game's prizes in one response, which is
+// what the landing screen actually asks for: it advertises the whole catalog
+// before the player has chosen a game.
+//
+// It exists so that adding a game does not add a request to the first screen
+// every customer sees. The per-game route above stays for the single-game
+// question; this one is not a cache in front of it but a different query — one
+// reading of the awards table instead of one per game.
+func (s *Server) handleAllPrizes(w http.ResponseWriter, r *http.Request) {
+	loc := localeOf(r)
+	prizes, err := s.svc.AllPrizes(r.Context(), loc)
+	if err != nil {
+		writeAppError(w, loc, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, prizes)
+}
+
 func (s *Server) handleHighScores(w http.ResponseWriter, r *http.Request) {
 	slug := domain.GameSlug(r.PathValue("slug"))
 	limit := 0

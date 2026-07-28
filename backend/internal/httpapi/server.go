@@ -81,6 +81,13 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/games/{slug}/scores/{id}", s.handleGetScore)
 	mux.HandleFunc("GET /api/v1/games/{slug}/awards", s.handlePrizes)
 
+	// The whole catalog's prizes in one read, for the landing screen. Public for
+	// the same reason the per-game route is — it is advertising — and it lives
+	// outside /games/{slug} because it is not about one game. Never fold the
+	// per-game route into this by making {slug} optional: the two answer
+	// different questions and only one of them is on the first-paint path.
+	mux.HandleFunc("GET /api/v1/awards", s.handleAllPrizes)
+
 	// The storefront's identity (name, tagline) is player-facing, so it is the
 	// one settings read that is NOT behind requireAdmin. settings.Public is the
 	// allowlist that keeps it to that — never widen this route to the full list.

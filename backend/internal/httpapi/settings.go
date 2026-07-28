@@ -16,13 +16,20 @@ import (
 // The allowlist is enforced in internal/settings, not here: what is safe to
 // publish is a rule about the data, and a handler is the wrong place to decide
 // it a second time.
+//
+// It is the one read served conditionally (see writeJSONRevalidated), because
+// it is the shape that argument fits: every player in the venue gets the same
+// handful of bytes, and a storefront's name changes perhaps twice a year. The
+// player app already remembers the last answer (state/settingsCache.ts), so
+// this is no longer on the render path — the ETag saves the body of a request
+// that was going to be made anyway.
 func (s *Server) handlePublicSettings(w http.ResponseWriter, r *http.Request) {
 	all, err := s.svc.Store().Settings().List(r.Context())
 	if err != nil {
 		writeAppError(w, localeOf(r), err)
 		return
 	}
-	writeJSON(w, http.StatusOK, settings.Public(all))
+	writeJSONRevalidated(w, r, settings.Public(all))
 }
 
 func (s *Server) handleListSettings(w http.ResponseWriter, r *http.Request) {

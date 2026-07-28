@@ -451,32 +451,39 @@ soon each bites. The rules for *where* a string lives are in the repo-root
 
 - **DynamoDB adapter** implementing `storage.Store` (the interface is ready) and
   a Postgres adapter for richer querying/analytics.
-- **Caching** for the hot read paths (game catalog, leaderboards, and the public
-  prize showcase) with invalidation on write. Two shapes, and they want different
-  answers:
-  - The landing screen fetches prizes **once per game** (`state/usePrizes.ts`),
-    all identical for everyone — re-derive the count from the registry rather
-    than trusting a number written here. The cost grows with the catalog, so
-    every new game makes the landing page slower for everyone. **The decision is
-    to batch this server-side rather than cache it client-side**: one endpoint
-    returning every game's public awards, so the landing screen makes one request
-    whatever the catalog holds. A cache would still pay per game on the first
-    visit, which is the visit that matters. It costs a wire type, an
-    `api-client` method and a rewrite of `usePrizes`; the showcase's merge
-    (`mergePrizes`) is already pure and moves either way. Do it before the next
-    game lands, not after.
-  - `state/usePublicSettings.ts` fetches `GET /api/v1/settings/public` on mount
-    and again on every refresh-button press. It does *not* grow with the catalog
-    — one request whose response is the same handful of bytes for every player in
-    the venue, changing perhaps twice a year. That makes it the cheapest possible
-    thing to serve from an `ETag` or a short `Cache-Control: max-age`, and the
-    one where the refresh button gives the argument its edge case: a cache the
-    operator cannot bust from the player's own reload control would make the
-    button lie. **What changed is the urgency, not the case.** The client now
-    remembers the last answer (`state/settingsCache.ts`), so the request is no
-    longer on the render path and its latency costs nobody a flash — it is back
-    to being ordinary traffic, and an `ETag` would now save bytes rather than a
-    repaint.
+- **Caching for the remaining hot reads: the game catalog and the leaderboards.**
+  The two the landing screen pays for are settled — the prize showcase is one
+  batched query (`GET /api/v1/awards`) and the public settings read is a
+  conditional GET (`writeJSONRevalidated` in `internal/httpapi/respond.go`) — and
+  the same conditional-GET treatment is the obvious next step for both of these.
+  `GET /api/v1/games` is the strongest candidate: identical for every player,
+  changing only when an admin enables a game, and on the render path of the first
+  screen. A leaderboard is the weaker one, since it changes on every round played
+  in the venue, and a tag recomputed per request buys nothing when the body
+  changes that often — it wants a real invalidation-on-write cache or nothing.
+- **The batched prize read is not conditional, and it is the biggest public body
+  we serve.** `handleAllPrizes` returns every game's ladder on every landing-page
+  load; `writeJSONRevalidated` would cost one line there. It was left out
+  deliberately rather than forgotten: a prize's `soldOut` flips as stock runs
+  down mid-shift, so the tag would miss more often than the settings one does,
+  and the saving is worth measuring before it is claimed. Measure the hit rate on
+  a real venue's traffic first.
+- **The showcase still waits for the game list before it starts.**
+  `state/usePrizes.ts` gates its fetch on `games` even though the batched read no
+  longer needs the slug list — that parameter is now only a re-fetch trigger. So
+  two independent requests run in series on the first screen: `/games` resolves,
+  then the prize strip begins. Separating "when to fetch first" from "when to
+  re-read" would let them go together; the reason it was not done with the
+  batching is that fetching on mount AND on a catalog change double-fires on the
+  first load, and getting that wrong is a worse landing screen than a slightly
+  later prize strip. Worth doing when first paint is actually measured.
+- **The per-game prize route has no caller.** `GET /api/v1/games/{slug}/awards`
+  (`handlePrizes`) was the landing screen's read and is now nothing's — the
+  showcase uses the batch, and no app asks one game for its own ladder. It is
+  kept because it answers a real question and the client method mirrors it, but
+  an endpoint nothing calls is an endpoint nothing notices breaking. Either give
+  it a caller (a per-game "what can I win here?" panel is the natural one) or
+  delete it and its `gamePrizes` client method together.
 - **Observability** — structured logging, request tracing, metrics (play latency,
   error rates), health/readiness probes.
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode
@@ -514,9 +521,11 @@ Concrete, near-term items, roughly ordered by how soon they will bite.
   Twitter meta tags (title = "Po scored 37 taps at Fun Store", image = the
   generated score card). This is the piece that makes the share feature above
   actually spread.
-- **Rate-limit the public reads.** `GET /games/{slug}/scores/{id}` and
-  `GET /games/{slug}/awards` are both unauthenticated, and the awards one is hit
-  on every landing-page load. Score ids are nanoid(11) — 66 bits, down from
+- **Rate-limit the public reads.** `GET /games/{slug}/scores/{id}`,
+  `GET /awards` and `GET /settings/public` are all unauthenticated, and the
+  awards batch is hit on every landing-page load — it is the whole catalog's
+  prize ladders in one response, so it is now the cheapest public request to
+  make and the most expensive one to serve. Score ids are nanoid(11) — 66 bits, down from
   UUIDv4's 122 — so guessing one is still impractical, but the margin that made
   "enumeration is impossible" a throwaway line is smaller, and a per-IP limit
   belongs here before real prizes are on the line.

@@ -653,6 +653,26 @@ func (s *Service) Prizes(ctx context.Context, slug domain.GameSlug, loc i18n.Loc
 	return reward.Showcase(awards, slug, def.Game.Direction, loc), nil
 }
 
+// AllPrizes lists every enabled game's prizes from one reading of the awards
+// table, for the landing screen's showcase.
+//
+// This is the batched form of Prizes, and it is the one the landing screen
+// uses: that screen advertises the whole catalog before the player has chosen
+// anything, so asking per game cost one request AND one full awards scan per
+// game — a page that got measurably slower with every game added. Prizes stays
+// for the single-game read, which is a different question.
+//
+// The catalog comes from the registry rather than ListGames because a prize
+// does not depend on a benchmark: reading the settings table here would be a
+// second query bought for a field this response does not carry.
+func (s *Service) AllPrizes(ctx context.Context, loc i18n.Locale) ([]reward.GamePrizes, error) {
+	awards, err := s.store.Awards().List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return reward.ShowcaseAll(awards, s.registry.Enabled(), loc), nil
+}
+
 // settingInt reads an int setting, falling back to def on any miss/parse error.
 func (s *Service) settingInt(ctx context.Context, key string, def int) int {
 	set, err := s.store.Settings().Get(ctx, key)

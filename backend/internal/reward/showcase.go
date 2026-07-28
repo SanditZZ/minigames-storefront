@@ -65,3 +65,43 @@ func Showcase(awards []domain.Award, slug domain.GameSlug, dir domain.ScoreDirec
 	})
 	return out
 }
+
+// GamePrizes is one game's showcase inside the batched public response.
+//
+// The batch is a LIST rather than a slug-keyed map so the games keep the order
+// the registry declared them in. That order is load-bearing on the client: the
+// landing screen merges every game's prizes by name (mergePrizes in
+// @minigames/player-core) and keeps the first copy of a blurb it sees, so a
+// re-ordering silently changes which game's wording a shared prize is
+// advertised with. A Go map marshals its keys sorted, which would have made
+// that order alphabetical-by-slug and nobody's decision.
+type GamePrizes struct {
+	GameSlug domain.GameSlug `json:"gameSlug"`
+	Prizes   []PublicAward   `json:"prizes"`
+}
+
+// ShowcaseAll lists every game's prizes from ONE reading of the awards table.
+//
+// This exists because the landing screen advertises the whole catalog at once,
+// and asking per game cost a request AND a full table scan per game — a page
+// that got slower every time a game was added. Awards are global rows carrying
+// the games they apply to, so one list answers all of them; the per-game filter
+// and sort are Showcase's, unchanged, called once per game.
+//
+// games is the ENABLED catalog in registry order: a game a player cannot reach
+// has no prizes to advertise, and the order is the response's (see GamePrizes).
+// A game with no active prizes still gets an entry with an empty list rather
+// than being dropped, so the response describes the catalog rather than only
+// the parts of it that pay out.
+//
+// Pure: same inputs, same output, no I/O.
+func ShowcaseAll(awards []domain.Award, games []domain.Game, loc i18n.Locale) []GamePrizes {
+	out := make([]GamePrizes, 0, len(games))
+	for _, g := range games {
+		out = append(out, GamePrizes{
+			GameSlug: g.Slug,
+			Prizes:   Showcase(awards, g.Slug, g.Direction, loc),
+		})
+	}
+	return out
+}

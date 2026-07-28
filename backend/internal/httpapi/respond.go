@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/app"
 	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
@@ -19,6 +22,66 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// writeJSONRevalidated serves a body the client is expected to ask for often
+// and which rarely changes, as a conditional GET: an ETag over the encoded
+// bytes, and 304 with no body when the caller already holds that version.
+//
+// `no-cache` is not `no-store` — it means "keep it, but ask every time". That
+// pairing is deliberate and is what makes this safe on an endpoint an operator
+// edits: every request still reaches the server, so a change is visible on the
+// next read and the player app's own refresh control cannot be made to lie by a
+// copy it is unable to bust. What is saved is the body, not the round trip.
+//
+// The tag is a hash of the RESPONSE, so anything that varies the response —
+// today the locale, tomorrow whatever else the allowlist grows — varies the tag
+// without this function being told about it.
+//
+// A body that will not encode falls back to a normal 200 rather than failing
+// the request: an unhashable response is a bug in the caller's type, and
+// serving it uncached is strictly better than serving nothing.
+func writeJSONRevalidated(w http.ResponseWriter, r *http.Request, body any) {
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		writeJSON(w, http.StatusOK, body)
+		return
+	}
+	sum := sha256.Sum256(encoded)
+	// Quoted per RFC 9110, and strong: the bytes either match or they do not.
+	tag := `"` + hex.EncodeToString(sum[:16]) + `"`
+
+	w.Header().Set("ETag", tag)
+	w.Header().Set("Cache-Control", "no-cache")
+	if matchesETag(r.Header.Get("If-None-Match"), tag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(encoded)
+}
+
+// matchesETag reports whether a client's If-None-Match covers tag.
+//
+// The header is a comma-separated list, and a cache that revalidated through a
+// proxy may present the same tag marked weak (`W/"…"`). Weak comparison is the
+// correct one for a conditional GET — it asks "is this semantically the same
+// response?", which is exactly the question — so the prefix is stripped rather
+// than treated as a miss.
+func matchesETag(header, tag string) bool {
+	if header == "" {
+		return false
+	}
+	if strings.TrimSpace(header) == "*" {
+		return true
+	}
+	for _, candidate := range strings.Split(header, ",") {
+		if strings.TrimPrefix(strings.TrimSpace(candidate), "W/") == tag {
+			return true
+		}
+	}
+	return false
 }
 
 // errorBody is the uniform error envelope the frontends can rely on.

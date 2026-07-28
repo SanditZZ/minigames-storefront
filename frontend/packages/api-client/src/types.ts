@@ -223,6 +223,20 @@ export interface Prize {
   soldOut: boolean;
 }
 
+/**
+ * One game's prizes inside the batched showcase read (GET /awards).
+ *
+ * The batch is a LIST, not a slug-keyed object, because the order is the
+ * backend's catalog order and the showcase's merge depends on it — see
+ * `mergePrizes` in @minigames/player-core, which keeps the first copy of a
+ * blurb it meets. It stays grouped by game rather than pooled because a
+ * `minScore` is meaningless without the game whose unit it is in.
+ */
+export interface GamePrizes {
+  gameSlug: string;
+  prizes: Prize[];
+}
+
 export interface HighScores {
   game: Game;
   scores: ScoreEntry[];

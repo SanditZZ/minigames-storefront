@@ -10,6 +10,7 @@ import (
 
 	"github.com/sanditzz/minigames-storefront/backend/internal/domain"
 	"github.com/sanditzz/minigames-storefront/backend/internal/game"
+	"github.com/sanditzz/minigames-storefront/backend/internal/i18n"
 	"github.com/sanditzz/minigames-storefront/backend/internal/id"
 	"github.com/sanditzz/minigames-storefront/backend/internal/storage"
 )
@@ -116,9 +117,17 @@ func (s *memSessions) Consume(_ context.Context, token string) (domain.Session, 
 	return sess, nil
 }
 
-type memAwards struct{ byID map[string]domain.Award }
+type memAwards struct {
+	byID map[string]domain.Award
+	// lists counts full-table reads. It exists for AllPrizes, whose entire
+	// reason to exist is that the landing screen stopped paying for one scan per
+	// game — a property no assertion on the RESPONSE can see, since the batched
+	// and the per-game answers are identical by design.
+	lists int
+}
 
 func (a *memAwards) List(context.Context) ([]domain.Award, error) {
+	a.lists++
 	out := make([]domain.Award, 0, len(a.byID))
 	for _, v := range a.byID {
 		out = append(out, v)
@@ -1114,5 +1123,72 @@ func TestListClaimsFiltersOnDerivedStatus(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// --- AllPrizes -------------------------------------------------------------
+
+// The batch must answer for the whole enabled catalog. The expectation is
+// re-derived from the registry rather than written as a number, so adding a
+// game extends this test instead of breaking it for the wrong reason.
+func TestAllPrizesCoversEveryEnabledGame(t *testing.T) {
+	svc := newTestService(winningStore())
+
+	batch, err := svc.AllPrizes(context.Background(), i18n.English)
+	if err != nil {
+		t.Fatalf("AllPrizes: %v", err)
+	}
+	enabled := game.DefaultRegistry().Enabled()
+	if len(batch) != len(enabled) {
+		t.Fatalf("batch has %d games, catalog has %d enabled", len(batch), len(enabled))
+	}
+	for i, g := range enabled {
+		if batch[i].GameSlug != g.Slug {
+			t.Fatalf("batch[%d] = %q, want %q — the response must keep the catalog's order",
+				i, batch[i].GameSlug, g.Slug)
+		}
+	}
+}
+
+// The batch and the per-game read must not be able to disagree: the landing
+// screen uses one and a game's own page uses the other.
+func TestAllPrizesAgreesWithThePerGameRead(t *testing.T) {
+	ctx := context.Background()
+	svc := newTestService(winningStore())
+
+	batch, err := svc.AllPrizes(ctx, i18n.Thai)
+	if err != nil {
+		t.Fatalf("AllPrizes: %v", err)
+	}
+	for _, entry := range batch {
+		single, err := svc.Prizes(ctx, entry.GameSlug, i18n.Thai)
+		if err != nil {
+			t.Fatalf("Prizes(%q): %v", entry.GameSlug, err)
+		}
+		if len(single) != len(entry.Prizes) {
+			t.Fatalf("%s: batched %d prizes, per-game %d", entry.GameSlug, len(entry.Prizes), len(single))
+		}
+		for i := range single {
+			if single[i] != entry.Prizes[i] {
+				t.Fatalf("%s prize %d: batched %+v, per-game %+v",
+					entry.GameSlug, i, entry.Prizes[i], single[i])
+			}
+		}
+	}
+}
+
+// The point of the batch, and the only part of it a response cannot show: the
+// awards table is read once however many games the catalog holds. The per-game
+// route cost one scan each, so this number used to grow with the catalog.
+func TestAllPrizesReadsTheAwardsTableOnce(t *testing.T) {
+	store := winningStore()
+	svc := newTestService(store)
+	store.awards.lists = 0
+
+	if _, err := svc.AllPrizes(context.Background(), i18n.English); err != nil {
+		t.Fatalf("AllPrizes: %v", err)
+	}
+	if store.awards.lists != 1 {
+		t.Fatalf("AllPrizes read the awards table %d times, want exactly 1", store.awards.lists)
 	}
 }
