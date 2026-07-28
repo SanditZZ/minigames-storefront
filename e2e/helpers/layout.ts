@@ -9,6 +9,45 @@ import type { Page } from "@playwright/test";
  */
 export const NARROW_VIEWPORT = { width: 320, height: 640 };
 
+/**
+ * How far the page has scrolled vertically.
+ *
+ * Reads whichever element actually scrolls rather than assuming the document
+ * does: an app that moves its scroll into a flex container leaves `window.scrollY`
+ * at 0 forever, so a spec asserting on it would pass while the page sat still —
+ * the worst kind of green. `scrollingElement` covers the document case and the
+ * `max` picks up a scrolled descendant, which is enough for "did the wheel reach
+ * the page or did an input eat it?".
+ */
+export async function verticalScroll(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    let deepest = 0;
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>("*"))) {
+      if (el.scrollTop > deepest) deepest = el.scrollTop;
+    }
+    return Math.max(window.scrollY, document.scrollingElement?.scrollTop ?? 0, deepest);
+  });
+}
+
+/**
+ * Turns the wheel in whichever direction the page still has room to move, and
+ * returns the offset it started from.
+ *
+ * The direction is the whole reason this is a helper. `hover()` scrolls its
+ * target into view, which on a long form parks the page at the BOTTOM — so a
+ * fixed downward wheel has nowhere left to go and produces an unchanged offset,
+ * which is indistinguishable from an input that swallowed the event. A spec
+ * asserting on that reads as a real failure and is not one.
+ *
+ * The cursor is not moved: callers position it over the element under test
+ * first, because "who received this wheel" is usually the point.
+ */
+export async function wheelWhereThereIsRoom(page: Page, distance = 400): Promise<number> {
+  const before = await verticalScroll(page);
+  await page.mouse.wheel(0, before > 0 ? -distance : distance);
+  return before;
+}
+
 /** An element that is wider than the viewport, named well enough to find it. */
 export interface Overflow {
   /** How far past the viewport's right edge the document extends, in px. */

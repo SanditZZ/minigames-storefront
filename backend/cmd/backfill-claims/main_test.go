@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -40,6 +42,55 @@ func TestPartitionWinsHandlesNothingToDo(t *testing.T) {
 	claimable, orphaned := partitionWins(nil, map[string]domain.Award{})
 	if len(claimable) != 0 || len(orphaned) != 0 {
 		t.Fatalf("empty input produced %d claimable, %d orphaned", len(claimable), len(orphaned))
+	}
+}
+
+// --- The check's rules ------------------------------------------------------
+
+func TestCheckRefusesToBePairedWithAWritingMode(t *testing.T) {
+	// The point is that neither resolves by precedence: a run asking for both is
+	// wrong about what it wants, and guessing would be the dangerous half.
+	if err := validate(config{check: true, apply: true}); err == nil {
+		t.Fatal("-check -apply was accepted; a check must never write")
+	}
+	if err := validate(config{check: true, revert: "some-backup.json"}); err == nil {
+		t.Fatal("-check -revert was accepted; a check must never write")
+	}
+	if err := validate(config{apply: true}); err != nil {
+		t.Fatalf("-apply alone was rejected: %v", err)
+	}
+}
+
+// The judgement call this whole mode rests on: an unrepairable win is reported
+// and does NOT fail the check, because no run could ever clear it and a check
+// that is red forever is a check nobody reads.
+func TestCheckReportSeparatesRepairableFromPermanent(t *testing.T) {
+	repairable := []win{{ScoreID: "s1", GameSlug: "tap-fast", AwardID: "a1"}}
+	orphaned := []win{{ScoreID: "s2", GameSlug: "stack", AwardID: "gone"}}
+
+	both := checkReport("db.sqlite", repairable, orphaned)
+	if !strings.Contains(both, "s1") || !strings.Contains(both, "s2") {
+		t.Fatalf("report names neither round:\n%s", both)
+	}
+	if !strings.Contains(both, "-apply") {
+		t.Fatalf("report does not say how to repair:\n%s", both)
+	}
+	if !strings.Contains(both, "NEVER") {
+		t.Fatalf("report does not distinguish the permanent case:\n%s", both)
+	}
+
+	// A permanent-only database still reports, and the report must not read as a
+	// call to run the repair — there is nothing for it to do.
+	only := checkReport("db.sqlite", nil, orphaned)
+	if strings.Contains(only, "-apply") {
+		t.Fatalf("report tells the operator to repair the unrepairable:\n%s", only)
+	}
+}
+
+func TestCheckReportSaysSoWhenThereIsNothingWrong(t *testing.T) {
+	clean := checkReport("db.sqlite", nil, nil)
+	if !strings.Contains(clean, "OK") {
+		t.Fatalf("a clean database does not report OK:\n%s", clean)
 	}
 }
 
@@ -98,7 +149,7 @@ func TestBackfillIssuesAClaimTheStoreCanRead(t *testing.T) {
 	roundAt := time.Now().UTC().Add(-2 * time.Hour).Truncate(time.Nanosecond)
 	path, scoreID, awardID := seeded(t, roundAt)
 
-	if err := run(path, true, "", t.TempDir()); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: t.TempDir()}); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 
@@ -143,7 +194,7 @@ func TestBackfillReconstructsAnExpiredClaimForAnOldRound(t *testing.T) {
 	roundAt := time.Now().UTC().Add(-time.Duration(domain.DefaultClaimTTLHours+24) * time.Hour)
 	path, scoreID, _ := seeded(t, roundAt)
 
-	if err := run(path, true, "", t.TempDir()); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: t.TempDir()}); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 
@@ -161,7 +212,7 @@ func TestBackfillReconstructsAnExpiredClaimForAnOldRound(t *testing.T) {
 func TestBackfillIsIdempotent(t *testing.T) {
 	path, scoreID, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
 
-	if err := run(path, true, "", t.TempDir()); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: t.TempDir()}); err != nil {
 		t.Fatalf("first apply: %v", err)
 	}
 	first, err := readBack(t, path, scoreID)
@@ -169,7 +220,7 @@ func TestBackfillIsIdempotent(t *testing.T) {
 		t.Fatalf("read back: %v", err)
 	}
 
-	if err := run(path, true, "", t.TempDir()); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: t.TempDir()}); err != nil {
 		t.Fatalf("second apply: %v", err)
 	}
 	second, err := readBack(t, path, scoreID)
@@ -191,7 +242,7 @@ func TestBackfillIsIdempotent(t *testing.T) {
 func TestBackfillDryRunWritesNothing(t *testing.T) {
 	path, scoreID, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
 
-	if err := run(path, false, "", t.TempDir()); err != nil {
+	if err := run(config{dbPath: path, backupDir: t.TempDir()}); err != nil {
 		t.Fatalf("dry run: %v", err)
 	}
 
@@ -200,18 +251,67 @@ func TestBackfillDryRunWritesNothing(t *testing.T) {
 	}
 }
 
+// The detection this mode exists for: a win with no claim is a finding, and the
+// finding has to be distinguishable from the script failing to look.
+func TestCheckFailsOnAWinWithNoClaimAndWritesNothing(t *testing.T) {
+	path, scoreID, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
+
+	err := run(config{dbPath: path, check: true})
+	if !errors.Is(err, errNeedsRepair) {
+		t.Fatalf("check returned %v, want errNeedsRepair — the win has no claim", err)
+	}
+
+	// Read-only means read-only: the check must not have quietly repaired what it
+	// was asked to report.
+	if _, err := readBack(t, path, scoreID); err == nil {
+		t.Fatal("the check issued a claim; only -apply writes")
+	}
+}
+
+func TestCheckPassesOnceTheBackfillHasRun(t *testing.T) {
+	path, _, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
+
+	if err := run(config{dbPath: path, apply: true, backupDir: t.TempDir()}); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	if err := run(config{dbPath: path, check: true}); err != nil {
+		t.Fatalf("check still fails after the repair: %v", err)
+	}
+}
+
+// The permanent case, end to end: a win whose award was deleted is reported
+// every run and never fails the check, so a cron job that finds only these
+// stays green rather than being switched off.
+func TestCheckDoesNotFailOnAWinWhoseAwardIsGone(t *testing.T) {
+	path, _, awardID := seeded(t, time.Now().UTC().Add(-time.Hour))
+
+	store, err := sqlite.Open(path)
+	if err != nil {
+		t.Fatalf("open to delete the award: %v", err)
+	}
+	if err := store.Awards().Delete(context.Background(), awardID); err != nil {
+		store.Close()
+		t.Fatalf("delete award: %v", err)
+	}
+	store.Close()
+
+	if err := run(config{dbPath: path, check: true}); err != nil {
+		t.Fatalf("check failed on an unrepairable win: %v — it would stay red forever", err)
+	}
+}
+
 func TestRevertRemovesExactlyWhatItIssued(t *testing.T) {
 	path, scoreID, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
 	backupDir := t.TempDir()
 
-	if err := run(path, true, "", backupDir); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: backupDir}); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 	if _, err := readBack(t, path, scoreID); err != nil {
 		t.Fatalf("claim was not issued: %v", err)
 	}
 
-	if err := run(path, false, onlyBackup(t, backupDir), ""); err != nil {
+	if err := run(config{dbPath: path, revert: onlyBackup(t, backupDir)}); err != nil {
 		t.Fatalf("revert: %v", err)
 	}
 	if _, err := readBack(t, path, scoreID); err == nil {
@@ -220,7 +320,7 @@ func TestRevertRemovesExactlyWhatItIssued(t *testing.T) {
 
 	// And the undo is itself re-runnable: a second pass finds nothing and says
 	// so rather than failing.
-	if err := run(path, false, onlyBackup(t, backupDir), ""); err != nil {
+	if err := run(config{dbPath: path, revert: onlyBackup(t, backupDir)}); err != nil {
 		t.Fatalf("second revert: %v", err)
 	}
 }
@@ -232,7 +332,7 @@ func TestRevertRefusesToDeleteARedeemedClaim(t *testing.T) {
 	path, scoreID, _ := seeded(t, time.Now().UTC().Add(-time.Hour))
 	backupDir := t.TempDir()
 
-	if err := run(path, true, "", backupDir); err != nil {
+	if err := run(config{dbPath: path, apply: true, backupDir: backupDir}); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
 
@@ -250,7 +350,7 @@ func TestRevertRefusesToDeleteARedeemedClaim(t *testing.T) {
 	}
 	store.Close()
 
-	if err := run(path, false, onlyBackup(t, backupDir), ""); err != nil {
+	if err := run(config{dbPath: path, revert: onlyBackup(t, backupDir)}); err != nil {
 		t.Fatalf("revert: %v", err)
 	}
 

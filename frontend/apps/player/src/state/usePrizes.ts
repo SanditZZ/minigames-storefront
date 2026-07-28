@@ -1,7 +1,7 @@
 // ACTIONS layer: fetching the prize showcase. All the shaping is delegated to
 // the pure functions in @minigames/player-core.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Game } from "@minigames/api-client";
 import { mergePrizes, orderPrizes, type ShowcasePrize } from "@minigames/player-core";
 import { useApi } from "../i18n";
@@ -16,10 +16,19 @@ import { useApi } from "../i18n";
  * is unchanged, because the response is still grouped by game.
  *
  * `games` is no longer what builds the request — the server decides which games
- * are enabled — but it is still the right trigger: the showcase advertises the
- * same catalog the picker renders, so it is re-read exactly when that set
- * changes. Keying on the slug list rather than the array identity keeps a
- * refresh that returns the same catalog from re-fetching.
+ * are enabled — so it is a RE-FETCH TRIGGER and nothing more: the showcase
+ * advertises the same catalog the picker renders, so it is re-read exactly when
+ * that set changes. Keying on the slug list rather than the array identity keeps
+ * a refresh that returns the same catalog from re-fetching.
+ *
+ * It is deliberately NOT what gates the first fetch. Waiting for `games` put two
+ * independent requests in series on the first screen — `/games` resolved, and
+ * only then did the prize strip begin — for a parameter the request no longer
+ * carries. The two now go together. What makes that safe is the one line below:
+ * the catalog ARRIVING is not the catalog CHANGING, so the transition from "no
+ * games yet" to the first list must not re-fire the request that is already in
+ * flight. Getting that wrong double-fetches on every cold load, which is a worse
+ * landing screen than the serial one this replaces.
  *
  * A failure resolves to an empty list rather than an error state: the showcase
  * is advertising, and a landing screen that refuses to render its game picker
@@ -34,10 +43,22 @@ export function usePrizes(games: Game[] | null): ShowcasePrize[] {
   const api = useApi();
   const [prizes, setPrizes] = useState<ShowcasePrize[]>([]);
 
+  // "" means the catalog has not arrived — and also an empty catalog, since
+  // `[].join(",")` is "" as well. The two are not told apart on purpose: the
+  // collision costs a storefront with no games at all one redundant re-read,
+  // and disambiguating it would put a second piece of state beside the one
+  // below to serve a store nobody can play at.
   const key = games ? games.map((g) => g.slug).join(",") : "";
+  const seenKey = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!key) return;
+    // The catalog ARRIVING is not the catalog CHANGING: the mount already
+    // fetched, so record the new key and stand down. A later edit moves the key
+    // between two non-empty values and does re-read.
+    const previous = seenKey.current;
+    seenKey.current = key;
+    if (key !== "" && previous === "") return;
+
     let alive = true;
 
     api

@@ -266,13 +266,6 @@ with their hands currently cannot win a prize at all.
   accepting it — the wrongness is visible on the landing screen the first time
   they look. It bites exactly once per store that had a logo before this
   shipped, which today is however many of them uploaded a wide one.
-- **`NumberInput`'s wheel handler is still untested.** The stepper's repeat and
-  the cleared-field draft are covered now (`admin-forms.spec.ts`), but the
-  `onWheel` that BLURS the field is not: it exists so a focused number input
-  cannot absorb a page scroll, and asserting it needs a wheel event over a
-  focused input plus a check that the page scrolled and the value did not.
-  Cheap to add to the same spec; left out because a wheel is not an input a
-  phone has, and this admin is used on one as often as not.
 - **The `NumberInput` suffix gutter is fixed, so a long unit clips.** The
   reserved room and the span's `max-w` are two constants in
   `apps/admin/src/ui/Controls.tsx` that have to agree, and the units come from
@@ -468,15 +461,17 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   down mid-shift, so the tag would miss more often than the settings one does,
   and the saving is worth measuring before it is claimed. Measure the hit rate on
   a real venue's traffic first.
-- **The showcase still waits for the game list before it starts.**
-  `state/usePrizes.ts` gates its fetch on `games` even though the batched read no
-  longer needs the slug list — that parameter is now only a re-fetch trigger. So
-  two independent requests run in series on the first screen: `/games` resolves,
-  then the prize strip begins. Separating "when to fetch first" from "when to
-  re-read" would let them go together; the reason it was not done with the
-  batching is that fetching on mount AND on a catalog change double-fires on the
-  first load, and getting that wrong is a worse landing screen than a slightly
-  later prize strip. Worth doing when first paint is actually measured.
+- **Nothing can assert that the showcase fetches once.** The prize strip no
+  longer waits for `/games` (`state/usePrizes.ts`), so both reads leave together
+  on the first screen and a single guard — the catalog ARRIVING is not the
+  catalog CHANGING — is all that stands between that and a double fetch. It
+  cannot be tested where it would bite: the suite drives Vite's dev server, where
+  StrictMode double-invokes effects, so a correct page is observed making two
+  requests and a double-fetching one makes four. `countRequests`
+  (`e2e/helpers/network.ts`) says exactly this, which is why it only ever asserts
+  a count of ZERO. Closing it means either a production-build Playwright project
+  or measuring first paint for real, at which point the request count stops being
+  a proxy for the thing anybody cares about.
 - **The per-game prize route has no caller.** `GET /api/v1/games/{slug}/awards`
   (`handlePrizes`) was the landing screen's read and is now nothing's — the
   showcase uses the batch, and no app asks one game for its own ladder. It is
@@ -548,23 +543,24 @@ Concrete, near-term items, roughly ordered by how soon they will bite.
   `Service.awardByID` still degrades a deleted award to "no prize" — as it does
   for any win issued before claims existed. Soft-delete/archive is the complete
   answer, and it pairs with the audit-trail item below.
-- **Nothing NOTICES a win with no claim; the repair is manual.**
-  `cmd/backfill-claims` closes the hole once someone runs it, and the player's
-  side is built — a win with no claim renders the prize with
-  `result.noClaimNote` (`ResultSummary`) — but nothing between those two ever
-  raises its hand. `issueClaim` logs and returns nil, and a log line in
-  `.prod/logs/api.log` is not a signal anybody watches, so the interval between
-  a failed write and someone thinking to run the script is unbounded. In that
-  window the counter still has no row to look up and no way to tell this player
-  from someone inventing a prize. The cheap version is a `-check` mode that
-  exits non-zero when any win lacks a claim, run from cron or from `ship.sh`;
-  the real version is the metric in the observability entry above.
+- **The claims check only runs when somebody ships.** `backfill-claims -check`
+  detects a win with no claim, and `ship.sh` step 6 runs it against
+  `.prod/minigames.db` after every deploy — so the detection exists exactly as
+  often as someone pushes. A venue that goes a fortnight without a change goes a
+  fortnight unchecked, and that is the venue where a failed `issueClaim` matters
+  most, because nobody is looking at the code either. A systemd timer or cron
+  entry running it is a few lines; what it does not have is anywhere for the
+  exit-2 to GO, which is the same "nobody watches `.prod/logs/api.log`" problem
+  one level up. The real version is the metric in the observability entry above.
 - **A win whose award was deleted can never be given a claim.** `partitionWins`
   (`cmd/backfill-claims`) sets those rounds aside and reports them rather than
   writing a row, because `award_name` is a snapshot and a deleted award leaves
   no name to snapshot — inventing one would put a lie in the one column designed
   to outlive the award. So a prize deleted before its claim was backfilled is
-  unrecoverable, permanently. Soft-delete/archive is the fix and it is the same
+  unrecoverable, permanently. `-check` reports them on every run and
+  deliberately does NOT count them towards its exit code — nothing could clear
+  them, and a check that is red forever is a check that gets switched off — so
+  they accumulate quietly rather than raising an alarm anybody can act on. Soft-delete/archive is the fix and it is the same
   fix the entry below wants; this is a second, sharper reason for it, because
   here the data loss is already irreversible rather than merely confusing.
 

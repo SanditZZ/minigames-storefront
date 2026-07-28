@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { admin, openAdmin, openAwardForm } from "../helpers/admin";
+import { verticalScroll, wheelWhereThereIsRoom } from "../helpers/layout";
 
 /**
  * The two admin controls whose interesting behaviour a pure test cannot reach.
@@ -8,7 +9,8 @@ import { admin, openAdmin, openAwardForm } from "../helpers/admin";
  * parsing, clamping and step bounds, `tokens/contrast.ts` for the ratio — and
  * both of those pass while the wiring around them is wrong. What is left is
  * behaviour that only exists in a browser: a timer that repeats while a button
- * is held, a draft string that keeps a cleared field from becoming 0, and an
+ * is held, a draft string that keeps a cleared field from becoming 0, a wheel
+ * that must reach the PAGE rather than the number under the cursor, and an
  * alert that has to appear WITHOUT disabling the Save underneath it.
  *
  * ## Nothing here saves, and that is the cleanup strategy
@@ -87,6 +89,38 @@ test.describe("the award form's stock stepper", () => {
     // a stock of 0 is a prize nobody can win, so the wrong behaviour here is
     // both surprising and consequential.
     await expect(stock).toHaveValue("");
+
+    await page.getByRole("button", { name: "Cancel" }).click();
+  });
+
+  test("a wheel over the focused field scrolls the page instead of changing the stock", async ({ page }) => {
+    await openAwardForm(page, "tap-fast", FINITE_STOCK_PRIZE);
+
+    const stock = page.getByLabel("Stock", { exact: true });
+    // Focused AND under the cursor is the whole hazard: Chrome only lets a
+    // number input consume a wheel while it has focus, so a test that skipped
+    // the click would pass against a component with no handler at all.
+    await stock.hover();
+    await stock.focus();
+    const started = await stock.inputValue();
+    const scrolledTo = await wheelWhereThereIsRoom(page);
+
+    // The value is the half an operator loses money on: a scroll past this form
+    // silently retuning a prize's stock is a change nobody made and nobody sees.
+    await expect(stock).toHaveValue(started);
+
+    // And the scroll has to actually happen. Preventing the default alone would
+    // satisfy the assertion above while leaving the page pinned under the
+    // cursor, which is why the handler BLURS — see the comment on onWheel in
+    // ui/Controls.tsx. Polled because the scroll is smooth-capable and need not
+    // have settled by the time the wheel event resolves.
+    await expect
+      .poll(async () => verticalScroll(page), { message: "the wheel never reached the page" })
+      .not.toBe(scrolledTo);
+
+    // Blurred, not merely ignored: the second wheel notch is the one a
+    // prevent-default fix leaks, and focus is what decides it.
+    await expect(stock).not.toBeFocused();
 
     await page.getByRole("button", { name: "Cancel" }).click();
   });

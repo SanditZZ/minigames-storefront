@@ -33,24 +33,37 @@
 //     plan is re-derived from the database every time, never from the backup.
 //   - AUDITABLE. Every claim is logged with its score, code and award.
 //
+// -check is the detection half, and it exists because nothing else notices.
+// issueClaim logs and returns nil, so a failed write leaves a winning round with
+// no code and no signal — the interval between that and someone thinking to run
+// the repair is otherwise unbounded. -check reads and writes nothing, exits 2
+// when there is something to repair, and is meant to be run from cron or from
+// ship.sh. It is deliberately a separate mode rather than a side effect of the
+// dry run: a dry run reports what it WOULD do and succeeds, and a check has to
+// fail for anyone downstream to hear it.
+//
 // Usage:
 //
 //	go run ./cmd/backfill-claims -db ../.prod/minigames.db              # dry run
+//	go run ./cmd/backfill-claims -db ../.prod/minigames.db -check       # detect only
 //	go run ./cmd/backfill-claims -db ../.prod/minigames.db -apply       # commit
 //	go run ./cmd/backfill-claims -db ../.prod/minigames.db -revert <f>  # undo
 //
 // Stop the stack (./scripts/serve-prod.sh --stop) before applying: the running
 // API holds the same SQLite file, and a claim issued underneath it is not in
-// any cache it keeps, but the write lock is worth not fighting over.
+// any cache it keeps, but the write lock is worth not fighting over. -check
+// takes no write lock, so it is safe against a live database.
 package main
 
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -81,32 +94,87 @@ type backup struct {
 	Claims    []domain.Claim `json:"claims"`
 }
 
+// config is every choice the run makes, gathered so the call sites read as the
+// mode they are in rather than as a row of bare booleans.
+type config struct {
+	dbPath    string
+	check     bool
+	apply     bool
+	revert    string
+	backupDir string
+}
+
+// Exit codes. A caller — cron, ship.sh — has to be able to tell "this database
+// has a hole in it" from "this script could not read the database", because the
+// first is a finding about the data and the second is a broken check reporting
+// nothing at all. Both are non-zero, so a caller that only tests for failure
+// still behaves.
+const (
+	exitFailed = 1 // the run itself failed; nothing was learned
+	exitFound  = 2 // -check ran fine and found wins that need repairing
+)
+
+// errNeedsRepair is what -check returns when it found something. It carries the
+// summary line rather than a stack of detail — the detail is already on stdout.
+var errNeedsRepair = errors.New("winning rounds are missing their claims")
+
 func main() {
-	var (
-		dbPath    = flag.String("db", "../.prod/minigames.db", "path to the SQLite database")
-		apply     = flag.Bool("apply", false, "actually write the claims (default is a dry run)")
-		revert    = flag.String("revert", "", "path to a backup file to undo")
-		backupDir = flag.String("backup-dir", "", "where to write the undo file (default: alongside the database)")
-	)
+	var cfg config
+	flag.StringVar(&cfg.dbPath, "db", "../.prod/minigames.db", "path to the SQLite database")
+	flag.BoolVar(&cfg.check, "check", false, "report unclaimed wins and exit non-zero; never writes")
+	flag.BoolVar(&cfg.apply, "apply", false, "actually write the claims (default is a dry run)")
+	flag.StringVar(&cfg.revert, "revert", "", "path to a backup file to undo")
+	flag.StringVar(&cfg.backupDir, "backup-dir", "", "where to write the undo file (default: alongside the database)")
 	flag.Parse()
 
-	if err := run(*dbPath, *apply, *revert, *backupDir); err != nil {
+	err := run(cfg)
+	switch {
+	case err == nil:
+		return
+	case errors.Is(err, errNeedsRepair):
 		fmt.Fprintf(os.Stderr, "\nbackfill-claims: %v\n", err)
-		os.Exit(1)
+		os.Exit(exitFound)
+	default:
+		fmt.Fprintf(os.Stderr, "\nbackfill-claims: %v\n", err)
+		os.Exit(exitFailed)
 	}
 }
 
-func run(dbPath string, apply bool, revertFile, backupDir string) error {
-	db, err := open(dbPath)
+func run(cfg config) error {
+	if err := validate(cfg); err != nil {
+		return err
+	}
+
+	db, err := open(cfg.dbPath)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	if revertFile != "" {
-		return runRevert(db, revertFile)
+	switch {
+	case cfg.revert != "":
+		return runRevert(db, cfg.revert)
+	case cfg.check:
+		return runCheck(db, cfg.dbPath)
+	default:
+		return runBackfill(db, cfg.dbPath, cfg.apply, cfg.backupDir)
 	}
-	return runBackfill(db, dbPath, apply, backupDir)
+}
+
+// validate rejects the flag combinations that would otherwise resolve silently
+// to one of them. -check is read-only by definition, so pairing it with a mode
+// that writes is a mistake about what the run is for, not a preference to
+// resolve by precedence.
+//
+// Pure: same inputs, same output, no I/O.
+func validate(cfg config) error {
+	if cfg.check && cfg.apply {
+		return errors.New("-check never writes; drop one of -check / -apply")
+	}
+	if cfg.check && cfg.revert != "" {
+		return errors.New("-check never writes; drop one of -check / -revert")
+	}
+	return nil
 }
 
 func open(path string) (*sql.DB, error) {
@@ -123,6 +191,83 @@ func open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("ping %s: %w", path, err)
 	}
 	return db, nil
+}
+
+// --- Check ------------------------------------------------------------------
+
+// runCheck answers one question — is any winning round missing its claim? — and
+// answers it without minting an id, a code or a transaction. It deliberately
+// does NOT build the plan the backfill would: building one calls id.New, and a
+// detector that generates the thing it is detecting the absence of is a detector
+// nobody trusts to run against production.
+func runCheck(db *sql.DB, dbPath string) error {
+	wins, err := readUnclaimedWins(db)
+	if err != nil {
+		return err
+	}
+	awards, err := readAwards(db)
+	if err != nil {
+		return err
+	}
+
+	repairable, orphaned := partitionWins(wins, awards)
+	fmt.Print(checkReport(dbPath, repairable, orphaned))
+
+	if len(repairable) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%d %w — see above", len(repairable), errNeedsRepair)
+}
+
+// checkReport renders the whole verdict as a string, so the exact words are
+// assertable without capturing stdout.
+//
+// ORPHANED WINS DO NOT FAIL THE CHECK, and that is the one judgement call in
+// this file. A win whose award was deleted can never be given a claim —
+// award_name is a snapshot and there is no name left to snapshot (see
+// partitionWins) — so failing on it would pin the check red permanently, with
+// no run that could ever clear it. A permanently red check is silenced within a
+// week and then detects nothing at all, including the repairable case this
+// exists for. They are reported loudly instead, every run, because they are
+// still data loss; they are just not data loss this script can undo. Soft-delete
+// for awards is what would make them repairable, and only then should they
+// count towards the exit code.
+//
+// Pure: same inputs, same output, no I/O.
+func checkReport(dbPath string, repairable, orphaned []win) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Database: %s\n\n", dbPath)
+
+	if len(repairable) == 0 && len(orphaned) == 0 {
+		b.WriteString("OK — every winning round has a claim.\n")
+		return b.String()
+	}
+
+	if len(repairable) > 0 {
+		fmt.Fprintf(&b, "%d winning round(s) have NO claim and can be repaired:\n", len(repairable))
+		for _, w := range repairable {
+			fmt.Fprintf(&b, "  score %-12s  game %-16s  award %-12s  %s\n",
+				w.ScoreID, w.GameSlug, w.AwardID, w.CreatedAt.Format(time.RFC3339))
+		}
+		fmt.Fprintf(&b, "\nRepair with:  go run ./cmd/backfill-claims -db %s -apply\n", dbPath)
+		b.WriteString("Note a round older than the claim window reconstructs to an already-expired\n")
+		b.WriteString("claim. That is correct, and a row the counter can look up still beats none.\n")
+	}
+
+	if len(orphaned) > 0 {
+		if len(repairable) > 0 {
+			b.WriteString("\n")
+		}
+		fmt.Fprintf(&b, "%d winning round(s) have NO claim and can NEVER be given one — the award\n", len(orphaned))
+		b.WriteString("was deleted, so there is no name left to snapshot:\n")
+		for _, w := range orphaned {
+			fmt.Fprintf(&b, "  score %-12s  game %-16s  award %s (deleted)\n", w.ScoreID, w.GameSlug, w.AwardID)
+		}
+		b.WriteString("These do NOT fail the check: no run can clear them, and a check that stays\n")
+		b.WriteString("red forever gets silenced. They are permanent, and they are why award\n")
+		b.WriteString("soft-delete matters.\n")
+	}
+	return b.String()
 }
 
 // --- Backfill ---------------------------------------------------------------

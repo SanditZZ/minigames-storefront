@@ -17,7 +17,10 @@ The gate, in order — each step must pass before the next runs:
    the admin's side of it** in a browser, against an isolated throwaway stack
    (own ports, own temp SQLite file — never `.prod/`).
 4. Build + redeploy via `scripts/serve-prod.sh`.
-5. Only then: `git add -A`, commit, `git push origin main`.
+5. `backfill-claims -check` against the deployed database — the one step that
+   reports without gating, because it judges the data rather than the change.
+   See "Data-repair scripts" below.
+6. Only then: `git add -A`, commit, `git push origin main`.
 
 **The gate and CI must run the same commands.** `ship.sh` invokes the npm
 scripts by name rather than re-spelling them, so the two cannot drift. A
@@ -223,7 +226,23 @@ Stop the stack before applying any of them.
 - `cmd/backfill-claims` — issues the claims that winning rounds should have
   earned. Two ways a win ends up without one: the round predates the claims
   table, or `issueClaim` failed at submit time and logged rather than failing
-  the submission.
+  the submission. Its `-check` mode is the detection half (below).
+
+**A repair nobody knows to run is not a repair, so the script also detects.**
+`backfill-claims -check` reads nothing but the tables, writes nothing at all,
+and exits **2** when a winning round is missing its claim — a code distinct from
+**1**, which means the check itself could not run. `ship.sh` step 6 runs it
+against `.prod/minigames.db` after every deploy. Two rules that look like
+softness and are not:
+
+- **It warns; it does not gate.** A missing claim is a fact about the DATA, not
+  a defect in the commit being pushed, and a docs push blocked by an old data
+  hole is how a check gets deleted.
+- **Wins whose award was deleted do not fail it.** Those can never be given a
+  claim (`award_name` is a snapshot; there is no name left to snapshot), so
+  counting them would pin the check red forever with no run able to clear it.
+  They are reported every time instead. Award soft-delete is what would make
+  them repairable — and only then should they count.
 
 **A repair script reconstructs through the production calculation, never its
 own copy of it.** `backfill-claims` builds each row with `claim.Issue`, so a
