@@ -7,7 +7,7 @@ import { PlayScreen } from "./screens/PlayScreen";
 import { ResultScreen } from "./screens/ResultScreen";
 import { stashResult } from "./state/resultCache";
 import { StoreProvider, useStore } from "./state/StoreProvider";
-import { Screen, StatusMessage } from "./ui";
+import { Screen, StatusMessage, StoreBanner } from "./ui";
 
 /**
  * App resolves the language and the storefront, then hands over to the app
@@ -50,10 +50,13 @@ function PlayerApp({ router }: { router: Router }) {
   const [loadError, setLoadError] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
 
-  // The identity itself is read where it is rendered, from StoreProvider. What
-  // this level still owns is the REFRESH, because the player's one reload
-  // gesture has to re-read the catalog and the settings together — see `reload`.
-  const { refresh: refreshSettings, refreshing } = useStore();
+  // The identity is read where it is rendered — the header takes its own copy
+  // from StoreProvider — with the banner as the exception, because it is not
+  // rendered by a screen at all: it lives outside the padded column, in the
+  // layout. What this level still owns besides it is the REFRESH, because the
+  // player's one reload gesture has to re-read the catalog and the settings
+  // together — see `reload`.
+  const { identity, refresh: refreshSettings, refreshing } = useStore();
 
   // `api` is a dependency rather than an ambient import, and that is what makes
   // the toggle work: switching language swaps the client, so this re-reads the
@@ -102,8 +105,15 @@ function PlayerApp({ router }: { router: Router }) {
 
   const { route } = router;
 
+  // The landing screen only, for now. A cover is scene-setting — it belongs
+  // where a customer decides whether to play at all, and a player mid-round has
+  // already decided. It is a prop rather than a rule inside StoreBanner so that
+  // giving the result screen one later is this line, not a refactor.
+  const banner =
+    route.name === "home" && identity.bannerUrl ? <StoreBanner url={identity.bannerUrl} /> : null;
+
   return (
-    <Screen>
+    <Screen banner={banner}>
       {route.name === "home" && (
         <HomeScreen
           games={games}

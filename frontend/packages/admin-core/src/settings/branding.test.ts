@@ -22,6 +22,7 @@ const blank: BrandingDraft = {
   name: "",
   tagline: "",
   logoUrl: "",
+  bannerUrl: "",
   brand: "",
   "brand-2": "",
   "brand-3": "",
@@ -79,12 +80,29 @@ describe("brandingChanges", () => {
     });
   });
 
-  // Unlike a colour, a cleared logo is a WRITE of "": there is no built-in
-  // logo to fall back to, so "" is the real value meaning "use the wordmark".
+  // Unlike a colour, a cleared image is a WRITE of "": there is no built-in
+  // logo or banner to fall back to, so "" is the real value meaning "none".
   it("stores a cleared logo rather than deleting the row", () => {
     const saved = { ...blank, logoUrl: "http://api/uploads/abc.png" };
     expect(brandingChanges({ ...saved, logoUrl: "" }, saved)).toEqual([
       { key: "store_logo_url", value: "", previous: "http://api/uploads/abc.png", kind: "string" },
+    ]);
+  });
+
+  // The two images are separate settings, and this is the test that would fail
+  // if the table paired either field with the other's key — a swap that a form
+  // driving both through the same code path makes easy and silent.
+  it("writes the logo and the banner to their own keys", () => {
+    const saved = { ...blank, logoUrl: "http://api/mark.png", bannerUrl: "http://api/old.jpg" };
+    expect(
+      brandingChanges({ ...saved, bannerUrl: " http://api/cover.jpg " }, saved),
+    ).toEqual([
+      {
+        key: "store_banner_url",
+        value: "http://api/cover.jpg",
+        previous: "http://api/old.jpg",
+        kind: "string",
+      },
     ]);
   });
 

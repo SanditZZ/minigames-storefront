@@ -153,6 +153,11 @@ describe("frameFor", () => {
   it("matches the output's aspect ratio", () => {
     expect(frameFor({ width: 800, height: 600 }, 260)).toEqual({ width: 260, height: 195 });
     expect(frameFor({ width: 512, height: 512 }, 260)).toEqual({ width: 260, height: 260 });
+    // The three shapes the admin actually asks for are 4:3 (an award photo),
+    // 1:1 (the store's mark) and this — the cover banner, and by some way the
+    // most extreme, which makes it the one where a preview that ignored the
+    // ratio would be most obviously not what gets uploaded.
+    expect(frameFor({ width: 1200, height: 400 }, 260)).toEqual({ width: 260, height: 87 });
   });
 
   it("never upscales past the output's own width", () => {

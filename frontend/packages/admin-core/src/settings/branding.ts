@@ -15,7 +15,12 @@
 // the kind of bug that is only discovered by an operator.
 
 import type { Setting } from "@minigames/api-client";
-import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import {
+  STORE_BANNER_KEY,
+  STORE_LOGO_KEY,
+  STORE_NAME_KEY,
+  STORE_TAGLINE_KEY,
+} from "@minigames/api-client";
 import {
   COLOR_SETTING_KEYS,
   isHexColor,
@@ -28,10 +33,33 @@ import { settingValue } from "./map";
 export const BRANDING_COLOR_NAMES = Object.keys(COLOR_SETTING_KEYS) as ColorName[];
 
 /** The branding form's fields. "" means unset for every one of them. */
-export type BrandingDraft = { name: string; tagline: string; logoUrl: string } & Record<
-  ColorName,
-  string
->;
+export type BrandingDraft = {
+  name: string;
+  tagline: string;
+  logoUrl: string;
+  bannerUrl: string;
+} & Record<ColorName, string>;
+
+/** The text fields, paired with the setting each one is stored in. */
+type TextField = { field: "name" | "tagline" | "logoUrl" | "bannerUrl"; key: string };
+
+/**
+ * The string-valued half of the form, as data.
+ *
+ * A table rather than four near-identical `if (draft.x !== saved.x)` blocks:
+ * they differ only in which key they write, and the fourth one — the banner —
+ * is what made copying the third indefensible. The order is the order a save
+ * performs the writes in, which the tests read against.
+ */
+const TEXT_FIELDS: TextField[] = [
+  { field: "name", key: STORE_NAME_KEY },
+  { field: "tagline", key: STORE_TAGLINE_KEY },
+  // A cleared image stores "" rather than deleting the row: unlike a colour,
+  // these settings are seeded-shaped — the client reads "" as "no image", so
+  // there is no default to fall back to and nothing to restore.
+  { field: "logoUrl", key: STORE_LOGO_KEY },
+  { field: "bannerUrl", key: STORE_BANNER_KEY },
+];
 
 /** One write a save must perform. `value` of "" with kind "color" is a delete. */
 export interface BrandingChange {
@@ -45,9 +73,9 @@ export interface BrandingChange {
 /** The saved branding, read out of the admin's settings rows. */
 export function readBranding(settings: Setting[] | null | undefined): BrandingDraft {
   return {
-    name: settingValue(settings, STORE_NAME_KEY),
-    tagline: settingValue(settings, STORE_TAGLINE_KEY),
-    logoUrl: settingValue(settings, STORE_LOGO_KEY),
+    ...(Object.fromEntries(
+      TEXT_FIELDS.map(({ field, key }) => [field, settingValue(settings, key)]),
+    ) as Pick<BrandingDraft, TextField["field"]>),
     ...(Object.fromEntries(
       BRANDING_COLOR_NAMES.map((n) => [n, settingValue(settings, COLOR_SETTING_KEYS[n])]),
     ) as Record<ColorName, string>),
@@ -65,27 +93,10 @@ export function readBranding(settings: Setting[] | null | undefined): BrandingDr
 export function brandingChanges(draft: BrandingDraft, saved: BrandingDraft): BrandingChange[] {
   const out: BrandingChange[] = [];
 
-  if (draft.name !== saved.name) {
-    out.push({ key: STORE_NAME_KEY, value: draft.name.trim(), previous: saved.name, kind: "string" });
-  }
-  if (draft.tagline !== saved.tagline) {
-    out.push({
-      key: STORE_TAGLINE_KEY,
-      value: draft.tagline.trim(),
-      previous: saved.tagline,
-      kind: "string",
-    });
-  }
-  if (draft.logoUrl !== saved.logoUrl) {
-    // A cleared logo stores "" rather than deleting the row: unlike a colour,
-    // this setting IS seeded-shaped — the client reads "" as "no logo, use the
-    // wordmark", so there is no default to fall back to and nothing to restore.
-    out.push({
-      key: STORE_LOGO_KEY,
-      value: draft.logoUrl.trim(),
-      previous: saved.logoUrl,
-      kind: "string",
-    });
+  for (const { field, key } of TEXT_FIELDS) {
+    if (draft[field] !== saved[field]) {
+      out.push({ key, value: draft[field].trim(), previous: saved[field], kind: "string" });
+    }
   }
   for (const name of BRANDING_COLOR_NAMES) {
     if (draft[name] !== saved[name]) {

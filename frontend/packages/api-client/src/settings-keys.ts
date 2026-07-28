@@ -16,3 +16,13 @@ export const STORE_TAGLINE_KEY = "store_tagline";
 
 /** Absolute URL of the store's logo, shown instead of the wordmark. Public. */
 export const STORE_LOGO_KEY = "store_logo_url";
+
+/**
+ * Absolute URL of the store's cover image, spanning the top of the landing
+ * screen. Public.
+ *
+ * Separate from the logo rather than a second render of it: the mark is square
+ * and identifies the shop, the cover is wide and sets its tone, and an image
+ * cropped to serve both is wrong in one of the two places.
+ */
+export const STORE_BANNER_KEY = "store_banner_url";

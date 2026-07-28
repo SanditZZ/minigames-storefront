@@ -17,6 +17,7 @@ export { RingTimer } from "./RingTimer";
 export { ScoreRow, SelectCard } from "./SelectCard";
 export { SegmentedControl } from "./SegmentedControl";
 export { Badge, ProgressBar, Stat } from "./Stat";
+export { StoreBanner } from "./StoreBanner";
 export { StoreMark } from "./StoreMark";
 export { TextField } from "./TextField";
 export { AppearIn, Confetti, Halo, HaloBox, TapMarks } from "./Vfx";

@@ -13,6 +13,16 @@ export const ui = {
   /** The claim code on a winning result, in its grouped display form. */
   claimCode: (page: Page) => page.getByText(CLAIM_CODE_PATTERN),
   copyCode: (page: Page) => page.getByRole("button", { name: /Copy the claim code/i }),
+  /**
+   * The store's cover banner, addressed by the URL the settings told it to show.
+   *
+   * By `src` rather than by role or name, and that is the assertion rather than
+   * a shortcut: the banner is decoration (`alt=""`, see StoreBanner) precisely
+   * because the store is already named in the header below it, so it has no
+   * accessible name to look it up by — and the URL is the thing that had to
+   * survive the trip from the admin's form to this element anyway.
+   */
+  banner: (page: Page, url: string) => page.locator(`img[src="${url}"]`),
   quit: (page: Page) => page.getByRole("button", { name: "Quit" }),
   confirmQuit: (page: Page) => page.getByRole("button", { name: "Confirm quitting this round" }),
   /** Reaction Timer's pre-flip state. */

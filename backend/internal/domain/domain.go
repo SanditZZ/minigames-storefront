@@ -213,6 +213,14 @@ const (
 	// because an admin may equally paste one from their own CDN — the upload
 	// endpoint is a convenience that produces such a URL, not the only source.
 	SettingStoreLogoURL = "store_logo_url"
+	// SettingStoreBannerURL is an absolute URL to the store's cover image,
+	// spanning the top of the landing screen the way a social profile's cover
+	// does. It is a SECOND image rather than a second use of the logo because
+	// the two have different jobs and different shapes: the logo is a square
+	// mark identifying the shop, the banner is wide photography setting its
+	// tone. One image cannot be cropped to both without being wrong in one
+	// place. Unset means the screen renders without one — never a placeholder.
+	SettingStoreBannerURL = "store_banner_url"
 
 	// The five brand colours, overriding the compiled-in design tokens. They
 	// are public for the same reason the name is: the player's app renders

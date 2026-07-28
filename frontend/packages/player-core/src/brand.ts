@@ -19,10 +19,15 @@
 // spelled two ways is a bug that typechecks. `settings.IsPublic` on the Go side
 // is what decides they may be read without a token.
 
-import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import {
+  STORE_BANNER_KEY,
+  STORE_LOGO_KEY,
+  STORE_NAME_KEY,
+  STORE_TAGLINE_KEY,
+} from "@minigames/api-client";
 import type { Translator } from "./i18n";
 
-export { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY };
+export { STORE_BANNER_KEY, STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY };
 
 /** The player-facing identity of the store, resolved and ready to render. */
 export interface StoreIdentity {
@@ -30,6 +35,14 @@ export interface StoreIdentity {
   tagline: string;
   /** Absolute URL of the store's logo, or "" when there is none. */
   logoUrl: string;
+  /**
+   * Absolute URL of the store's cover image, or "" when there is none.
+   *
+   * Two images rather than one because they answer different questions — the
+   * logo is WHO the shop is and the banner is what it FEELS like — and because
+   * a square mark and a 3:1 cover cannot be the same file cropped twice.
+   */
+  bannerUrl: string;
 }
 
 /**
@@ -48,6 +61,10 @@ export function defaultIdentity(t: Translator): StoreIdentity {
     // No default logo, deliberately: the wordmark IS the fallback, and shipping
     // a stock logo would put someone else's mark on an unconfigured storefront.
     logoUrl: "",
+    // No default banner, and the empty string means render NOTHING rather than
+    // a grey placeholder box. An unconfigured storefront should look clean, not
+    // unfinished — the same rule the missing logo already follows.
+    bannerUrl: "",
   };
 }
 
@@ -73,6 +90,7 @@ export function storeIdentity(
     name: pick(settings?.[STORE_NAME_KEY], fallback.name),
     tagline: pick(settings?.[STORE_TAGLINE_KEY], fallback.tagline),
     logoUrl: pick(settings?.[STORE_LOGO_KEY], fallback.logoUrl),
+    bannerUrl: pick(settings?.[STORE_BANNER_KEY], fallback.bannerUrl),
   };
 }
 

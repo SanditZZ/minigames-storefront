@@ -4,9 +4,9 @@
 // here to decide what they mean.
 //
 // Its whole reason to exist is the allowlist below. Settings are admin data by
-// default, and the player app needs exactly two of them; deciding which in a
-// handler would mean the decision lives next to the code most likely to be
-// copy-pasted for the next endpoint.
+// default, and the player app needs only the handful that describe the
+// storefront's identity; deciding which in a handler would mean the decision
+// lives next to the code most likely to be copy-pasted for the next endpoint.
 package settings
 
 import "github.com/sanditzz/minigames-storefront/backend/internal/domain"
@@ -24,9 +24,10 @@ import "github.com/sanditzz/minigames-storefront/backend/internal/domain"
 // server behaviour a player has no use for; claim_ttl_hours is venue policy
 // already carried on the claim itself as an absolute expiresAt.
 var publicKeys = map[string]bool{
-	domain.SettingStoreName:    true,
-	domain.SettingStoreTagline: true,
-	domain.SettingStoreLogoURL: true,
+	domain.SettingStoreName:      true,
+	domain.SettingStoreTagline:   true,
+	domain.SettingStoreLogoURL:   true,
+	domain.SettingStoreBannerURL: true,
 	// The palette. Public because the player's browser is what applies it —
 	// there is no version of "the store picks its colours" that keeps them
 	// secret, and a hex triple is not information about the store's defences.

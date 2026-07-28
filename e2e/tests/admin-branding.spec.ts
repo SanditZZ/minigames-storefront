@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { admin, openAdmin, rootVar } from "../helpers/admin";
+import { ui } from "../helpers/round";
+import { WEB_URL } from "../stack";
 
 /**
  * Store branding, from the operator's form to the player's screen.
@@ -106,6 +108,40 @@ test.describe("store branding", () => {
 
     await page.goto("/");
     await expect.poll(() => rootVar(page, "--color-brand")).toBe(token);
+  });
+
+  test("a cover banner reaches the landing screen, and clearing it takes it away", async ({
+    page,
+  }) => {
+    // An asset the throwaway stack actually serves, from the player's own
+    // origin, so the <img> genuinely loads. A made-up URL would pass the
+    // visibility check anyway — the banner's container carries the 3:1 aspect
+    // box, so a broken image still has size — which is the kind of green that
+    // means nothing.
+    const cover = `${WEB_URL}/favicon.svg`;
+
+    await page.goto("/");
+    await expect(ui.banner(page, cover)).toBeHidden();
+
+    await openAdmin(page, "/settings");
+    await admin.storeBanner(page).fill(cover);
+    await admin.saveBranding(page).click();
+    await expect(admin.saveBranding(page)).toBeDisabled();
+
+    await page.goto("/");
+    await expect(ui.banner(page, cover)).toBeVisible();
+
+    // Clearing is the half worth asserting as much as setting it. An unset
+    // banner has to render NOTHING rather than a placeholder — a storefront
+    // that has not configured one should look finished — and "" reaching an
+    // <img src> instead of being read as absent is the way that breaks.
+    await openAdmin(page, "/settings");
+    await admin.storeBanner(page).fill("");
+    await admin.saveBranding(page).click();
+    await expect(admin.saveBranding(page)).toBeDisabled();
+
+    await page.goto("/");
+    await expect(ui.banner(page, cover)).toBeHidden();
   });
 
   test("a colour the parser refuses is never saved", async ({ page }) => {

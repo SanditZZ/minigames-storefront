@@ -4,10 +4,21 @@
  *
  * Extracted from PageHeader the moment a second screen wanted it. The rule it
  * carries is the reason it is one component rather than two call sites: a logo
- * is height-capped and width-free, because it can be any aspect ratio and
- * bounding the height is what stops a wide wordmark and a square badge pushing
- * the content below them down the screen by different amounts. Get that wrong in
- * one of two copies and two screens disagree about how tall a store is.
+ * renders SQUARE — a fixed box, cropped to fill — because a store's upload can
+ * be any aspect ratio, and a free one pushes the content below it down the
+ * screen by a different amount for every store. Get that wrong in one of two
+ * copies and two screens disagree about how tall a store is.
+ *
+ * Square rather than height-capped-and-width-free, which is what this was: both
+ * a wide wordmark and a square badge were accepted, and the mark had to be the
+ * store's whole visual identity because it was the only image on the screen. It
+ * is not any more — a wide image now has StoreBanner, which is the shape a wide
+ * image was reaching for.
+ *
+ * `object-cover`, not `object-contain`: the box is always filled rather than
+ * letterboxing a wide mark into a stripe floating in empty space. The cost is
+ * that a wide upload is cropped to its centre, which is why the admin's logo
+ * field exports 1:1 — the operator frames it, so what they see is what renders.
  *
  * `name` is required even when a logo is present — it becomes the image's alt
  * text, so the store is named for a screen reader and for anyone whose logo
@@ -33,7 +44,7 @@ export function StoreMark({
       <img
         src={logoUrl}
         alt={name}
-        className={`mx-auto w-auto max-w-full object-contain ${size === "lg" ? "max-h-12" : "max-h-8"}`}
+        className={`mx-auto aspect-square rounded-2xl object-cover ${size === "lg" ? "size-16" : "size-10"}`}
       />
     );
   }

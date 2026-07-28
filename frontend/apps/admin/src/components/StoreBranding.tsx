@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import type { ApiClient, Setting } from "@minigames/api-client";
-import { STORE_LOGO_KEY, STORE_NAME_KEY, STORE_TAGLINE_KEY } from "@minigames/api-client";
+import {
+  STORE_BANNER_KEY,
+  STORE_LOGO_KEY,
+  STORE_NAME_KEY,
+  STORE_TAGLINE_KEY,
+} from "@minigames/api-client";
 import {
   BRANDING_COLOR_NAMES,
   brandingChanges,
@@ -122,12 +127,27 @@ export function StoreBranding({
           label="Logo"
           value={draft.logoUrl}
           onChange={set("logoUrl")}
-          // Wide and PNG: the player renders the logo height-capped at any
-          // width, and a logo is the one image here that usually needs a
-          // transparent background — JPEG would give it a white box.
-          output={{ width: 600, height: 200 }}
+          // Square and PNG. Square because the player renders the mark in a
+          // fixed 1:1 box (StoreMark) — exporting anything else would hand
+          // `object-cover` a crop the operator never saw, which is exactly what
+          // this cropper exists to prevent. PNG because a logo is the one image
+          // here that usually needs a transparent background; JPEG would give it
+          // a white box.
+          output={{ width: 400, height: 400 }}
           format="image/png"
-          hint="Replaces the store name above the headline. Wide marks work best; leave empty to show the name as text."
+          hint="A square mark shown above the headline. Replaces the store name; leave empty to show the name as text."
+        />
+
+        <ImageField
+          api={api}
+          label="Cover banner"
+          value={draft.bannerUrl}
+          onChange={set("bannerUrl")}
+          // 3:1 and JPEG: this is photography rather than a mark, so it is the
+          // opposite call to the logo on both counts — nothing is transparent
+          // and the file is large enough that PNG would waste the upload cap.
+          output={{ width: 1200, height: 400 }}
+          hint="A wide image across the top of the landing screen, like a profile cover. Leave empty for no banner — the screen looks right without one."
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -198,6 +218,8 @@ const DESCRIPTIONS: Record<string, string> = {
   [STORE_NAME_KEY]: "Store name shown to players above the headline. Public.",
   [STORE_TAGLINE_KEY]: "Short line under the headline on the landing screen. Public.",
   [STORE_LOGO_KEY]: "Absolute URL of the store logo, shown instead of the name. Public.",
+  [STORE_BANNER_KEY]:
+    "Absolute URL of the store cover image, spanning the top of the landing screen. Public.",
   ...Object.fromEntries(
     BRANDING_COLOR_NAMES.map((n) => [
       COLOR_SETTING_KEYS[n],

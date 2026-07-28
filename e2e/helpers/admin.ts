@@ -55,6 +55,16 @@ export const admin = {
   // hint reads "Replaces the store name above the headline", so a loose match
   // resolves to two controls.
   storeName: (page: Page) => page.getByLabel("Store name", { exact: true }),
+  /**
+   * The cover banner's URL box.
+   *
+   * Loose rather than `exact`, for the mirror image of the reason above: an
+   * ImageField carries a hint inside its `<label>`, so the label's textContent
+   * is the caption AND the hint and an exact match finds nothing. "Cover
+   * banner" appears in one field, which is what keeps the loose match
+   * unambiguous.
+   */
+  storeBanner: (page: Page) => page.getByLabel("Cover banner"),
   /** The hex box for one palette colour, by the colour's own name ("Coral"). */
   colorHex: (page: Page, colour: string) => page.getByLabel(`${colour} hex value`, { exact: true }),
   saveBranding: (page: Page) => page.getByRole("button", { name: /Save branding/ }),

@@ -5,12 +5,31 @@ import type { ReactNode } from "react";
  * cream→apricot gradient lives here so every screen and game share one canvas.
  * Safe-area padding keeps content clear of notches and home indicators on the
  * phones this runs on in-store.
+ *
+ * `banner` is the store's cover image (StoreBanner), and it is a slot here
+ * rather than markup inside a screen because it has to escape the padded column
+ * — a cover that stops short of the edges is a card, not a cover. It sits
+ * OUTSIDE the padding and above everything, so the image reaches the top of the
+ * viewport and runs under a notch the way a cover photo should.
+ *
+ * When a banner is present the column drops its top safe-area padding: the
+ * banner has already cleared the notch, and keeping it would leave a band of
+ * dead gradient under an image that fades into that same colour. Passing null —
+ * which is what an unset banner resolves to — restores it. The caller decides,
+ * because only the caller knows whether the store actually has one.
  */
-export function Screen({ children }: { children: ReactNode }) {
+export function Screen({ banner, children }: { banner?: ReactNode; children: ReactNode }) {
   return (
     <div className="min-h-full bg-gradient-to-b from-brand-4 to-brand-3">
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
-        {children}
+      <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+        {banner}
+        <div
+          className={`flex flex-1 flex-col gap-6 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${
+            banner ? "pt-4" : "pt-[max(1.25rem,env(safe-area-inset-top))]"
+          }`}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

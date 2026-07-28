@@ -9,10 +9,12 @@
 // A context rather than props, and the reason is the one the roadmap kept
 // filing: the identity is a property of the APP, not of the landing screen.
 // `usePublicSettings` used to be called in App.tsx and its answer passed to
-// HomeScreen alone, so every later feature that wanted the store's name on a
-// second screen — the shareable score card, a cover banner, the result screen's
-// own header — had to either re-thread the prop through screens that do not use
-// it or refetch. Threading state through components that only forward it is how
+// HomeScreen alone, so every later feature that wanted the store's identity
+// somewhere else — the result screen's own header, the cover banner (which is
+// not rendered by a screen at all: it lives in the layout, outside the padded
+// column), the shareable score card still to come — had to either re-thread the
+// prop through screens that do not use it or refetch. Threading state through
+// components that only forward it is how
 // a small change becomes a tangled one; the language support next door already
 // settled the same argument the same way (see LocaleProvider).
 //

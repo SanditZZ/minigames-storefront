@@ -19,6 +19,7 @@ func TestOnlyIdentityKeysArePublic(t *testing.T) {
 		domain.SettingStoreName,
 		domain.SettingStoreTagline,
 		domain.SettingStoreLogoURL,
+		domain.SettingStoreBannerURL,
 		domain.SettingColorBrand,
 		domain.SettingColorBrand2,
 		domain.SettingColorBrand3,

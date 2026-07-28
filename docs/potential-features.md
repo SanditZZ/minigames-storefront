@@ -199,8 +199,9 @@ with their hands currently cannot win a prize at all.
   engagement, funnel from purchase → play → claim. The last step is the only one
   instrumented: `claims` records issued vs redeemed vs expired, so "how many
   prizes did we actually hand over?" is a query. Everything before it is a guess.
-- **Nothing ever reclaims an orphaned upload.** Replacing an award's image or the
-  store logo overwrites the URL and leaves the previous file on disk forever;
+- **Nothing ever reclaims an orphaned upload.** Replacing an award's image, the
+  store logo or its cover banner overwrites the URL and leaves the previous file
+  on disk forever;
   `DELETE /api/v1/admin/uploads/{name}` exists and no UI calls it. Deleting on
   replace would need to know the old URL was ours *and* that nothing else
   references it, which is reference counting — the honest fix is a sweep that
@@ -225,7 +226,11 @@ with their hands currently cannot win a prize at all.
   asserting on canvas pixels needs either a pinned rendering environment or a
   readback of the exported blob's dimensions. The latter is cheap and worth
   doing: it would catch an export that does not match the preview, which is the
-  bug class the geometry was extracted to prevent.
+  bug class the geometry was extracted to prevent. It is worth more than it was,
+  because the aspect ratio is no longer effectively constant: the three callers
+  of `ImageField` ask for 4:3, 1:1 and 3:1. `frameFor` is unit-tested against
+  all three — the CANVAS is what still is not, and a 3:1 preview leaves the most
+  room for a draw call to disagree with the export.
 - **The contrast warning is advisory, and nothing measures the store that
   ignores it.** `lowContrastPairs` (`packages/tokens/src/contrast.ts`) flags an
   illegible palette in `StoreBranding.tsx` beside a Save that stays enabled — on
@@ -242,8 +247,9 @@ with their hands currently cannot win a prize at all.
   schedule and on one more screen: `StoreMark` on the result screen renders
   `defaultIdentity`'s "Fun Store" until the settings land, and a result URL
   opened cold by someone who has never visited the storefront is exactly the
-  case with no warm cache to hide it. One fix covers both — they come from one
-  request. Options,
+  case with no warm cache to hide it. The cover banner makes a third, and the
+  only one that moves layout rather than repainting it — see the entry above.
+  One fix covers all three — they come from one request. Options,
   cheapest first: cache the last-known palette in `localStorage` and apply it
   synchronously before the fetch resolves — `claimDocumentLang` in
   `apps/player/src/i18n/` is now the worked example of that shape, a pure
@@ -252,34 +258,30 @@ with their hands currently cannot win a prize at all.
   deploy time, which reintroduces the drift the read-time override was chosen to
   avoid. It bites on every cold load, but is invisible on the kiosk phones that
   never reload — which is why it is filed rather than fixed.
-- **A square logo and a full-width cover banner — two images, two shapes, two
-  jobs.** The store has one image today (`store_logo_url`, rendered by
-  `PageHeader` as `max-h-12 w-auto object-contain`), and it has to be both the
-  mark and the whole visual identity of the header. That is one image doing two
-  jobs badly: a wide wordmark and a square badge push the headline down by
-  different amounts, and neither fills the top of the screen the way a venue's
-  own photography would.
-  - **Square + rounded for the mark.** Constrain `store_logo_url` to a square
-    render (`aspect-square object-cover rounded-2xl`) so every store's header
-    is the same height whatever they upload. The cropper already exists and is
-    already pure — `packages/image-core` computes cover scale, pan clamp and the
-    export map — so this is a fixed 1:1 aspect passed into the existing
-    crop-and-zoom flow in the admin, not new geometry.
-  - **A separate `store_banner_url` for the cover.** A wide image spanning the
-    full app width above the header, in the shape people already understand from
-    a social profile cover (roughly 3:1). New public setting alongside
-    `STORE_LOGO_KEY` in `packages/api-client/src/settings-keys.ts`, a second
-    upload slot in `StoreBranding.tsx`, and a new `ui/` primitive beside
-    `StoreMark` rather than markup inside `GamePicker` — reaching it from a
-    second screen costs nothing now that the identity is a context
-    (`state/StoreProvider.tsx`), but a banner drawn inline in the picker would
-    have to be extracted again the first time the result screen wanted one.
-  - **Two constraints worth deciding before building.** The banner sits at the
-    very top, so it either replaces or sits above the `from-brand-4 to-brand-3`
-    gradient that every screen shares — decide which, because "both" is how a
-    header ends up with two backgrounds fighting. And an unset banner must
-    render as *nothing*, not as a grey placeholder box: an unconfigured
-    storefront should look clean, the same rule the missing logo already follows.
+- **A logo uploaded before the square crop is cropped, and nothing says so.**
+  `StoreMark` now renders the mark in a fixed 1:1 box (`object-cover`) and the
+  admin's logo field exports 400×400, but a `store_logo_url` set when the field
+  exported 600×200 is still that wide file — so it renders as its own centre
+  third, with the ends of a wordmark cut off. There is no migration to write:
+  the stored value is a URL to an image whose pixels are wrong for the new box,
+  and only the operator can reframe it. The honest fixes are a note on the field
+  when the saved image is not square (needs the admin to load the image and read
+  `naturalWidth`, which is a browser thing rather than a calculation), or
+  accepting it — the wrongness is visible on the landing screen the first time
+  they look. It bites exactly once per store that had a logo before this
+  shipped, which today is however many of them uploaded a wide one.
+- **The banner arrives late and pushes the page down.** `StoreBanner` renders
+  nothing until `usePublicSettings` resolves, and it sits ABOVE the content
+  column — so on a cold load the landing screen paints, then grows a 3:1 band at
+  the top and shoves everything under it down by a third of the viewport width.
+  That is a worse version of the palette flash below (same request, same fix
+  options) because it moves layout rather than recolouring it, and a customer
+  reaching for a game card can have it move under their thumb. Reserving the
+  space unconditionally is not the fix — it would put an empty band on every
+  storefront that has no banner, which is the placeholder the feature
+  deliberately does not render. Caching the last-known settings, which is the
+  cheapest option in that entry, fixes this one properly: a returning kiosk
+  knows whether there is a banner before it paints.
 - **`NumberInput` has no browser test, and its stepper is the part that needs
   one.** `packages/admin-core/src/settings/number.ts` is unit-tested — parsing,
   clamping, snapping, the step bounds — but the component in
@@ -292,8 +294,8 @@ with their hands currently cannot win a prize at all.
   someone refactors the timer cleanup, which is the fiddliest part and the one
   with no coverage at all. **The branding form's contrast warning has the same
   gap for the same reason**: `lowContrastPairs` is unit-tested, but that the
-  banner appears as a colour is typed — and that Save stays ENABLED underneath
-  it — is wiring no pure test reaches, and "stays enabled" is the part a future
+  warning alert appears as a colour is typed — and that Save stays ENABLED
+  underneath it — is wiring no pure test reaches, and "stays enabled" is a
   tidy-up is most likely to reverse.
 - **The `NumberInput` suffix gutter is fixed, so a long unit clips.** The
   reserved room and the span's `max-w` are two constants in
