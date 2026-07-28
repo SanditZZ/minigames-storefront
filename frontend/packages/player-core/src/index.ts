@@ -24,3 +24,4 @@ export * from "./reveal/pacing";
 export * from "./reveal/tiers";
 export * from "./router/parse";
 export * from "./router/routes";
+export * from "./settings/cache";

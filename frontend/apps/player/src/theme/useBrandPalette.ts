@@ -16,7 +16,7 @@
 // ones change. Every browser this runs on in-store has it; nothing here can fix
 // the ones that do not.
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { PublicSettings } from "@minigames/api-client";
 import { paletteCssVars } from "@minigames/tokens";
 
@@ -28,6 +28,23 @@ import { paletteCssVars } from "@minigames/tokens";
  * the inline property gone, the cascade falls back to the `@theme` block in the
  * generated theme.css — the compiled-in token — with no need to know what it
  * was.
+ *
+ * ## A layout effect, and that is the half of the cache that makes it worth it
+ *
+ * `usePublicSettings` now starts at the browser's remembered copy, so the very
+ * first render already knows the store's colours. A passive `useEffect` runs
+ * AFTER the browser paints, so it would have painted that first frame in the
+ * built-in palette anyway and the cache would only have shortened the flash
+ * from a network round trip to one frame. A layout effect runs after the DOM is
+ * committed and before the paint, which removes it.
+ *
+ * This is deliberately NOT the shape `claimDocumentLang` uses — a pure decision
+ * applied from `main.tsx` before React mounts. `<html lang>` has to be settled
+ * there because `index.html` ships a wrong answer and no React state owns it;
+ * the palette is React state, and writing it from two places would break the
+ * one rule this module exists to keep. The properties have a single owner, so
+ * "clear an override and the token comes back" stays a cleanup rather than a
+ * second module's guess about what the first one wrote.
  */
 export function useBrandPalette(settings: PublicSettings | null): void {
   const vars = paletteCssVars(settings);
@@ -41,7 +58,7 @@ export function useBrandPalette(settings: PublicSettings | null): void {
   const latest = useRef(vars);
   latest.current = vars;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const applied = latest.current;
     if (applied.length === 0) return;
 

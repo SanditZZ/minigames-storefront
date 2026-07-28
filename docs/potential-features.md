@@ -239,25 +239,28 @@ with their hands currently cannot win a prize at all.
   downstream knows: the player app never re-checks what it was handed, and no
   admin view lists "stores currently below AA". Only worth building when there
   is more than one store.
-- **The palette arrives after the first paint, and so does the store's name.**
-  `usePublicSettings` fetches on mount, so a player sees the built-in tokens for
-  one request and then the store's colours — a visible flash on a cold load,
-  worst on the landing screen where the whole background is a
-  `from-brand-4 to-brand-3` gradient. The identity now flashes on the same
-  schedule and on one more screen: `StoreMark` on the result screen renders
-  `defaultIdentity`'s "Fun Store" until the settings land, and a result URL
-  opened cold by someone who has never visited the storefront is exactly the
-  case with no warm cache to hide it. The cover banner makes a third, and the
-  only one that moves layout rather than repainting it — see the entry above.
-  One fix covers all three — they come from one request. Options,
-  cheapest first: cache the last-known palette in `localStorage` and apply it
-  synchronously before the fetch resolves — `claimDocumentLang` in
-  `apps/player/src/i18n/` is now the worked example of that shape, a pure
-  decision applied from `main.tsx` on the same turn as `createRoot`; or have
-  `serve-prod.sh` bake the current palette into the bundle's `theme.css` at
-  deploy time, which reintroduces the drift the read-time override was chosen to
-  avoid. It bites on every cold load, but is invisible on the kiosk phones that
-  never reload — which is why it is filed rather than fixed.
+- **A browser that has never seen this storefront still pays for the settings
+  round trip.** The remembered copy (`apps/player/src/state/settingsCache.ts`)
+  fixes every visit after the first and cannot fix the first: with nothing in
+  storage, the player still paints the built-in palette and the fallback
+  wordmark, and the landing screen still grows a 3:1 banner that shoves the game
+  list down when the settings land. Closing that needs the answer to be IN the
+  document rather than behind a request — `serve-prod.sh` baking the current
+  settings into each app's `index.html` at deploy time, or a server-rendered
+  route — and both reintroduce the deploy-time/read-time drift the runtime
+  override was chosen to avoid. It bites a given device exactly once, which is
+  why the half that could be fixed without that trade was, and this half is
+  filed. Note the result screen is the worst case even now: a result URL opened
+  cold by someone who has never visited the storefront is precisely the visit
+  with nothing to remember.
+- **The admin repaints its own palette after the gate.**
+  `apps/admin/src/theme/useBrandPalette.ts` is still a passive effect fed by the
+  authed settings list (`App.tsx`), so an operator picking colours sees the
+  built-in palette until sign-in resolves. The player's fix does not transfer
+  wholesale — that copy is of the PUBLIC settings, and the admin's payload is
+  every setting there is — but the colour keys ARE public, so remembering only
+  those is the version worth building. Lower stakes than the player's: one
+  operator, on a device they use daily.
 - **A logo uploaded before the square crop is cropped, and nothing says so.**
   `StoreMark` now renders the mark in a fixed 1:1 box (`object-cover`) and the
   admin's logo field exports 400×400, but a `store_logo_url` set when the field
@@ -270,18 +273,6 @@ with their hands currently cannot win a prize at all.
   accepting it — the wrongness is visible on the landing screen the first time
   they look. It bites exactly once per store that had a logo before this
   shipped, which today is however many of them uploaded a wide one.
-- **The banner arrives late and pushes the page down.** `StoreBanner` renders
-  nothing until `usePublicSettings` resolves, and it sits ABOVE the content
-  column — so on a cold load the landing screen paints, then grows a 3:1 band at
-  the top and shoves everything under it down by a third of the viewport width.
-  That is a worse version of the palette flash below (same request, same fix
-  options) because it moves layout rather than recolouring it, and a customer
-  reaching for a game card can have it move under their thumb. Reserving the
-  space unconditionally is not the fix — it would put an empty band on every
-  storefront that has no banner, which is the placeholder the feature
-  deliberately does not render. Caching the last-known settings, which is the
-  cheapest option in that entry, fixes this one properly: a returning kiosk
-  knows whether there is a banner before it paints.
 - **`NumberInput` has no browser test, and its stepper is the part that needs
   one.** `packages/admin-core/src/settings/number.ts` is unit-tested — parsing,
   clamping, snapping, the step bounds — but the component in
@@ -491,7 +482,11 @@ soon each bites. The rules for *where* a string lives are in the repo-root
     thing to serve from an `ETag` or a short `Cache-Control: max-age`, and the
     one where the refresh button gives the argument its edge case: a cache the
     operator cannot bust from the player's own reload control would make the
-    button lie.
+    button lie. **What changed is the urgency, not the case.** The client now
+    remembers the last answer (`state/settingsCache.ts`), so the request is no
+    longer on the render path and its latency costs nobody a flash — it is back
+    to being ordinary traffic, and an `ETag` would now save bytes rather than a
+    repaint.
 - **Observability** — structured logging, request tracing, metrics (play latency,
   error rates), health/readiness probes.
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode

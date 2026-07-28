@@ -69,6 +69,49 @@ test.describe("store branding", () => {
     await expect(page.getByText("Fun Store")).toBeVisible();
   });
 
+  test("a returning player sees the store before the settings arrive", async ({ page }) => {
+    // The store's identity used to land one request after the first paint: the
+    // palette repainted, the wordmark changed from "Fun Store" to the shop's own
+    // name, and the cover banner APPEARED — shoving the game list down a third of
+    // the viewport under a thumb already reaching for it. The player now starts
+    // from the copy the last visit left in `localStorage`
+    // (`state/settingsCache.ts`, decoded by `player-core/src/settings/cache.ts`).
+    //
+    // A cold first frame is not a thing Playwright can assert — it is over before
+    // an assertion can run, and polling for it is a race. Cutting the endpoint
+    // off is the same claim from the other side: whatever the page renders with
+    // no settings request in flight can only have come from the remembered copy.
+    const renamed = "Cached Coffee";
+
+    await openAdmin(page, "/settings");
+    await admin.storeName(page).fill(renamed);
+    await admin.saveBranding(page).click();
+    await expect(admin.saveBranding(page)).toBeDisabled();
+
+    // The visit that fills the copy.
+    await page.goto("/");
+    await expect(page.getByText(renamed)).toBeVisible();
+
+    await page.route("**/settings/public", (route) => route.abort());
+    await page.reload();
+    await expect(page.getByText(renamed)).toBeVisible();
+    // And the fallback never got its turn, which is the part that distinguishes
+    // a cache from a slow fetch: a failed request must not erase a good copy.
+    await expect(page.getByText("Fun Store")).toBeHidden();
+
+    // The admin reads the same endpoint for its own palette, so the block has to
+    // come off before the restore navigates there.
+    await page.unroute("**/settings/public");
+
+    await openAdmin(page, "/settings");
+    await admin.storeName(page).fill("Fun Store");
+    await admin.saveBranding(page).click();
+    await expect(admin.saveBranding(page)).toBeDisabled();
+
+    await page.goto("/");
+    await expect(page.getByText("Fun Store")).toBeVisible();
+  });
+
   test("a chosen colour reaches both apps, and clearing it gives the token back", async ({ page }) => {
     await openAdmin(page, "/settings");
 
