@@ -1,8 +1,16 @@
 # Minigames Storefront
 
-A fullstack monorepo of short, fast mini-games (finish each in under a minute) that
-storefront customers play for a chance to win a reward after buying a physical product.
-Built to experiment with **customer retention and engagement**.
+A toolkit small businesses can run at the counter: a customer who just bought
+something scans a code or taps a link and plays a short, fun mini-game —
+finished in under a minute — for a chance to win something back. A discount on
+their next visit, a free item, a coupon, whatever the business wants to
+configure as the prize. It turns a purchase that would otherwise end at the
+till into a small moment of interaction, and gives a shop a lightweight way to
+build repeat visits and goodwill without standing up a full loyalty program.
+
+Built as an experiment in **customer retention and engagement** — a fullstack
+monorepo with a staff-facing admin (set up games, prizes, and stock) and a
+customer-facing player app (play, win, redeem).
 
 - **Backend** — Go, ACD-layered (data / calculations / actions). SQLite today, designed to
   swap to DynamoDB (or any store) without touching business logic.
