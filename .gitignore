@@ -25,6 +25,9 @@ dist/
 *.log
 .prod/
 
+# Local-only assistant notes (machine/account specifics, never for the repo)
+CLAUDE.local.md
+
 # Default APP_UPLOAD_DIR when the API is run without serve-prod.sh, which
 # points it at .prod/uploads instead.
 backend/uploads/
