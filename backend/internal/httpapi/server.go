@@ -15,11 +15,12 @@ import (
 
 // Server binds the app service to an HTTP router.
 type Server struct {
-	svc        *app.Service
-	cors       []string
-	adminToken string
-	blobs      blob.Store // nil disables the upload routes
-	handler    http.Handler
+	svc         *app.Service
+	cors        []string
+	adminToken  string
+	blobs       blob.Store // nil disables the upload routes
+	publicReads *ipRateLimiter
+	handler     http.Handler
 }
 
 // NewServer builds the router with all routes and middleware wired. adminToken
@@ -28,11 +29,20 @@ type Server struct {
 // blobs may be nil, which disables uploads rather than crashing — the API is
 // still fully usable with image URLs typed by hand, which is what it did before
 // object storage existed.
-func NewServer(svc *app.Service, corsOrigins []string, adminToken string, blobs blob.Store) *Server {
+//
+// rateLimitPerMinute and rateLimitBurst bound the unauthenticated public
+// reads per client IP — see ratelimit.go.
+func NewServer(svc *app.Service, corsOrigins []string, adminToken string, blobs blob.Store, rateLimitPerMinute, rateLimitBurst int) *Server {
 	if adminToken == "" {
 		log.Print("WARNING: admin API is unauthenticated (APP_ADMIN_TOKEN is empty)")
 	}
-	s := &Server{svc: svc, cors: corsOrigins, adminToken: adminToken, blobs: blobs}
+	s := &Server{
+		svc:         svc,
+		cors:        corsOrigins,
+		adminToken:  adminToken,
+		blobs:       blobs,
+		publicReads: newIPRateLimiter(rateLimitPerMinute, rateLimitBurst),
+	}
 	s.handler = chain(s.routes(),
 		recoverMiddleware,
 		logMiddleware,
@@ -78,7 +88,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/v1/games/{slug}/sessions", s.handleStartSession)
 	mux.HandleFunc("POST /api/v1/games/{slug}/scores", s.handleSubmitScore)
 	mux.HandleFunc("GET /api/v1/games/{slug}/scores", s.handleHighScores)
-	mux.HandleFunc("GET /api/v1/games/{slug}/scores/{id}", s.handleGetScore)
+	mux.HandleFunc("GET /api/v1/games/{slug}/scores/{id}", rateLimited(s.publicReads, s.handleGetScore))
 	mux.HandleFunc("GET /api/v1/games/{slug}/awards", s.handlePrizes)
 
 	// The whole catalog's prizes in one read, for the landing screen. Public for
@@ -86,12 +96,12 @@ func (s *Server) routes() http.Handler {
 	// outside /games/{slug} because it is not about one game. Never fold the
 	// per-game route into this by making {slug} optional: the two answer
 	// different questions and only one of them is on the first-paint path.
-	mux.HandleFunc("GET /api/v1/awards", s.handleAllPrizes)
+	mux.HandleFunc("GET /api/v1/awards", rateLimited(s.publicReads, s.handleAllPrizes))
 
 	// The storefront's identity (name, tagline) is player-facing, so it is the
 	// one settings read that is NOT behind requireAdmin. settings.Public is the
 	// allowlist that keeps it to that — never widen this route to the full list.
-	mux.HandleFunc("GET /api/v1/settings/public", s.handlePublicSettings)
+	mux.HandleFunc("GET /api/v1/settings/public", rateLimited(s.publicReads, s.handlePublicSettings))
 
 	// --- Admin CRUD (guarded by the shared-secret header) ---
 	mux.HandleFunc("GET /api/v1/admin/awards", s.requireAdmin(s.handleListAwards))

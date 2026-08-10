@@ -24,17 +24,24 @@ type Config struct {
 	// the player's own device. See scripts/serve-prod.sh, which passes the
 	// same value it bakes into the bundles.
 	PublicURL string
+	// RateLimitPerMinute and RateLimitBurst bound the unauthenticated public
+	// reads (awards, public settings, score lookup) per client IP. See
+	// internal/httpapi/ratelimit.go for why these three and not every route.
+	RateLimitPerMinute int
+	RateLimitBurst     int
 }
 
 // Load reads config from env with sensible local-dev defaults.
 func Load() Config {
 	return Config{
-		Addr:        env("APP_ADDR", ":8080"),
-		DBPath:      env("APP_DB_PATH", "minigames.db"),
-		CORSOrigins: env("APP_CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
-		AdminToken:  env("APP_ADMIN_TOKEN", "admin"),
-		UploadDir:   env("APP_UPLOAD_DIR", "uploads"),
-		PublicURL:   env("APP_PUBLIC_URL", "http://localhost:8080"),
+		Addr:               env("APP_ADDR", ":8080"),
+		DBPath:             env("APP_DB_PATH", "minigames.db"),
+		CORSOrigins:        env("APP_CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"),
+		AdminToken:         env("APP_ADMIN_TOKEN", "admin"),
+		UploadDir:          env("APP_UPLOAD_DIR", "uploads"),
+		PublicURL:          env("APP_PUBLIC_URL", "http://localhost:8080"),
+		RateLimitPerMinute: EnvInt("APP_RATE_LIMIT_PER_MINUTE", 60),
+		RateLimitBurst:     EnvInt("APP_RATE_LIMIT_BURST", 10),
 	}
 }
 

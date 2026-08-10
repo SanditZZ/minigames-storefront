@@ -82,6 +82,7 @@ func TestEnglishIsComplete(t *testing.T) {
 		MsgNotFound, MsgGameNotFound, MsgGameUnavailable, MsgInvalidSession,
 		MsgSessionExpired, MsgSessionConsumed, MsgScoreRejected, MsgClaimNotFound,
 		MsgConflict, MsgInternalError, MsgInvalidBody, MsgTokenRequired,
+		MsgTooManyRequests,
 	} {
 		if messages[English][id] == "" {
 			t.Errorf("no English text for %q", id)

@@ -66,7 +66,7 @@ func run() error {
 		log.Printf("uploads: %s served at %s%s", cfg.UploadDir, cfg.PublicURL, blob.URLPrefix)
 	}
 
-	server := httpapi.NewServer(svc, strings.Split(cfg.CORSOrigins, ","), cfg.AdminToken, blobs)
+	server := httpapi.NewServer(svc, strings.Split(cfg.CORSOrigins, ","), cfg.AdminToken, blobs, cfg.RateLimitPerMinute, cfg.RateLimitBurst)
 	httpServer := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           server.Handler(),

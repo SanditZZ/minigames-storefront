@@ -25,6 +25,7 @@ const (
 	MsgInternalError   MessageID = "error.internal"
 	MsgInvalidBody     MessageID = "error.invalidBody"
 	MsgTokenRequired   MessageID = "error.tokenRequired"
+	MsgTooManyRequests MessageID = "error.tooManyRequests"
 )
 
 // messages is the catalog, keyed locale → id → text.
@@ -47,6 +48,7 @@ var messages = map[Locale]map[MessageID]string{
 		MsgInternalError:   "internal error",
 		MsgInvalidBody:     "invalid request body",
 		MsgTokenRequired:   "token is required",
+		MsgTooManyRequests: "too many requests, please slow down",
 	},
 	Thai: {
 		MsgNotFound:        "ไม่พบข้อมูล",
@@ -61,6 +63,7 @@ var messages = map[Locale]map[MessageID]string{
 		MsgInternalError:   "เกิดข้อผิดพลาดภายในระบบ",
 		MsgInvalidBody:     "ข้อมูลที่ส่งมาไม่ถูกต้อง",
 		MsgTokenRequired:   "ต้องระบุโทเคนของรอบการเล่น",
+		MsgTooManyRequests: "มีการเรียกใช้งานถี่เกินไป กรุณาลองใหม่อีกครั้ง",
 	},
 }
 

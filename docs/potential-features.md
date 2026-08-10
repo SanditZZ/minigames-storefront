@@ -516,27 +516,27 @@ Concrete, near-term items, roughly ordered by how soon they will bite.
   Twitter meta tags (title = "Po scored 37 taps at Fun Store", image = the
   generated score card). This is the piece that makes the share feature above
   actually spread.
-- **Rate-limit the public reads.** `GET /games/{slug}/scores/{id}`,
-  `GET /awards` and `GET /settings/public` are all unauthenticated, and the
-  awards batch is hit on every landing-page load — it is the whole catalog's
-  prize ladders in one response, so it is now the cheapest public request to
-  make and the most expensive one to serve. Score ids are nanoid(11) — 66 bits, down from
-  UUIDv4's 122 — so guessing one is still impractical, but the margin that made
-  "enumeration is impossible" a throwaway line is smaller, and a per-IP limit
-  belongs here before real prizes are on the line.
-  **Claim codes changed what a score id is worth.** `ScoreResult` returns the
-  claim, and `GET /games/{slug}/scores/{id}` is unauthenticated — the full code
-  comes back with no admin token. That is not a bug to patch, it is the design: a
-  player has no account, so the unguessable result URL is the only way to show
-  them their own code. But it makes the score id a **bearer capability for a
-  prize** rather than a name for a public leaderboard row, and nothing in the app
+- **Claim codes changed what a score id is worth, and only the cheap half of the
+  fix has landed.** `ScoreResult` returns the claim, and
+  `GET /games/{slug}/scores/{id}` is unauthenticated — the full code comes back
+  with no admin token. That is not a bug to patch, it is the design: a player
+  has no account, so the unguessable result URL is the only way to show them
+  their own code. But it makes the score id a **bearer capability for a prize**
+  rather than a name for a public leaderboard row, and nothing else in the app
   treats it that way. The consequences are all in where URLs leak rather than in
   guessing: shared links, browser history on a borrowed phone, screenshots, a
-  `Referer` header to any third party the result page ever loads. Worth deciding
-  deliberately before prizes have value — the options are rate-limiting (cheap,
-  partial), omitting the code unless the request proves it owns the round
-  (correct, needs a token minted at submit time), or accepting it explicitly and
-  writing down that a result URL is as sensitive as the prize.
+  `Referer` header to any third party the result page ever loads.
+  **Per-IP rate limiting on the three unauthenticated public reads is built** —
+  `GET /games/{slug}/scores/{id}`, `GET /awards` and `GET /settings/public` share
+  one 60-req/min-per-IP token bucket per client (`internal/httpapi/ratelimit.go`,
+  wrapped at route registration; retune with `APP_RATE_LIMIT_PER_MINUTE` /
+  `APP_RATE_LIMIT_BURST`). That was always the cheap, partial option — score ids
+  are nanoid(11), 66 bits versus UUIDv4's 122, so a bucket sized for legitimate
+  traffic slows enumeration without claiming to stop it. The real decision is
+  still open: omit the code unless the request proves it owns the round
+  (correct, needs a token minted at submit time), or accept the current design
+  explicitly and write down that a result URL is as sensitive as the prize it
+  names.
 - **A deleted award still rewrites a LOSING round's history.** `claims.award_name`
   is a snapshot, so a round that won something keeps saying what it won even
   after the prize is deleted. A losing round has nothing to snapshot, and

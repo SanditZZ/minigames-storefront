@@ -74,6 +74,15 @@ export default defineConfig({
         APP_ADMIN_TOKEN: ADMIN_TOKEN,
         APP_UPLOAD_DIR: UPLOAD_DIR,
         APP_PUBLIC_URL: API_URL,
+        // The public-read rate limiter buckets by client IP, and every spec in
+        // this suite shares one — 127.0.0.1 — the same way a real venue's
+        // devices can share one NAT'd address. 49 sequential specs reloading
+        // the catalog/settings on every landing-page visit blow past a
+        // limit sized for one legitimate device well within a run, so the
+        // suite raises it rather than fighting it; the 429 path itself is
+        // covered by internal/httpapi/ratelimit_test.go, not by the browser.
+        APP_RATE_LIMIT_PER_MINUTE: "6000",
+        APP_RATE_LIMIT_BURST: "200",
       },
     },
     {
