@@ -13,6 +13,29 @@ it does, read the comment on the symbol, not this file.
 Every entry names the file it is a claim about, so it can be re-checked rather
 than re-argued.
 
+## Queued as beginner-friendly first issues
+
+Five items picked from the sections below as the first batch of GitHub issues
+for outside contributors — one small on-ramp, one test-only, three real
+features of increasing scope. Sizes (S/M/L) are relative to this repo, not
+absolute. This is a queue, not a new claim about the code: each item's full
+rationale and file citation stays in its own entry below. **Delete this
+section once the issues are filed** — a queue that outlives what it was
+tracking is exactly the kind of stale entry this doc's sweep rules exist to
+catch.
+
+- **[S] `NumberInput` suffix clipping** — see the entry under "Admin &
+  operations" (`apps/admin/src/ui/Controls.tsx`).
+- **[M] Extend the 320px overflow check to the result screen and the admin
+  app** — see the entry under "What the bilingual player app does not cover"
+  (`e2e/helpers/layout.ts`, `horizontalOverflow`).
+- **[L] Add "Odd One Out"** — see the entry under "More mini-games (the core
+  lever)".
+- **[M–L] Idle reset for kiosk mode** — see the entry under "Player
+  experience".
+- **[M–L] Orphaned-upload sweep script** — see the entry under "Admin &
+  operations" (`DELETE /api/v1/admin/uploads/{name}`, `blob.MaxUploadBytes`).
+
 ## More mini-games (the core lever)
 
 The registry pattern makes these cheap — one backend `Definition`
