@@ -484,6 +484,17 @@ soon each bites. The rules for *where* a string lives are in the repo-root
 - **Containerization + IaC** for reproducible deploys; single-binary embed mode
   (serve both frontends from the Go binary on one port).
 - **Feature flags** to roll games/campaigns out gradually.
+- **The Playwright suite has no PR-gated CI job, and that stops being fine once
+  the repo is public.** `.github/workflows/ci.yml` says so itself: the browser
+  suite runs only locally via `ship.sh` because it costs minutes per push for a
+  single-maintainer repo, with a comment reading "if this repo ever takes
+  outside contributions, add it back as a job gated on pull_request." An
+  external PR today can pass CI (go test, frontend typecheck/unit, e2e
+  typecheck-only) while breaking the real player flow, because nothing but the
+  maintainer's own machine ever drives it in a browser. Add an `e2e` job
+  (`ubuntu-latest`, `npx playwright install chromium`, the same stack
+  `playwright.config.ts` already boots) gated on `pull_request`, once outside
+  contributions are actually expected.
 
 ## Follow-ups from shipped work
 
