@@ -98,6 +98,26 @@ build (Odd One Out, Quick Math, etc.) if you want a concrete starting point.
   in the description, that's usually a second PR.
 - Open the PR against `main`.
 
+## Design decisions
+
+Beyond the mandatory constraints below, you're free to make your own call on
+layout, interaction, and UX for a feature — the goal is a consistent app, not
+one dictated pattern for every screen.
+
+- **Non-negotiable**: the five-token color palette and Phosphor fill icons
+  (never emoji, never hand-drawn) — see [`frontend/CLAUDE.md`](frontend/CLAUDE.md)
+  — and the shared UI kit (`src/ui/` in each app): extend it, don't duplicate
+  styled markup.
+- **Your call**: how a new panel or control is laid out, which existing UI kit
+  primitive fits a new interaction, spacing and structure within those
+  constraints. If two existing screens already solve a similar problem
+  differently, match whichever is more recent rather than inventing a third
+  way.
+
+If you're unsure whether a design choice fits, open the PR anyway and say so —
+matching the existing feel matters more than getting it right on the first
+guess, and it's a cheap thing to redirect in review.
+
 ## Code style
 
 - **Go**: `gofmt` (and `go vet`) is the bar — no separate linter is configured.
