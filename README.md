@@ -19,6 +19,21 @@ customer-facing player app (play, win, redeem).
 - **Native admin** — Expo (React Native), sharing pure logic with the web admin via a
   package boundary rather than a rewrite.
 
+## Screenshots
+
+<table>
+<tr>
+<td width="240"><img src="docs/screenshots/player-landing.png" width="220" alt="Player landing screen: today's prizes and the game list"><br><sub>Landing — today's prizes, pick a game</sub></td>
+<td width="240"><img src="docs/screenshots/player-midgame.png" width="220" alt="Tap Fast mid-round"><br><sub>Tap Fast, mid-round</sub></td>
+<td width="240"><img src="docs/screenshots/player-reveal.png" width="220" alt="Score reveal, tier ladder"><br><sub>The reveal</sub></td>
+</tr>
+<tr>
+<td width="240"><img src="docs/screenshots/player-result.png" width="220" alt="Result screen: won a prize, claim code, QR, leaderboard"><br><sub>Result — claim code, QR, leaderboard</sub></td>
+<td width="240"><img src="docs/screenshots/admin-awards.png" width="220" alt="Admin awards panel"><br><sub>Admin — awards</sub></td>
+<td width="240"><img src="docs/screenshots/admin-claims.png" width="220" alt="Admin claims panel"><br><sub>Admin — claims / redemption</sub></td>
+</tr>
+</table>
+
 ## Layout
 
 ```
