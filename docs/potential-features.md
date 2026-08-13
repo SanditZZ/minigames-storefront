@@ -91,6 +91,26 @@ with their hands currently cannot win a prize at all.
   replay, so it deepens the gap Precision Stop already leaves, and fine motor
   control on a small screen is the least accessible input in the catalog.
 
+Two ideas below are a different SHAPE than the list above — not another
+catalog entry, but a second game archetype or a new transport, respectively.
+Worth weighing before either gets scoped as "just another game":
+
+- **Scratch & Win (instant-win archetype)** — a game with no skill component:
+  the server pre-rolls a win/lose outcome by weighted probability before the
+  player reveals it, rather than scoring a round against a threshold. It is a
+  second archetype next to `Validator`/`Scorer` (`game.Definition`,
+  `internal/game/game.go`) — reward selection moves from `reward.Select`'s
+  hardest-`minScore`-cleared match (`internal/reward/reward.go`) to a weighted
+  draw, so it depends on **Probability / rarity** below rather than
+  replacing it. Closes a gap none of the games above do: a customer who won't
+  compete on speed OR attention still can't win one today.
+- **Real-time head-to-head** — two sessions racing the same challenge with
+  live opponent progress. Every game today is single-session request/response
+  (`POST sessions` → `POST scores`) — there is no realtime transport anywhere
+  in `backend/`. This needs a paired-session concept above `domain.Session`
+  and a push channel (WebSocket/SSE) that doesn't exist at all yet, which
+  makes it the highest-effort item in this section by a wide margin.
+
 ## Reward system depth
 
 - **Probability / rarity** — award a prize with a configured chance, not just a
@@ -98,6 +118,13 @@ with their hands currently cannot win a prize at all.
 - **Daily / per-customer win caps** — limit prizes per person per day to control
   cost (needs customer identity, below).
 - **Time-boxed campaigns** — awards with start/end windows and schedules.
+  Worth building together with **A/B testing** (under "The rest of the
+  admin" below) rather than separately: both are a rules-evaluation step in
+  front of `reward.Select` — one activates an award set for a date range, the
+  other assigns a session to an experiment arm and compares outcomes — and a
+  scheduler with no arms is most of the harder half already done. A `campaign`
+  concept wrapping `Award` activation plus an arm-assignment function in
+  `reward/` covers both with one admin panel instead of two.
 - **The web scanner exists and cannot run anywhere this project is served.**
   `useCodeScanner` (`apps/admin/src/scan/`) opens the rear camera and decodes with
   `BarcodeDetector`; `scanAvailability` (`admin-core/src/claims/scan.ts`) decides
@@ -147,6 +174,30 @@ with their hands currently cannot win a prize at all.
   history, and personal bests.
 - **Streaks & comeback rewards** — bonuses for returning N days in a row.
 - **Referral plays** — earn a play by bringing a friend.
+- **Loyalty tiers (progression layer)** — a points ledger and tier ladder
+  (Bronze/Silver/Gold) driven by play frequency, spanning every game rather
+  than living inside one. Bigger than **Streaks & comeback rewards** above:
+  that bullet is a bonus rule, this is a new domain object — a per-customer
+  ledger every game writes to. Blocked on **Lightweight accounts**.
+- **Collectible set-collection** — a round has a chance to award one themed
+  piece; completing a set unlocks a bonus prize. The first mechanic needing
+  state ACROSS visits — every round today is self-contained, a score/claim
+  pair that accrues nothing — so "does this customer already hold piece 3" is
+  a new query shape, not just a new column. Blocked on identity like the rest
+  of this section.
+- **Ticket/wallet economy** — every round earns a spendable balance
+  regardless of hitting a `minScore` tier, redeemable later against any
+  prize — the arcade-wristband model, not the claim-a-specific-prize model
+  `claim/` implements today. A different reward philosophy, not a bigger
+  table: near-misses would start paying out. Needs a persistent per-customer
+  ledger, and `claim`'s single-use bearer-code redemption would have to
+  coexist with, or be replaced by, a balance debit.
+- **Segmentation-driven personalization** — classify players
+  (new/returning/frequent/lapsed) and let admins bias which games surface or
+  which prize odds apply, per segment. Reads across every other subsystem
+  (scores, claims, visit recency) to change what a player sees, rather than
+  being a single settings toggle — and it's what would let the three items
+  above be targeted instead of blanket.
 
 ## Anti-abuse / integrity (before real prizes of value)
 
@@ -465,6 +516,16 @@ soon each bites. The rules for *where* a string lives are in the repo-root
 
 ## Platform / infrastructure
 
+- **Multi-store / franchise support** — `settings` is one flat key/value row
+  (`internal/settings/public.go`'s allowlist has no store-scoping concept) and
+  no repository in `storage.Store` (`internal/storage/storage.go`) takes a
+  store id, so branding, awards, scores and claims are all implicitly
+  single-tenant. This is the one item in the whole doc that changes the SHAPE
+  of nearly every table rather than adding to one — every repository method
+  gains a store id, every admin route gets scoped. `storage.Store`'s own
+  design principle — narrow interfaces expressing access patterns, not
+  tables — is what would make this a large-but-tractable migration rather
+  than a rewrite.
 - **DynamoDB adapter** implementing `storage.Store` (the interface is ready) and
   a Postgres adapter for richer querying/analytics.
 - **Caching for the remaining hot reads: the game catalog and the leaderboards.**
