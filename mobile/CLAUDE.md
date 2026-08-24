@@ -69,7 +69,7 @@ resolves `localhost` to itself, so a default would fail as a baffling connection
 error rather than a clear one. Build with the address `serve-prod.sh` prints:
 
 ```bash
-EXPO_PUBLIC_API_URL=http://100.64.124.94:8081 npx expo start
+EXPO_PUBLIC_API_URL=http://100.x.x.x:8081 npx expo start
 ```
 
 ## The camera — the one capability the web admin cannot have

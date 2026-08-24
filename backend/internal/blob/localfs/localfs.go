@@ -18,7 +18,7 @@ import (
 // Store writes objects under Root and serves them under blob.URLPrefix.
 type Store struct {
 	root      string
-	publicURL string // absolute base, e.g. http://100.64.124.94:8081
+	publicURL string // absolute base, e.g. http://100.x.x.x:8081
 }
 
 // Open prepares the directory and returns a store.
