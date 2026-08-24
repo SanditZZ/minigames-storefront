@@ -145,12 +145,35 @@
   pointer-events: none;
 }
 
+/* Depth modifiers — override `--ticket-notch` via the `notch` prop on
+   Card/Panel/HighlightCard rather than a one-off style per screen. Declared
+   AFTER `.ticket-shape` so the equal-specificity override wins; "md" needs no
+   class since it's the base rule's own default. */
+.ticket-notch-sm {
+  --ticket-notch: 8px;
+}
+
+.ticket-notch-lg {
+  --ticket-notch: 18px;
+}
+
 /* The primary CTA's cut corner — ties the button to the ticket-card family.
    A straight clip, not a curve: polygon() can't express an arc, so the
    button's other three corners stay square rather than mixing rounded and
-   cut edges on one shape. */
+   cut edges on one shape. `--cta-notch` follows the same override pattern as
+   `--ticket-notch` above — Button ties it to its existing `size` prop rather
+   than adding a second one. */
 .cta-notch {
-  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  --cta-notch: 16px;
+  clip-path: polygon(0 0, calc(100% - var(--cta-notch)) 0, 100% var(--cta-notch), 100% 100%, 0 100%);
+}
+
+.cta-notch-sm {
+  --cta-notch: 12px;
+}
+
+.cta-notch-lg {
+  --cta-notch: 20px;
 }
 
 /* Kiosk-friendly base: prevent text selection / tap-highlight during rapid

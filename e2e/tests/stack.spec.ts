@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { ui } from "../helpers/round";
+import { shownScore, ui } from "../helpers/round";
 
 /**
  * Stack is the first game the SERVER scores. The client reports when the player
@@ -184,8 +184,7 @@ test.describe("stack", () => {
     // timings in Go; `drawn` came from the TypeScript simulation that painted
     // the tower. A divergence between the two languages' integer arithmetic
     // surfaces here as a player being told they missed a block that landed.
-    const shown = Number((await page.locator(".tabular-nums").first().innerText()).trim());
-    expect(shown).toBe(drawn);
+    expect(await shownScore(page)).toBe(drawn);
   });
 
   test("a missed first block ends the round at zero rather than failing the submission", async ({
@@ -203,7 +202,6 @@ test.describe("stack", () => {
     await expect(page).toHaveURL(SETTLED_STACK_URL);
     await expect(ui.playAgain(page)).toBeVisible();
 
-    const shown = Number((await page.locator(".tabular-nums").first().innerText()).trim());
-    expect(shown).toBe(0);
+    expect(await shownScore(page)).toBe(0);
   });
 });

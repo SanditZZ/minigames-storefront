@@ -123,6 +123,11 @@ export async function shownScore(page: Page): Promise<number> {
   return Number(text.trim());
 }
 
+// A testid, not `.tabular-nums`: the result screen's prize/claim ticket also
+// carries a `tabular-nums` claim code and, since the ticket motif rearrange,
+// sits ABOVE the score in DOM order — ".tabular-nums.first()" started reading
+// the claim code instead. Stat has no accessible role of its own to pick the
+// score out by, so ResultSummary tags this one instance explicitly.
 function scoreValue(page: Page): Locator {
-  return page.locator(".tabular-nums").first();
+  return page.getByTestId("result-score");
 }

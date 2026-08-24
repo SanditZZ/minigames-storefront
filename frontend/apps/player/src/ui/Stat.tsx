@@ -13,15 +13,24 @@ export function Stat({
   label,
   size = "lg",
   className = "",
+  testId,
 }: {
   value: ReactNode;
   label: string;
   size?: keyof typeof sizes;
   className?: string;
+  /** Optional automation hook — this component has no accessible role of its
+   *  own to distinguish one Stat from another on the same screen. */
+  testId?: string;
 }) {
   return (
     <div className={`text-center ${className}`}>
-      <div className={`${sizes[size]} font-black tabular-nums leading-none text-ink`}>{value}</div>
+      <div
+        data-testid={testId}
+        className={`${sizes[size]} font-black tabular-nums leading-none text-ink`}
+      >
+        {value}
+      </div>
       <Eyebrow className="mt-2">{label}</Eyebrow>
     </div>
   );

@@ -93,7 +93,11 @@ export function GamePicker({
         autoComplete="given-name"
       />
 
-      <Stack>
+      {/* A 2-column grid rather than one column per row — an arcade menu of
+          tiles instead of a vertical form list. Plain divs, not a <ul>: each
+          tile is already a button, and list semantics here would be one more
+          role for a screen reader to narrate without adding information. */}
+      <div className="grid grid-cols-2 gap-3">
         {games.map((game) => (
           <SelectCard
             key={game.slug}
@@ -107,7 +111,7 @@ export function GamePicker({
             onClick={() => onPick(game)}
           />
         ))}
-      </Stack>
+      </div>
     </Stack>
   );
 }

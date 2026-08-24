@@ -45,6 +45,47 @@ interface Pending {
 }
 
 /**
+ * One side of the "All claims" board — the ticket-booth-counter split
+ * (what's still out, what's already come back) an operator actually asks
+ * about, rather than one flat list they have to scan. Only used for the "all"
+ * filter; a specific status filter already answers that question by itself.
+ */
+function ClaimColumn({
+  title,
+  claims,
+  busy,
+  onRedeem,
+  onUnredeem,
+}: {
+  title: string;
+  claims: ClaimView[];
+  busy: boolean;
+  onRedeem: (view: ClaimView) => void;
+  onUnredeem: (view: ClaimView) => void;
+}) {
+  return (
+    <div>
+      <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink/50">{title}</h3>
+      {claims.length === 0 ? (
+        <p className="text-sm text-ink/40">None right now.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {claims.map((view) => (
+            <ClaimRow
+              key={view.claim.id}
+              view={view}
+              busy={busy}
+              onRedeem={() => onRedeem(view)}
+              onUnredeem={() => onUnredeem(view)}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
  * The counter's panel: redeem a code someone is holding, and see what is
  * outstanding.
  *
@@ -293,22 +334,40 @@ export function ClaimsPanel({ api, status, onStatusChange }: Props) {
             ? "No prizes have been won yet — claims appear here as players win them."
             : `No ${FILTER_LABELS[status].toLowerCase()} claims.`}
         </EmptyState>
+      ) : status === "all" ? (
+        // The booth-counter board: outstanding on the left, everything no
+        // longer outstanding (collected or lapsed) on the right — each row's
+        // own badge still names its exact status.
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ClaimColumn
+            title="Outstanding"
+            claims={claims.filter((view) => view.status === "issued")}
+            busy={busy}
+            onRedeem={(view) => setPending({ action: "redeem", view })}
+            onUnredeem={(view) => setPending({ action: "unredeem", view })}
+          />
+          <ClaimColumn
+            title="Collected"
+            claims={claims.filter((view) => view.status !== "issued")}
+            busy={busy}
+            onRedeem={(view) => setPending({ action: "redeem", view })}
+            onUnredeem={(view) => setPending({ action: "unredeem", view })}
+          />
+        </div>
       ) : (
-        <Card>
-          <ul className="flex flex-col divide-y divide-ink/10">
-            {claims.map((view) => (
-              <ClaimRow
-                key={view.claim.id}
-                view={view}
-                busy={busy}
-                // A row already HAS the claim, so it goes straight to the
-                // confirmation without a second request for what is on screen.
-                onRedeem={() => setPending({ action: "redeem", view })}
-                onUnredeem={() => setPending({ action: "unredeem", view })}
-              />
-            ))}
-          </ul>
-        </Card>
+        <ul className="flex flex-col gap-2">
+          {claims.map((view) => (
+            <ClaimRow
+              key={view.claim.id}
+              view={view}
+              busy={busy}
+              // A row already HAS the claim, so it goes straight to the
+              // confirmation without a second request for what is on screen.
+              onRedeem={() => setPending({ action: "redeem", view })}
+              onUnredeem={() => setPending({ action: "unredeem", view })}
+            />
+          ))}
+        </ul>
       )}
     </Stack>
   );

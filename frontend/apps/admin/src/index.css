@@ -47,9 +47,24 @@ body {
   pointer-events: none;
 }
 
+/* Depth modifiers — override `--ticket-notch` via the `notch` prop on Card
+   rather than a one-off style per panel. Declared AFTER `.ticket-shape` so
+   the equal-specificity override wins; "md" needs no class since it's the
+   base rule's own default. */
+.ticket-notch-sm {
+  --ticket-notch: 8px;
+}
+
+.ticket-notch-lg {
+  --ticket-notch: 18px;
+}
+
 /* The primary CTA's cut corner — ties the button to the ticket-card family.
    See the player app's identical rule for why the other three corners stay
-   square instead of mixing rounded and cut edges on one shape. */
+   square instead of mixing rounded and cut edges on one shape. Admin's
+   Button has no `size` prop (one button size throughout), so `--cta-notch`
+   stays at its default here — no sm/lg modifiers to wire up. */
 .cta-notch {
-  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  --cta-notch: 16px;
+  clip-path: polygon(0 0, calc(100% - var(--cta-notch)) 0, 100% var(--cta-notch), 100% 100%, 0 100%);
 }

@@ -219,7 +219,6 @@ test.describe("game catalog", () => {
     // from the TypeScript sweep that painted the marker. A divergence between the
     // two languages' integer arithmetic surfaces here as a player freezing the
     // marker dead centre and being told they were eleven off.
-    const shown = Number((await page.locator(".tabular-nums").first().innerText()).trim());
-    expect(shown).toBe(drawn);
+    expect(await shownScore(page)).toBe(drawn);
   });
 });

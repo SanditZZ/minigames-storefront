@@ -5,6 +5,7 @@ import { PrizeImage } from "./PrizeImage";
 
 type Tone = "solid" | "muted" | "accent";
 type Shape = "panel" | "ticket";
+type Notch = "sm" | "md" | "lg";
 
 const tones: Record<Tone, string> = {
   solid: "bg-white text-ink shadow-xl",
@@ -20,21 +21,40 @@ const shapes: Record<Shape, string> = {
   ticket: "ticket-shape",
 };
 
+// How deep the ticket's edge notches cut — only meaningful with
+// shape="ticket". A fixed vocabulary (not a raw pixel prop) so every ticket
+// surface in the app reads as one family instead of each screen picking its
+// own number; override via this prop, never by hand-editing index.css.
+const notches: Record<Notch, string> = {
+  sm: "ticket-notch-sm",
+  md: "",
+  lg: "ticket-notch-lg",
+};
+
 /** A content surface. `tone` picks the emphasis; all of them carry ink text
  *  per the palette rules — never white text on the pastels. `shape="ticket"`
- *  is for prize/claim cards only — see `shapes` above. */
+ *  is for prize/claim cards only — see `shapes` above; `notch` sizes its cut
+ *  (ignored when shape="panel"). */
 export function Card({
   tone = "solid",
   shape = "panel",
+  notch = "md",
   className = "",
   children,
 }: {
   tone?: Tone;
   shape?: Shape;
+  notch?: Notch;
   className?: string;
   children: ReactNode;
 }) {
-  return <div className={`rounded-2xl p-4 ${shapes[shape]} ${tones[tone]} ${className}`}>{children}</div>;
+  return (
+    <div
+      className={`rounded-2xl p-4 ${shapes[shape]} ${shape === "ticket" ? notches[notch] : ""} ${tones[tone]} ${className}`}
+    >
+      {children}
+    </div>
+  );
 }
 
 /** A card with a heading — the standard titled section (leaderboard, prize). */
@@ -42,17 +62,19 @@ export function Panel({
   title,
   tone = "muted",
   shape = "panel",
+  notch = "md",
   className = "",
   children,
 }: {
   title: ReactNode;
   tone?: Tone;
   shape?: Shape;
+  notch?: Notch;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <Card tone={tone} shape={shape} className={className}>
+    <Card tone={tone} shape={shape} notch={notch} className={className}>
       <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink/70">{title}</h3>
       {children}
     </Card>
@@ -79,6 +101,7 @@ export function HighlightCard({
   note,
   tone = "solid",
   shape = "panel",
+  notch = "md",
   className = "",
 }: {
   icon: IconName;
@@ -90,10 +113,11 @@ export function HighlightCard({
   note?: ReactNode;
   tone?: Tone;
   shape?: Shape;
+  notch?: Notch;
   className?: string;
 }) {
   return (
-    <Card tone={tone} shape={shape} className={`w-full max-w-sm text-center ${className}`}>
+    <Card tone={tone} shape={shape} notch={notch} className={`w-full max-w-sm text-center ${className}`}>
       {imageUrl ? (
         <PrizeImage src={imageUrl} fallback={icon} size="lg" className="mx-auto" />
       ) : (

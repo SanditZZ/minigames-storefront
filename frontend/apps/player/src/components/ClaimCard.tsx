@@ -40,7 +40,7 @@ export function ClaimCard({ view, imageUrl }: { view: ClaimView; imageUrl?: stri
   const code = groupClaimCode(claim.code);
 
   return (
-    <Card tone={copy.redeemable ? "solid" : "muted"} className="w-full max-w-sm text-center">
+    <Card tone={copy.redeemable ? "solid" : "muted"} shape="ticket" className="w-full max-w-sm text-center">
       {/* Unlike `awardName`, the image is NOT snapshotted — it is read from the
           award as it exists now, so deleting the prize drops back to the icon.
           That asymmetry is deliberate: what the player won has to stay true

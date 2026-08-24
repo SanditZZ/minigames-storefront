@@ -35,6 +35,16 @@ const sizes = {
   lg: "min-h-14 px-8 py-3 text-lg",
 } as const;
 
+// Scales the primary CTA's cut corner (`--cta-notch`, in index.css) with the
+// button's own `size` prop rather than adding a second prop just for the
+// notch — a `sm` Button and a `lg` Button should read as the same shape
+// language at their own scale, not the same notch pasted onto both.
+const ctaNotchSizes = {
+  sm: "cta-notch-sm",
+  md: "",
+  lg: "cta-notch-lg",
+} as const;
+
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: keyof typeof sizes;
@@ -47,7 +57,7 @@ export function Button({ variant = "primary", size = "md", fullWidth = false, cl
   return (
     <button
       type="button"
-      className={`${base} ${variants[variant]} ${sizes[size]} ${fullWidth ? "w-full" : ""} ${className}`}
+      className={`${base} ${variants[variant]} ${variant === "primary" ? ctaNotchSizes[size] : ""} ${sizes[size]} ${fullWidth ? "w-full" : ""} ${className}`}
       {...rest}
     />
   );

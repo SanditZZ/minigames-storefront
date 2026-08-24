@@ -25,33 +25,15 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
 
   return (
     <Stack gap="lg" className="items-center">
-      <AppearIn variant="pop" className="text-center">
-        <Stat value={result.score.value} label={game.scoreUnit} />
-        <div className="mt-3 flex items-center justify-center gap-2">
-          <Badge tone={record ? "brand" : "muted"}>
-            {/* The trophy used to live inside the translated string. It sits
-                beside it now: a dictionary holds words, and an emoji wedged
-                into one is a mark the store's palette cannot repaint. */}
-            {record ? (
-              <span className="inline-flex items-center gap-1">
-                <Icon name="trophy" />
-                {t("result.topScore")}
-              </span>
-            ) : (
-              t("result.rank", { rank: result.rank })
-            )}
-          </Badge>
-          <Badge tone="muted">{result.score.playerName}</Badge>
-        </div>
-      </AppearIn>
-
-      {/* `riseSolid` when there is a claim, because this card carries the QR and
-          a camera cannot decode a symbol at partial opacity over cream. A player
-          who holds their phone out the instant the score lands used to get one
-          failed scan and then a working one; the entrance is unchanged in every
-          other respect, including its length. The two prize-less states keep the
-          ordinary fade — nothing in them is machine-read. */}
-      <AppearIn variant={result.claim ? "riseSolid" : "rise"} delayMs={140} className="w-full flex justify-center">
+      {/* The prize/claim ticket leads — it's the reason the player kept
+          watching, and the score below is context for it, not the other way
+          round. `riseSolid` when there is a claim, because this card carries
+          the QR and a camera cannot decode a symbol at partial opacity over
+          cream. A player who holds their phone out the instant the screen
+          settles used to get one failed scan and then a working one. The two
+          prize-less states keep the ordinary entrance — nothing in them is
+          machine-read. */}
+      <AppearIn variant={result.claim ? "riseSolid" : "rise"} className="flex w-full justify-center">
         {result.claim ? (
           // The image comes from the live award, the name from the claim's
           // snapshot inside ClaimCard — see the note there on why only one of
@@ -73,8 +55,11 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
             title={result.award!.name}
             body={result.award!.description || undefined}
             note={t("result.noClaimNote")}
+            shape="ticket"
           />
         ) : (
+          // Not a ticket: there's nothing here to collect, so it doesn't wear
+          // the collect-a-prize shape.
           <HighlightCard
             icon="barbell"
             tone="muted"
@@ -82,6 +67,28 @@ export function ResultSummary({ game, result, onPlayAgain, onPickAnother }: Prop
             body={t("result.noPrize.body")}
           />
         )}
+      </AppearIn>
+
+      {/* The score, now a supporting strip under the payoff rather than the
+          headline above it. */}
+      <AppearIn variant="pop" delayMs={140} className="text-center">
+        <Stat value={result.score.value} label={game.scoreUnit} testId="result-score" />
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <Badge tone={record ? "brand" : "muted"}>
+            {/* The trophy used to live inside the translated string. It sits
+                beside it now: a dictionary holds words, and an emoji wedged
+                into one is a mark the store's palette cannot repaint. */}
+            {record ? (
+              <span className="inline-flex items-center gap-1">
+                <Icon name="trophy" />
+                {t("result.topScore")}
+              </span>
+            ) : (
+              t("result.rank", { rank: result.rank })
+            )}
+          </Badge>
+          <Badge tone="muted">{result.score.playerName}</Badge>
+        </div>
       </AppearIn>
 
       <AppearIn delayMs={260} className="w-full">

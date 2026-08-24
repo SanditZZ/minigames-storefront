@@ -4,6 +4,7 @@ import { Button } from "./Controls";
 // Surfaces and inline states shared by every admin panel.
 
 type Shape = "panel" | "ticket";
+type Notch = "sm" | "md" | "lg";
 
 // "ticket" adds the die-cut ticket-stub cutout (.ticket-shape, in index.css)
 // — used for the claims panel. Everything else stays a plain rounded card.
@@ -12,17 +13,32 @@ const shapes: Record<Shape, string> = {
   ticket: "ticket-shape",
 };
 
+// How deep the ticket's edge notches cut — only meaningful with
+// shape="ticket". A fixed vocabulary (not a raw pixel prop), mirroring the
+// player app's Card, so every ticket surface reads as one family; override
+// via this prop, never by hand-editing index.css.
+const notches: Record<Notch, string> = {
+  sm: "ticket-notch-sm",
+  md: "",
+  lg: "ticket-notch-lg",
+};
+
 export function Card({
   shape = "panel",
+  notch = "md",
   className = "",
   children,
 }: {
   shape?: Shape;
+  /** Ignored when shape="panel". */
+  notch?: Notch;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <div className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 ${shapes[shape]} ${className}`}>
+    <div
+      className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 ${shapes[shape]} ${shape === "ticket" ? notches[notch] : ""} ${className}`}
+    >
       {children}
     </div>
   );
