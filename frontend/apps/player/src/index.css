@@ -118,15 +118,23 @@
 
 /* ── Carnival-ticket shape ──────────────────────────────────────────────────
    The die-cut "ticket-stub" look used for prize/claim cards: a semicircle
-   bite out of each side edge, plus a dashed tear line between them, applied
-   via the `shape="ticket"` prop on Card/Panel/HighlightCard.
+   bite out of each side edge, applied via the `shape="ticket"` prop on
+   Card/Panel/HighlightCard.
+
+   Edge notches ONLY — an earlier version also drew a dashed line straight
+   across the card's vertical middle, which looked right on a short, uniform
+   card and cut through the prize name/claim code on a taller one. The notch
+   is safe at any content height because it only bites ~notch-radius into the
+   card's own padding; a full-width line has no such guarantee, since where
+   "the middle" falls depends entirely on how much content is above and below
+   it. Don't re-add a fixed-position divider without a way to place it at a
+   spot the caller's actual content guarantees is empty.
 
    Pure geometry, no colour baked in, so a store's runtime palette override
-   (packages/tokens/src/override.ts) keeps working unchanged — the dashed
-   line reads `currentColor` from whatever `text-*` class the card already
-   carries. `mask-composite: intersect` combines the two edge-bite masks into
-   one cutout; a browser without support just keeps the plain rounded
-   rectangle underneath — no broken layout either way. */
+   (packages/tokens/src/override.ts) keeps working unchanged. `mask-composite:
+   intersect` combines the two edge-bite masks into one cutout; a browser
+   without support just keeps the plain rounded rectangle underneath — no
+   broken layout either way. */
 .ticket-shape {
   position: relative;
   --ticket-notch: 12px;
@@ -134,15 +142,6 @@
     radial-gradient(circle var(--ticket-notch) at 0 50%, transparent 92%, #000 100%),
     radial-gradient(circle var(--ticket-notch) at 100% 50%, transparent 92%, #000 100%);
   mask-composite: intersect;
-}
-
-.ticket-shape::after {
-  content: "";
-  position: absolute;
-  inset: 50% calc(var(--ticket-notch) * 1.5) auto;
-  border-top: 2px dashed currentColor;
-  opacity: 0.15;
-  pointer-events: none;
 }
 
 /* Depth modifiers — override `--ticket-notch` via the `notch` prop on
