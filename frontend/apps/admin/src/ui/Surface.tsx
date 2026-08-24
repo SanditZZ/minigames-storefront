@@ -3,8 +3,29 @@ import { Button } from "./Controls";
 
 // Surfaces and inline states shared by every admin panel.
 
-export function Card({ className = "", children }: { className?: string; children: ReactNode }) {
-  return <div className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 ${className}`}>{children}</div>;
+type Shape = "panel" | "ticket";
+
+// "ticket" adds the die-cut ticket-stub cutout (.ticket-shape, in index.css)
+// — used for the claims panel. Everything else stays a plain rounded card.
+const shapes: Record<Shape, string> = {
+  panel: "",
+  ticket: "ticket-shape",
+};
+
+export function Card({
+  shape = "panel",
+  className = "",
+  children,
+}: {
+  shape?: Shape;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 ${shapes[shape]} ${className}`}>
+      {children}
+    </div>
+  );
 }
 
 export function Badge({ tone = "neutral", children }: { tone?: "on" | "off" | "neutral"; children: ReactNode }) {

@@ -3,17 +3,29 @@ import type { ButtonHTMLAttributes } from "react";
 type Variant = "primary" | "ghost" | "solid" | "quiet";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-xl font-bold transition active:scale-95 " +
+  "inline-flex items-center justify-center gap-2 font-bold transition active:scale-95 " +
   "disabled:opacity-50 disabled:active:scale-100 " +
   // Visible keyboard focus everywhere, without a focus ring on pointer taps.
   "outline-none focus-visible:ring-4 focus-visible:ring-brand/50";
 
 // Colours come only from the shared palette tokens (see frontend/CLAUDE.md).
+// The corner treatment moved out of `base` so `primary` can swap it for the
+// ticket family's cut corner (`.cta-notch`, in index.css) instead of fighting
+// a `rounded-xl` utility of the same specificity.
 const variants: Record<Variant, string> = {
-  primary: "bg-brand text-ink shadow-lg", // Coral CTA with ink label
-  solid: "bg-ink text-brand-4 shadow-lg", // strong dark button, cream label
+  primary: "cta-notch bg-brand text-ink shadow-lg", // Coral CTA with ink label
+  solid: "rounded-xl bg-ink text-brand-4 shadow-lg", // strong dark button, cream label
+  ghost: "rounded-xl bg-ink/10 text-ink hover:bg-ink/15",
+  quiet: "rounded-xl text-ink/60 hover:text-ink", // low-emphasis, borderless
+};
+
+// Same colours, without a baked-in corner treatment — IconButton always
+// applies its own circular "coin" shape instead (see below).
+const iconVariants: Record<Variant, string> = {
+  primary: "bg-brand text-ink shadow-lg",
+  solid: "bg-ink text-brand-4 shadow-lg",
   ghost: "bg-ink/10 text-ink hover:bg-ink/15",
-  quiet: "text-ink/60 hover:text-ink", // low-emphasis, borderless
+  quiet: "text-ink/60 hover:text-ink",
 };
 
 // Every size clears a 44px tap target at its default line-height.
@@ -52,8 +64,9 @@ interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
 }
 
 /**
- * A square, icon-only button — 44px on a side, so it clears the tap target
- * minimum without the horizontal padding a text button needs.
+ * A circular, icon-only "coin/token" button — 44px across, so it clears the
+ * tap target minimum. `ring-inset` draws the coin's rim inside the circle so
+ * it never depends on matching whatever happens to sit behind the button.
  */
 export function IconButton({ variant = "ghost", label, className = "", children, ...rest }: IconButtonProps) {
   return (
@@ -61,7 +74,7 @@ export function IconButton({ variant = "ghost", label, className = "", children,
       type="button"
       aria-label={label}
       title={label}
-      className={`${base} ${variants[variant]} size-11 text-lg ${className}`}
+      className={`${base} rounded-full ring-2 ring-inset ring-ink/15 ${iconVariants[variant]} size-11 text-lg ${className}`}
       {...rest}
     >
       {children}

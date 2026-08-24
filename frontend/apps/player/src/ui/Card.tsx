@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { PrizeImage } from "./PrizeImage";
 
 type Tone = "solid" | "muted" | "accent";
+type Shape = "panel" | "ticket";
 
 const tones: Record<Tone, string> = {
   solid: "bg-white text-ink shadow-xl",
@@ -11,34 +12,47 @@ const tones: Record<Tone, string> = {
   accent: "bg-brand-4 text-ink ring-1 ring-brand/40",
 };
 
+// "ticket" adds the die-cut ticket-stub cutout (.ticket-shape, in index.css)
+// for prize/claim surfaces — the emotional payoff moments. Everything else
+// stays a plain rounded rectangle.
+const shapes: Record<Shape, string> = {
+  panel: "",
+  ticket: "ticket-shape",
+};
+
 /** A content surface. `tone` picks the emphasis; all of them carry ink text
- *  per the palette rules — never white text on the pastels. */
+ *  per the palette rules — never white text on the pastels. `shape="ticket"`
+ *  is for prize/claim cards only — see `shapes` above. */
 export function Card({
   tone = "solid",
+  shape = "panel",
   className = "",
   children,
 }: {
   tone?: Tone;
+  shape?: Shape;
   className?: string;
   children: ReactNode;
 }) {
-  return <div className={`rounded-2xl p-4 ${tones[tone]} ${className}`}>{children}</div>;
+  return <div className={`rounded-2xl p-4 ${shapes[shape]} ${tones[tone]} ${className}`}>{children}</div>;
 }
 
 /** A card with a heading — the standard titled section (leaderboard, prize). */
 export function Panel({
   title,
   tone = "muted",
+  shape = "panel",
   className = "",
   children,
 }: {
   title: ReactNode;
   tone?: Tone;
+  shape?: Shape;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <Card tone={tone} className={className}>
+    <Card tone={tone} shape={shape} className={className}>
       <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-ink/70">{title}</h3>
       {children}
     </Card>
@@ -64,6 +78,7 @@ export function HighlightCard({
   body,
   note,
   tone = "solid",
+  shape = "panel",
   className = "",
 }: {
   icon: IconName;
@@ -74,10 +89,11 @@ export function HighlightCard({
   /** Boxed footnote, e.g. how to claim the prize. */
   note?: ReactNode;
   tone?: Tone;
+  shape?: Shape;
   className?: string;
 }) {
   return (
-    <Card tone={tone} className={`w-full max-w-sm text-center ${className}`}>
+    <Card tone={tone} shape={shape} className={`w-full max-w-sm text-center ${className}`}>
       {imageUrl ? (
         <PrizeImage src={imageUrl} fallback={icon} size="lg" className="mx-auto" />
       ) : (

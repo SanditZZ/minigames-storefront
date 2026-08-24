@@ -24,13 +24,23 @@ const control =
   "w-full rounded-lg border border-ink/15 bg-white px-3 py-2 text-ink outline-none focus:border-brand focus:ring-1 focus:ring-brand";
 
 type BtnVariant = "primary" | "ghost" | "danger";
+// The corner treatment moved out of the shared base so `primary` can swap it
+// for the ticket family's cut corner (`.cta-notch`, in index.css) instead of
+// fighting a `rounded-lg` utility of the same specificity.
 const btnBase =
-  "inline-flex items-center justify-center rounded-lg font-semibold transition disabled:opacity-50 " +
+  "inline-flex items-center justify-center font-semibold transition disabled:opacity-50 " +
   "outline-none focus-visible:ring-2 focus-visible:ring-brand";
 const btnVariants: Record<BtnVariant, string> = {
-  primary: "bg-brand text-ink hover:bg-brand-2 px-4 py-2",
-  ghost: "text-ink/70 hover:bg-ink/5 px-4 py-2",
-  danger: "text-red-700 hover:bg-red-50 px-3 py-2",
+  primary: "cta-notch bg-brand text-ink hover:bg-brand-2 px-4 py-2",
+  ghost: "rounded-lg text-ink/70 hover:bg-ink/5 px-4 py-2",
+  danger: "rounded-lg text-red-700 hover:bg-red-50 px-3 py-2",
+};
+// Same colours, without the padding/rounding a text button needs —
+// IconButton always applies its own circular "coin" shape instead (below).
+const iconBtnVariants: Record<BtnVariant, string> = {
+  primary: "bg-brand text-ink hover:bg-brand-2",
+  ghost: "text-ink/70 hover:bg-ink/5",
+  danger: "text-red-700 hover:bg-red-50",
 };
 
 export function Button({
@@ -39,6 +49,35 @@ export function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant }) {
   return <button className={`${btnBase} ${btnVariants[variant]} ${className}`} {...rest} />;
+}
+
+/**
+ * A circular, icon-only "coin/token" button — mirrors the player app's
+ * IconButton (deliberate per-app duplication, same as Button/Card/Layout;
+ * see frontend/CLAUDE.md). Admin has no icon-only control today — every icon
+ * sits inside a plain rectangular Button. `label` is required: an icon-only
+ * control's only name must not depend on a glyph a screen reader can't read.
+ * `ring-inset` draws the coin's rim inside the circle so it never depends on
+ * matching whatever happens to sit behind the button.
+ */
+export function IconButton({
+  variant = "ghost",
+  label,
+  className = "",
+  children,
+  ...rest
+}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`${btnBase} rounded-full ring-2 ring-inset ring-ink/15 size-11 text-lg ${iconBtnVariants[variant]} ${className}`}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
