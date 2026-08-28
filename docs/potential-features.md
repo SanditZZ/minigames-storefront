@@ -584,6 +584,39 @@ soon each bites. The rules for *where* a string lives are in the repo-root
 
 Concrete, near-term items, roughly ordered by how soon they will bite.
 
+### Ticket/coin visual motif
+
+- **The motif is web-only; the native client has none of it.** The ticket-notch
+  cutout (`.ticket-shape`, both apps' `index.css`) is CSS `mask-image` +
+  `mask-composite: intersect`, and the coin icon-button is `rounded-full` +
+  `ring-inset` — neither has a React Native equivalent (no CSS masking, and
+  Reanimated/`react-native-svg` would have to redraw the notch as an actual SVG
+  path). `mobile/CLAUDE.md`'s Expo client currently renders the pre-motif shape
+  language. Bites the moment the native client's UI kit is fleshed out past its
+  current stub, since by then two platforms will disagree about what a prize
+  card looks like.
+- **No shape/radius token layer exists**, unlike colour and motion
+  (`packages/tokens/src/palette.ts`, `motion.ts`). `--ticket-notch` and
+  `--cta-notch` are hand-written CSS custom properties per app, following the
+  existing `@keyframes` precedent — deliberate for now, but if the native
+  client above ever needs the same notch depth values, they will want to move
+  into `packages/tokens` the way colours and durations already did, rather than
+  becoming a third hand-copied pair of numbers.
+- **No `coin` icon exists in `packages/icons`** (27 icons, see
+  `packages/icons/src/data.ts`) — the coin/token treatment today is purely the
+  circular container shape (`rounded-full ring-2 ring-inset ring-ink/15`) plus
+  whatever icon already sits inside it (Phosphor's fill weight does have
+  `coin`/`coins`, per `frontend/CLAUDE.md`'s transcribe-only rule). Worth adding
+  if a future screen wants a literal coin glyph rather than the container
+  shape alone — nothing currently needs it.
+- **No display typography was added.** The ticket/coin direction only changed
+  shape and layout; the app still runs on the browser's default `font-sans`
+  stack (confirmed: no `@font-face`, no Google Fonts link, no `fontFamily` key
+  anywhere in either app). A chunkier display face for scores/countdowns/prize
+  titles (`ScoreReveal`'s `text-7xl`, `Countdown`'s `text-8xl`) was one of the
+  original direction options and was set aside in favour of the ticket motif —
+  still open if more visual distinctiveness is wanted later.
+
 ### Result URL polish
 
 - **The benchmark/top-prize convention breaks silently on a live edit.** Every
