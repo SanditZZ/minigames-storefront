@@ -111,6 +111,10 @@ export const th: Messages = {
   "board.loading": "กำลังโหลด…",
   "board.empty": "มาเป็นคนแรกบนกระดานกันเลย!",
 
+  // --- TV/kiosk display (/display/:slug) ----------------------------------
+  "display.live": "อันดับสด",
+  "display.notFound": "ไม่มีเกมนี้ให้แสดง",
+
   // --- Prize claim -------------------------------------------------------
   "claim.label.ready": "พร้อมรับรางวัล",
   "claim.label.collected": "รับแล้ว",

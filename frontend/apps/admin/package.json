@@ -12,6 +12,7 @@
     "@minigames/admin-core": "*",
     "@minigames/api-client": "*",
     "@minigames/image-core": "*",
+    "@minigames/qr-core": "*",
     "@minigames/tokens": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

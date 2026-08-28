@@ -105,7 +105,7 @@ export default defineConfig({
       url: ADMIN_URL,
       reuseExistingServer: false,
       timeout: 120_000,
-      env: { VITE_API_BASE_URL: API_URL },
+      env: { VITE_API_BASE_URL: API_URL, VITE_PLAYER_BASE_URL: WEB_URL },
     },
   ],
 });

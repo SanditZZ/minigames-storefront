@@ -11,6 +11,7 @@
 export * from "./awards/filter";
 export * from "./claims/present";
 export * from "./claims/scan";
+export * from "./display/url";
 export * from "./settings/benchmarks";
 export * from "./settings/branding";
 export * from "./settings/duration";

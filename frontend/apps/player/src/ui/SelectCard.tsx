@@ -67,27 +67,35 @@ export function ScoreRow({
   value,
   unit,
   highlighted = false,
+  size = "sm",
 }: {
   rank: number;
   name: string;
   value: number;
   unit: string;
   highlighted?: boolean;
+  /** "lg" is the TV/kiosk display's full-bleed board — see DisplayScreen. */
+  size?: "sm" | "lg";
 }) {
+  const lg = size === "lg";
   return (
     <li
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+      className={`flex items-center gap-3 rounded-lg ${lg ? "px-5 py-4 text-2xl sm:text-3xl" : "px-3 py-2 text-sm"} ${
         highlighted ? "bg-brand font-semibold text-ink" : "text-ink/80"
       }`}
       aria-current={highlighted ? "true" : undefined}
     >
-      {/* `min-w-6` rather than `w-6`: the column has to stay wide enough to keep
+      {/* `min-w` rather than `w`: the column has to stay wide enough to keep
           every rank aligned, and a pinned row is where three digits finally
-          show up — a #128 in a fixed 24px slot overflows its own cell.
+          show up — a #128 in a fixed slot overflows its own cell.
           `rounded-full` on a box that can grow past a circle becomes a pill
           instead — still the same coin/token language as everywhere else,
           without the three-digit overflow a fixed circle would reintroduce. */}
-      <span className="grid min-w-6 shrink-0 place-items-center rounded-full bg-ink/10 px-1.5 py-0.5 text-center font-bold tabular-nums">
+      <span
+        className={`grid shrink-0 place-items-center rounded-full bg-ink/10 text-center font-bold tabular-nums ${
+          lg ? "min-w-14 px-2 py-1" : "min-w-6 px-1.5 py-0.5"
+        }`}
+      >
         {rank}
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
@@ -106,9 +114,12 @@ export function ScoreRow({
  * either side of it, and "horizontal ellipsis" is not a useful thing to hear
  * in the middle of a table. Sighted readers get the same fact from the shape.
  */
-export function ScoreGapRow() {
+export function ScoreGapRow({ size = "sm" }: { size?: "sm" | "lg" }) {
   return (
-    <li className="px-3 text-center text-sm font-bold leading-none text-ink/25" aria-hidden>
+    <li
+      className={`px-3 text-center font-bold leading-none text-ink/25 ${size === "lg" ? "text-2xl" : "text-sm"}`}
+      aria-hidden
+    >
       ···
     </li>
   );

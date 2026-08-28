@@ -108,6 +108,10 @@ if [[ "$DO_BUILD" == "1" ]]; then
   echo "▸ Building frontends (baking API URL ${API_URL})…"
   # Vite inlines VITE_* at build time, so the built bundles call the right API.
   export VITE_API_BASE_URL="$API_URL"
+  # Only the admin bundle reads this (its settings panel links to the player's
+  # own display route), but exporting it once before both builds is simpler
+  # than branching the build command per app.
+  export VITE_PLAYER_BASE_URL="$PLAYER_URL"
   (cd "$ROOT/frontend" && npm run build -w apps/player >/dev/null && npm run build -w apps/admin >/dev/null)
 fi
 

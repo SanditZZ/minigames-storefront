@@ -2,5 +2,6 @@
 
 export { Button, Checkbox, ColorInput, DurationInput, Field, IconButton, Input, NumberInput, Select, Textarea } from "./Controls";
 export { Icon } from "./Icon";
+export { QrGlyph } from "./QrGlyph";
 export { AppShell, CenteredCard, ClaimRow, PanelHeader, RankRow, Stack, Tabs, TopBar } from "./Layout";
 export { Alert, Badge, Card, ConfirmPrompt, EmptyState, Loading } from "./Surface";

@@ -120,6 +120,10 @@ export const en = {
   "board.loading": "Loading…",
   "board.empty": "Be the first on the board!",
 
+  // --- TV/kiosk display (/display/:slug) ----------------------------------
+  "display.live": "Live leaderboard",
+  "display.notFound": "This game isn't available.",
+
   // --- Prize claim -------------------------------------------------------
   "claim.label.ready": "Ready to collect",
   "claim.label.collected": "Collected",
