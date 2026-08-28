@@ -3,7 +3,7 @@
 # ship.sh — the build-gated "apply a change" flow for this repo.
 #
 # Runs, in order, and STOPS on the first failure so a broken change never
-# reaches main:
+# reaches a PR:
 #   1. backend unit tests         (go test ./...)
 #   2. frontend unit tests        (vitest — router + reveal calculations)
 #   3. end-to-end browser tests   (Playwright, against an isolated throwaway
@@ -15,18 +15,31 @@
 #                                  restarts the local stack so it reflects the change)
 #   6. claims integrity check     (backfill-claims -check against the deployed
 #                                  database — WARNS, never blocks; see below)
-#   7. commit + push to main      (only reached if 1–5 succeed; 6 never blocks)
+#   7. commit + push branch + open/update a PR
+#                                  (only reached if 1–5 succeed; 6 never blocks)
 #
 # The full suite runs BEFORE every push, by design — see CLAUDE.md.
+#
+# This repo ships via branch + PR, not a direct push to main — `main` is
+# protected and every change merges through review + CI, including the
+# owner's own. Run this FROM a feature branch:
+#   git checkout -b <branch-name>
+#   ./scripts/ship.sh "feat: add reaction game"
+# Running it while still on `main` refuses before any step runs (see the
+# guard right below this header) rather than after 5+ minutes of tests.
 #
 # Usage:
 #   ./scripts/ship.sh                       # auto commit message
 #   ./scripts/ship.sh "feat: add reaction game"
 #   SKIP_E2E=1 ./scripts/ship.sh            # escape hatch, see below
+#   ALLOW_MAIN_PUSH=1 ./scripts/ship.sh     # deliberate exception, see below
 #
 # SKIP_E2E exists only for machines where browsers genuinely cannot run. It is
 # NOT for stepping past a failing test — a red E2E means the player flow is
 # broken, which is exactly what the gate is for.
+#
+# ALLOW_MAIN_PUSH exists for the rare deliberate direct-to-main change (a
+# hotfix, a docs typo) — it is not a way to routinely skip the branch/PR flow.
 #
 # Step 6 is the ONE step here that does not gate. Every other step judges the
 # change being shipped; that one judges the DATA the running stack holds, and a
@@ -41,7 +54,8 @@
 # the Expo app was COMPILED and not RUN — unlike the web player, which step 3
 # always drives in a browser. See mobile/CLAUDE.md.
 #
-# set -e ensures any failing step aborts before the commit/push — main stays green.
+# set -e ensures any failing step aborts before the commit/push — the branch
+# (and therefore the PR) only ever gets a green state.
 
 set -euo pipefail
 
@@ -49,6 +63,20 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 MSG="${1:-chore: auto-ship $(date '+%Y-%m-%d %H:%M:%S')}"
+
+# Fail fast, before any test runs, rather than after 5+ minutes at the old
+# push step. `main` is protected (PR + review + CI required) — this refusal
+# is what keeps the owner's own exemption from becoming the one path nobody
+# reviews.
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$BRANCH" == "main" && "${ALLOW_MAIN_PUSH:-}" != "1" ]]; then
+  echo "✗ Refusing to run on main — this repo ships via branch + PR now, not a" >&2
+  echo "  direct push. Create a branch first:" >&2
+  echo "    git checkout -b <branch-name>" >&2
+  echo "  then re-run ./scripts/ship.sh. For a deliberate exception (a hotfix," >&2
+  echo "  a docs typo), set ALLOW_MAIN_PUSH=1." >&2
+  exit 1
+fi
 
 echo "▸ [1/7] Backend tests…"
 (cd "$ROOT/backend" && go test ./...)
@@ -142,7 +170,7 @@ else
   esac
 fi
 
-echo "▸ [7/7] Commit + push to main…"
+echo "▸ [7/7] Commit + push branch + open/update PR…"
 if [[ -n "$(git status --porcelain)" ]]; then
   git add -A
   git commit -m "$MSG"
@@ -150,7 +178,19 @@ if [[ -n "$(git status --porcelain)" ]]; then
 else
   echo "  no file changes to commit."
 fi
-# Push whatever is ahead of origin/main (no-op if already up to date).
-git push origin main
 
-echo "✓ Shipped. main is green and pushed."
+# -u so a brand-new branch gets its upstream set on the first push; a no-op
+# flag on every push after that.
+git push -u origin "$BRANCH"
+
+# `gh pr view` fails (non-zero) when no PR exists yet for this branch — that
+# failure is the branch of the `if`, not a script-aborting error under `set
+# -e`, so this is the normal "first push on this branch" path, not a bug.
+if gh pr view "$BRANCH" >/dev/null 2>&1; then
+  echo "  PR already open for $BRANCH — pushed the update."
+  gh pr view "$BRANCH" --json url -q .url
+else
+  gh pr create --fill --head "$BRANCH"
+fi
+
+echo "✓ Shipped $BRANCH. CI re-runs the same checks on the pushed commit; the PR is not merged automatically."
