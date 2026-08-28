@@ -83,8 +83,13 @@ export function ScoreRow({
     >
       {/* `min-w-6` rather than `w-6`: the column has to stay wide enough to keep
           every rank aligned, and a pinned row is where three digits finally
-          show up — a #128 in a fixed 24px slot overflows its own cell. */}
-      <span className="min-w-6 shrink-0 text-center font-bold tabular-nums">{rank}</span>
+          show up — a #128 in a fixed 24px slot overflows its own cell.
+          `rounded-full` on a box that can grow past a circle becomes a pill
+          instead — still the same coin/token language as everywhere else,
+          without the three-digit overflow a fixed circle would reintroduce. */}
+      <span className="grid min-w-6 shrink-0 place-items-center rounded-full bg-ink/10 px-1.5 py-0.5 text-center font-bold tabular-nums">
+        {rank}
+      </span>
       <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
       <span className="shrink-0 whitespace-nowrap font-bold tabular-nums">
         {value} {unit}

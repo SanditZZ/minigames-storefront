@@ -44,7 +44,12 @@ export function StoreMark({
       <img
         src={logoUrl}
         alt={name}
-        className={`mx-auto aspect-square rounded-2xl object-cover ${size === "lg" ? "size-16" : "size-10"}`}
+        // Circular, like every other coin/token surface in the app — the
+        // square box that makes cropping consistent (see the class comment)
+        // is still there underneath; only the corner treatment changed.
+        className={`mx-auto aspect-square rounded-full object-cover ring-2 ring-inset ring-ink/15 ${
+          size === "lg" ? "size-16" : "size-10"
+        }`}
       />
     );
   }

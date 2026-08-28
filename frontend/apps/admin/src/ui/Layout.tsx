@@ -146,7 +146,12 @@ export function ClaimRow({
 export function RankRow({ rank, name, value, unit }: { rank: number; name: string; value: number; unit: string }) {
   return (
     <li className="flex items-center gap-3 py-2 text-sm">
-      <span className="w-6 shrink-0 text-center font-bold tabular-nums text-ink/50">{rank}</span>
+      {/* `min-w-6` rather than `w-6` — see the player app's identical
+          ScoreRow — so a three-digit rank grows the pill instead of
+          overflowing a fixed circle. */}
+      <span className="grid min-w-6 shrink-0 place-items-center rounded-full bg-ink/10 px-1.5 py-0.5 text-center font-bold tabular-nums text-ink/60">
+        {rank}
+      </span>
       <span className="min-w-0 flex-1 truncate font-medium text-ink">{name}</span>
       <span className="shrink-0 whitespace-nowrap font-bold tabular-nums text-ink">
         {value} {unit}

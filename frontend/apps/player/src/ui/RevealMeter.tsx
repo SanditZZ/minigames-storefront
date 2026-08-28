@@ -33,9 +33,10 @@ export function RevealMeter({ heightPct, tiers, activeTier, bellLit }: Props) {
     <div className="flex h-72 w-full max-w-xs items-stretch gap-4" aria-hidden>
       {/* Tower */}
       <div className="relative w-20 shrink-0">
-        {/* Bell at the summit */}
+        {/* Bell at the summit — the ring-inset rim matches every other
+            coin/token surface in the app (see IconButton). */}
         <div
-          className={`absolute -top-1 left-1/2 z-10 grid h-11 w-11 -translate-x-1/2 -translate-y-full place-items-center rounded-full text-xl shadow-lg ${
+          className={`absolute -top-1 left-1/2 z-10 grid h-11 w-11 -translate-x-1/2 -translate-y-full place-items-center rounded-full text-xl shadow-lg ring-2 ring-inset ring-ink/15 ${
             bellLit ? "bg-brand animate-flash" : "bg-white"
           }`}
         >

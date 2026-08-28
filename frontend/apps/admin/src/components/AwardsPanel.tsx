@@ -159,7 +159,12 @@ export function AwardsPanel({ api, games, router }: Props) {
           ) : (
             <Stack gap="sm">
               {shown.map((a) => (
-                <Card key={a.id} className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Card
+                  key={a.id}
+                  shape="ticket"
+                  notch="sm"
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center"
+                >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="truncate font-semibold text-ink">{a.name}</span>
