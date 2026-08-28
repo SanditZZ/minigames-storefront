@@ -33,6 +33,10 @@ export function parsePath(pathname: string): Route {
     return { name: "result", slug: parts[1], scoreId: parts[2] };
   }
 
+  if (parts[0] === "display" && parts.length === 2 && isSafeSegment(parts[1])) {
+    return { name: "display", slug: parts[1] };
+  }
+
   return { name: "notFound", path: pathname };
 }
 
@@ -70,6 +74,8 @@ export function pathFor(route: Route): string {
       return `/play/${route.slug}`;
     case "result":
       return `/result/${route.slug}/${route.scoreId}`;
+    case "display":
+      return `/display/${route.slug}`;
     case "notFound":
       return route.path;
   }

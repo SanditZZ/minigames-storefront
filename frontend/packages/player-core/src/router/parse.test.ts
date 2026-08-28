@@ -11,6 +11,7 @@ describe("parsePath", () => {
       slug: "tap-fast",
       scoreId: "abc-123",
     });
+    expect(parsePath("/display/tap-fast")).toEqual({ name: "display", slug: "tap-fast" });
   });
 
   it("tolerates trailing and repeated slashes", () => {
@@ -38,6 +39,8 @@ describe("parsePath", () => {
     expect(parsePath("/play/a/b").name).toBe("notFound");
     expect(parsePath("/result/tap-fast").name).toBe("notFound");
     expect(parsePath("/nonsense").name).toBe("notFound");
+    expect(parsePath("/display").name).toBe("notFound");
+    expect(parsePath("/display/a/b").name).toBe("notFound");
   });
 });
 
@@ -112,6 +115,7 @@ describe("round-tripping", () => {
     { route: { name: "result", slug: "tap-fast", scoreId: "abc-123" }, playerName: "", reveal: false, lang: null },
     { route: { name: "home" }, playerName: "Po", reveal: false, lang: "th" },
     { route: { name: "play", slug: "tap-fast" }, playerName: "", reveal: false, lang: "en" },
+    { route: { name: "display", slug: "tap-fast" }, playerName: "", reveal: false, lang: null },
   ];
 
   it("parses back to exactly what it rendered", () => {
@@ -123,7 +127,7 @@ describe("round-tripping", () => {
   });
 
   it("pathFor inverts parsePath", () => {
-    for (const path of ["/", "/play/tap-fast", "/result/tap-fast/abc-123"]) {
+    for (const path of ["/", "/play/tap-fast", "/result/tap-fast/abc-123", "/display/tap-fast"]) {
       expect(pathFor(parsePath(path))).toBe(path);
     }
   });

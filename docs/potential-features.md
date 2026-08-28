@@ -156,9 +156,10 @@ Worth weighing before either gets scoped as "just another game":
   is. A deep link into the admin (`/claims?code=…`) would be faster for staff and
   would turn a prize credential into a URL, which spreads the way the "score id is
   a bearer capability" entry below describes. Prefer the bare code until claims
-  have owners — and note `@minigames/qr-core` would need extending first: it
-  encodes version 1 only (ten alphanumeric characters), and its header comment
-  names the three extension points a longer payload needs.
+  have owners. `@minigames/qr-core` is no longer the blocker this used to name —
+  the TV/kiosk display work (issue #6) added `encodeText` (byte mode, versions
+  1-6, level M) for the admin's display-URL QR, so a claim deep link is now a
+  pure policy call rather than an encoder limitation.
 - **A claim has no owner.** Anyone holding the code can redeem it, which is the
   same trust model as a paper voucher and was the deliberate scope (this is a
   portfolio piece — no real prizes). If prizes ever have value, the gap to close
@@ -513,6 +514,16 @@ soon each bites. The rules for *where* a string lives are in the repo-root
   landing screen's refresh control, which already reloads the catalog and the
   settings together (`App.reload`): a timer returning to the picker should
   refetch on the way.
+- **Auto-cycling the TV/kiosk display across every enabled game.**
+  `DisplayScreen` (`apps/player/src/screens/DisplayScreen.tsx`) shows one game,
+  addressed by `/display/:slug` — issue #6's v1 scope, chosen over cycling to
+  ship the route, the admin's link/QR, and the `qr-core` byte-mode encoder in
+  one pass. A store with several enabled games still needs a person to pick
+  which one's board is on the screen. The pieces this would build on already
+  exist: `games.filter(g => g.enabled)` (already computed once, in
+  `DisplayLink.tsx`, for the admin's own game picker) and a route that does not
+  need to change shape — a bare `/display` with no slug reads naturally as
+  "cycle everything enabled".
 
 ## Platform / infrastructure
 

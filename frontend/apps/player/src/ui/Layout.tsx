@@ -17,16 +17,30 @@ import type { ReactNode } from "react";
  * dead gradient under an image that fades into that same colour. Passing null —
  * which is what an unset banner resolves to — restores it. The caller decides,
  * because only the caller knows whether the store actually has one.
+ *
+ * `wide` drops the phone-width cap for the one screen that isn't phone-shaped:
+ * the TV/kiosk display (see DisplayScreen). It keeps the same gradient and
+ * safe-area handling — a TV has no notch, but the extra padding at that scale
+ * reads as generous rather than wrong — rather than that screen rolling its
+ * own backdrop.
  */
-export function Screen({ banner, children }: { banner?: ReactNode; children: ReactNode }) {
+export function Screen({
+  banner,
+  wide = false,
+  children,
+}: {
+  banner?: ReactNode;
+  wide?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div className="min-h-full bg-gradient-to-b from-brand-4 to-brand-3">
-      <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <div className={`mx-auto flex min-h-dvh flex-col ${wide ? "max-w-none" : "max-w-md"}`}>
         {banner}
         <div
-          className={`flex flex-1 flex-col gap-6 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${
-            banner ? "pt-4" : "pt-[max(1.25rem,env(safe-area-inset-top))]"
-          }`}
+          className={`flex flex-1 flex-col gap-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] ${
+            wide ? "px-8 sm:px-16" : "px-5"
+          } ${banner ? "pt-4" : "pt-[max(1.25rem,env(safe-area-inset-top))]"}`}
         >
           {children}
         </div>

@@ -8,6 +8,7 @@
 //   /play/tap-fast                       → play a round
 //   /result/tap-fast/{scoreId}           → the finished round (permanent, shareable)
 //   /result/tap-fast/{scoreId}?reveal=1  → …the first time, with the score-reveal animation
+//   /display/tap-fast                    → ambient, no-interaction leaderboard for a TV/monitor
 //
 // Three pieces of state ride in the query string rather than in React state:
 //   ?name=   the display name, so it survives navigation and can be pre-filled
@@ -29,6 +30,7 @@ export type Route =
   | { name: "home" }
   | { name: "play"; slug: string }
   | { name: "result"; slug: string; scoreId: string }
+  | { name: "display"; slug: string }
   | { name: "notFound"; path: string };
 
 /** A route plus the query state that rides along with it. */

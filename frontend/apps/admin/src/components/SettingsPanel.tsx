@@ -8,6 +8,7 @@ import {
   type DurationSpec,
   type DurationValue,
 } from "@minigames/admin-core";
+import { DisplayLink } from "./DisplayLink";
 import { GameBenchmarks } from "./GameBenchmarks";
 import { StoreBranding } from "./StoreBranding";
 import {
@@ -79,6 +80,7 @@ export function SettingsPanel({
         <Stack gap="sm">
           <StoreBranding api={api} settings={settings} onSaved={onChanged} />
           <GameBenchmarks api={api} games={games} settings={settings} onSaved={onChanged} />
+          <DisplayLink games={games} />
           {settings.map((s) => (
             <SettingRow key={s.key} api={api} setting={s} onSaved={onChanged} onDeleted={onChanged} />
           ))}

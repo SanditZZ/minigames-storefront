@@ -18,6 +18,10 @@ interface Props {
    * emphasise and the row to pin were always the same row.
    */
   own?: { entry: ScoreEntry; rank: number } | null;
+  /** "lg" is the TV/kiosk display's full-bleed board — see DisplayScreen. */
+  size?: "sm" | "lg";
+  /** Overrides the panel's default phone-sized width, for the TV display. */
+  className?: string;
 }
 
 /**
@@ -26,14 +30,14 @@ interface Props {
  * so the same data can also feed the reveal meter without requesting it twice,
  * and `boardRows` (@minigames/player-core) decides what ends up on screen.
  */
-export function Leaderboard({ scores, unit, own = null }: Props) {
+export function Leaderboard({ scores, unit, own = null, size = "sm", className = "w-full max-w-sm" }: Props) {
   const t = useT();
   const rows = scores === null ? [] : boardRows(scores, own);
 
   return (
     // `unit` arrives already translated — it is the game's score unit, which
     // the backend serves in the requested language (see internal/i18n).
-    <Panel title={t("board.title")} className="w-full max-w-sm">
+    <Panel title={t("board.title")} className={className}>
       {scores === null ? (
         <EmptyNote>{t("board.loading")}</EmptyNote>
       ) : rows.length === 0 ? (
@@ -44,7 +48,7 @@ export function Leaderboard({ scores, unit, own = null }: Props) {
             row.kind === "gap" ? (
               // Keyed by position, and it is stable: there is at most one gap
               // and it is always the second-to-last row.
-              <ScoreGapRow key={`gap-${i}`} />
+              <ScoreGapRow key={`gap-${i}`} size={size} />
             ) : (
               <ScoreRow
                 key={row.entry.id}
@@ -53,6 +57,7 @@ export function Leaderboard({ scores, unit, own = null }: Props) {
                 value={row.entry.value}
                 unit={unit}
                 highlighted={row.entry.id === own?.entry.id}
+                size={size}
               />
             ),
           )}

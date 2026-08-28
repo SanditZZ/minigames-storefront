@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { Game, SubmitResult } from "@minigames/api-client";
 import { LocaleProvider, useApi, useT } from "./i18n";
 import { useRouter, type Router } from "./router";
+import { DisplayScreen } from "./screens/DisplayScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { PlayScreen } from "./screens/PlayScreen";
 import { ResultScreen } from "./screens/ResultScreen";
@@ -113,7 +114,7 @@ function PlayerApp({ router }: { router: Router }) {
     route.name === "home" && identity.bannerUrl ? <StoreBanner url={identity.bannerUrl} /> : null;
 
   return (
-    <Screen banner={banner}>
+    <Screen banner={banner} wide={route.name === "display"}>
       {route.name === "home" && (
         <HomeScreen
           games={games}
@@ -148,6 +149,10 @@ function PlayerApp({ router }: { router: Router }) {
           onPlayAgain={() => router.navigate({ name: "play", slug: route.slug })}
           onPickAnother={goHome}
         />
+      )}
+
+      {route.name === "display" && (
+        <DisplayScreen game={gameFor(route.slug)} loading={games === null && !loadError} />
       )}
 
       {route.name === "notFound" && (
